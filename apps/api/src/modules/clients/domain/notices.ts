@@ -15,6 +15,8 @@ const MONTH_NAMES = [
 export interface NoticesInput {
   today: string;
   subscription: SubscriptionDto | null;
+  // The renewal that follows `subscription`, if any: an already renewed plan gets no expiring notice.
+  upcomingSubscription?: SubscriptionDto | null;
   pendingCheckin: PendingCheckinDto | null;
   lastAnswered: { period: string; respondedAt: Date } | null;
   packs: PackDto[];
@@ -23,8 +25,11 @@ export interface NoticesInput {
 // `period` is 'YYYY-MM'.
 const monthName = (period: string): string => MONTH_NAMES[Number(period.slice(5, 7)) - 1] ?? period;
 
-function subscriptionNotice(subscription: SubscriptionDto | null): NoticeDto | null {
-  if (subscription?.status === 'expiring') {
+const isRenewed = (subscription: SubscriptionDto, upcoming: SubscriptionDto | null | undefined): boolean =>
+  upcoming !== null && upcoming !== undefined && upcoming.startsOn > subscription.endsOn;
+
+function subscriptionNotice(subscription: SubscriptionDto | null, upcoming: SubscriptionDto | null | undefined): NoticeDto | null {
+  if (subscription?.status === 'expiring' && !isRenewed(subscription, upcoming)) {
     const days = subscription.daysLeft;
     return {
       id: `plan_expiring:${subscription.id}`,
@@ -68,11 +73,17 @@ function answeredCheckinNotice(answered: NoticesInput['lastAnswered'], today: st
   };
 }
 
+export function packLowTitle(sessionsLeft: number): string {
+  if (sessionsLeft === 0) return 'No te quedan sesiones de Recovery';
+  if (sessionsLeft === 1) return 'Te queda 1 sesión de Recovery';
+  return `Te quedan ${sessionsLeft} sesiones de Recovery`;
+}
+
 function packNotice(pack: PackDto): NoticeDto {
   return {
     id: `pack_low:${pack.id}`,
     kind: 'pack_low',
-    title: `Te queda ${pack.sessionsLeft} sesión de Recovery`,
+    title: packLowTitle(pack.sessionsLeft),
     body: 'Renová tu paquete para seguir reservando.',
     actionUrl: RECOVERY_PLANS_URL,
   };
@@ -81,7 +92,7 @@ function packNotice(pack: PackDto): NoticeDto {
 // Order of the HTTP contract: plan, pending check-in, answered check-in, low packs.
 export function buildNotices(input: NoticesInput): NoticeDto[] {
   const notices = [
-    subscriptionNotice(input.subscription),
+    subscriptionNotice(input.subscription, input.upcomingSubscription),
     pendingCheckinNotice(input.pendingCheckin),
     answeredCheckinNotice(input.lastAnswered, input.today),
   ];

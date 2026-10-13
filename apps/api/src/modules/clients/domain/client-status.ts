@@ -7,7 +7,8 @@ export interface ClientStatusInput {
   today: string;
   settings: SettingsValues;
   paused: boolean;
-  performance: { current: SubscriptionModel | null; latest: SubscriptionModel | null };
+  // `upcomingAfterCurrent`: a renewal that starts after the current plan ends (as in R12), so the plan is not "expiring".
+  performance: { current: SubscriptionModel | null; latest: SubscriptionModel | null; upcomingAfterCurrent?: boolean };
   lastAttendanceOn: string | null;
 }
 
@@ -19,11 +20,11 @@ function paymentStatusOf({ current, latest }: ClientStatusInput['performance']):
 
 function statusOf(input: ClientStatusInput): ClientStatus {
   const { today, settings, paused, performance, lastAttendanceOn } = input;
-  const { current, latest } = performance;
+  const { current, latest, upcomingAfterCurrent = false } = performance;
   if (paused) return 'paused';
   if (latest === null) return 'no_plan';
   if (current === null) return 'expired';
-  if (diffDays(today, current.endsOn) <= settings.expiringSoonDays) return 'expiring';
+  if (!upcomingAfterCurrent && diffDays(today, current.endsOn) <= settings.expiringSoonDays) return 'expiring';
   if (diffDays(lastAttendanceOn ?? current.startsOn, today) >= settings.noAttendanceDays) return 'inactive';
   return 'active';
 }

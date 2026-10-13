@@ -8,12 +8,12 @@ import { BookingsService } from '../../bookings/services/bookings.service.js';
 import { SlotStatsService } from '../../bookings/services/slot-stats.service.js';
 import { ActivityMetricsService } from '../../bookings/services/activity-metrics.service.js';
 import type { ClientMetricsDto, UserMetrics } from '../../bookings/models/user-metrics.model.js';
+import { toPerformanceInput, type ClientAlertsInput } from '../../followup/domain/alert-rules.js';
 import { AlertsService } from '../../followup/services/alerts.service.js';
 import { ContactsService } from '../../followup/services/contacts.service.js';
 import { InactivityService } from '../../followup/services/inactivity.service.js';
 import type { InactivityReasonDto } from '../../followup/models/inactivity.model.js';
 import { SettingsService } from '../../settings/services/settings.service.js';
-import { performanceSummary, type PerformanceSummary } from '../../subscriptions/domain/vigencia.js';
 import type { SubscriptionModel } from '../../subscriptions/models/subscription.model.js';
 import { SubscriptionsService } from '../../subscriptions/services/subscriptions.service.js';
 import type { UserModel } from '../../users/models/user.model.js';
@@ -32,7 +32,7 @@ const HISTORY_LIMIT = 50;
 // Everything R11 needs about one client, loaded in batch.
 interface ClientContext {
   user: UserModel;
-  performance: PerformanceSummary;
+  performance: ClientAlertsInput['performance'];
   firstStartsOn: string | null;
   pause: InactivityReasonDto | null;
   metrics: UserMetrics;
@@ -200,7 +200,7 @@ export class ClientsService {
     const subsByUser = groupByUser(subs);
     return clients.map((user) => {
       const userSubs = subsByUser.get(user.id) ?? [];
-      const performance = performanceSummary(userSubs, today);
+      const performance = toPerformanceInput(userSubs, today);
       const userMetrics = metrics.get(user.id);
       if (!userMetrics) throw new AppError('INTERNAL_ERROR');
       const pause = pauses.get(user.id) ?? null;

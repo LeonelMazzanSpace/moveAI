@@ -141,7 +141,7 @@ describe('staff clients, KPIs and dashboard (e2e)', () => {
 
     it('computes every KPI of R11', async () => {
       const monthStart = `${businessMonth(today())}-01`;
-      const first =await signUp(ctx.app, { name: 'Nueva Este Mes' });
+      const first = await signUp(ctx.app, { name: 'Nueva Este Mes' });
       const renewed = await signUp(ctx.app, { name: 'Renovó Este Mes' });
       const stale = await signUp(ctx.app, { name: 'Inactiva' });
       const gone = await signUp(ctx.app, { name: 'Ya Se Fue' });
@@ -168,6 +168,43 @@ describe('staff clients, KPIs and dashboard (e2e)', () => {
         attendancesToday: 2, // present Performance + present Rehab; the absent mark is not counted
         slotsToday: 4, // three attended slots + one open Recovery slot; the cancelled one is not counted
       });
+    });
+  });
+
+  describe('soft-deleted clients and renewals in the KPIs', () => {
+    it('leaves the attendances of soft-deleted clients and staff out of attendancesToday', async () => {
+      const kept = await signUp(ctx.app, { name: 'Clienta Activa' });
+      const removed = await signUp(ctx.app, { name: 'Cliente Borrado' });
+      await attend(ctx.dataSource, kept.userId, staff.userId, today());
+      await attend(ctx.dataSource, removed.userId, staff.userId, today());
+      await attend(ctx.dataSource, staff.userId, staff.userId, today());
+
+      const before = await staff.agent.get('/api/staff/clients/kpis').expect(200);
+      expect(before.body.attendancesToday).toBe(2);
+
+      await ctx.dataSource.query(`UPDATE users SET deleted_at = now() WHERE id = $1`, [removed.userId]);
+
+      const after = await staff.agent.get('/api/staff/clients/kpis').expect(200);
+      expect(after.body).toEqual({ ...before.body, attendancesToday: 1 });
+      const dashboard = await staff.agent.get('/api/staff/dashboard').expect(200);
+      expect(dashboard.body.kpis).toEqual(after.body);
+    });
+
+    it('does not count as expiring a client whose plan is already renewed (D49)', async () => {
+      const renewed = await signUp(ctx.app, { name: 'Renovó Ya' });
+      const ending = await signUp(ctx.app, { name: 'Vence Sin Renovar' });
+      await givePerformancePlan(ctx.dataSource, renewed.userId, { startsOn: addDays(today(), -27), endsOn: addDays(today(), 3) });
+      await givePerformancePlan(ctx.dataSource, renewed.userId, { startsOn: addDays(today(), 4), endsOn: addDays(today(), 34) });
+      await givePerformancePlan(ctx.dataSource, ending.userId, { startsOn: addDays(today(), -27), endsOn: addDays(today(), 3) });
+      await attend(ctx.dataSource, renewed.userId, staff.userId, addDays(today(), -1));
+      await attend(ctx.dataSource, ending.userId, staff.userId, addDays(today(), -1));
+
+      const expiring = await staff.agent.get('/api/staff/clients?status=expiring').expect(200);
+      expect(expiring.body.items.map((row: { name: string }) => row.name)).toEqual(['Vence Sin Renovar']);
+      const active = await staff.agent.get('/api/staff/clients?status=active').expect(200);
+      expect(active.body.items).toEqual([expect.objectContaining({ name: 'Renovó Ya', status: 'active', paymentStatus: 'up_to_date' })]);
+      const kpis = await staff.agent.get('/api/staff/clients/kpis').expect(200);
+      expect(kpis.body).toMatchObject({ active: 2, expiringSoon: 1 });
     });
   });
 

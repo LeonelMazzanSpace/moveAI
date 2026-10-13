@@ -36,6 +36,17 @@ describe('deriveClientStatus', () => {
     expect(deriveClientStatus({ ...base, lastAttendanceOn: null, performance: { current: stale, latest: stale } }).status).toBe('inactive');
   });
 
+  it('does not flag as expiring a plan that already has a later renewal (D49)', () => {
+    const ending = sub('2026-09-14', '2026-10-14');
+    const renewal = sub('2026-10-15', '2026-11-14');
+    const input = { ...base, performance: { current: ending, latest: renewal, upcomingAfterCurrent: true } };
+    expect(deriveClientStatus(input)).toEqual({ status: 'active', paymentStatus: 'up_to_date' });
+    expect(deriveClientStatus({ ...input, lastAttendanceOn: '2026-09-28' }).status).toBe('inactive');
+    expect(deriveClientStatus({ ...input, paused: true }).status).toBe('paused');
+    expect(deriveClientStatus({ ...base, performance: { current: ending, latest: ending, upcomingAfterCurrent: false } }).status)
+      .toBe('expiring');
+  });
+
   it('uses the configured thresholds on their exact boundary', () => {
     const current = sub('2026-09-01', '2026-10-19');
     expect(deriveClientStatus({ ...base, performance: { current, latest: current } }).status).toBe('expiring');

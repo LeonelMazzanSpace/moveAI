@@ -1,5 +1,5 @@
 import type { PackDto, SubscriptionDto } from '../../subscriptions/models/subscription.model.js';
-import { buildNotices } from './notices.js';
+import { buildNotices, packLowTitle } from './notices.js';
 
 const subscription = (overrides: Partial<SubscriptionDto>): SubscriptionDto => ({
   id: 'sub-1', planId: 'p', planName: 'Plan Mensual', service: 'performance', startsOn: '2026-09-15', endsOn: '2026-10-18',
@@ -58,8 +58,22 @@ describe('buildNotices', () => {
     const notices = buildNotices({ ...base, packs: [pack('k1', 1), pack('k2', 3), pack('k3', 0)] });
     expect(notices).toEqual([
       expect.objectContaining({ id: 'pack_low:k1', kind: 'pack_low', title: 'Te queda 1 sesión de Recovery', actionUrl: '/planes?service=recovery' }),
-      expect.objectContaining({ id: 'pack_low:k3', title: 'Te queda 0 sesión de Recovery' }),
+      expect.objectContaining({ id: 'pack_low:k3', title: 'No te quedan sesiones de Recovery' }),
     ]);
+  });
+
+  it('words the pack title for one, several and no sessions left', () => {
+    expect(packLowTitle(1)).toBe('Te queda 1 sesión de Recovery');
+    expect(packLowTitle(2)).toBe('Te quedan 2 sesiones de Recovery');
+    expect(packLowTitle(5)).toBe('Te quedan 5 sesiones de Recovery');
+    expect(packLowTitle(0)).toBe('No te quedan sesiones de Recovery');
+  });
+
+  it('drops the expiring notice when the plan is already renewed (D49)', () => {
+    const renewal = subscription({ id: 'sub-2', status: 'scheduled', startsOn: '2026-10-19', endsOn: '2026-11-18' });
+    expect(buildNotices({ ...base, subscription: subscription({}), upcomingSubscription: renewal })).toEqual([]);
+    const [notice] = buildNotices({ ...base, subscription: subscription({}), upcomingSubscription: null });
+    expect(notice.kind).toBe('plan_expiring');
   });
 
   it('keeps the order of the contract', () => {

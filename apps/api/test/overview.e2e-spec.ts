@@ -134,6 +134,24 @@ describe('client overview: activity, stats and notices (e2e)', () => {
       }]);
     });
 
+    it('drops the expiring notice once the client renewed (D49)', async () => {
+      const client = await signUpClient(ctx.app);
+      await givePerformancePlan(ctx.dataSource, client.userId, { startsOn: addDays(today(), -27), endsOn: addDays(today(), 3) });
+      expect((await client.agent.get('/api/me/notices').expect(200)).body).toHaveLength(1);
+      const planId = await planIdBySlug(ctx.dataSource, 'performance-mensual');
+      await staff.agent.post('/api/staff/payments/manual').send({ userId: client.userId, planId, method: 'cash', amount: 3900 }).expect(201);
+      const subs = await client.agent.get('/api/me/subscriptions').expect(200);
+      expect(subs.body.upcomingPerformance).not.toBeNull();
+      expect((await client.agent.get('/api/me/notices').expect(200)).body).toEqual([]);
+    });
+
+    it('words the low pack notice for the exhausted case', async () => {
+      const client = await signUpClient(ctx.app);
+      await givePack(ctx.dataSource, client.userId, { startsOn: addDays(today(), -5), endsOn: addDays(today(), 25), total: 4, used: 4 });
+      const res = await client.agent.get('/api/me/notices').expect(200);
+      expect(res.body).toEqual([expect.objectContaining({ kind: 'pack_low', title: 'No te quedan sesiones de Recovery' })]);
+    });
+
     it('flags an expired plan', async () => {
       const client = await signUpClient(ctx.app);
       await givePerformancePlan(ctx.dataSource, client.userId, { startsOn: addDays(today(), -40), endsOn: addDays(today(), -5) });

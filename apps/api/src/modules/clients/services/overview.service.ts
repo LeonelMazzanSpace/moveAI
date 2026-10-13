@@ -46,6 +46,13 @@ export class OverviewService {
       this.checkins.pendingFor(userId),
       this.checkins.lastAnsweredFor(userId),
     ]);
-    return buildNotices({ today, subscription: mine.performance, pendingCheckin, lastAnswered, packs: mine.recoveryPacks });
+    return buildNotices({
+      today,
+      subscription: mine.performance,
+      upcomingSubscription: mine.upcomingPerformance,
+      pendingCheckin,
+      lastAnswered,
+      packs: mine.recoveryPacks,
+    });
   }
 }

@@ -86,7 +86,9 @@ export class AttendanceService {
       `SELECT count(*)::int AS count FROM attendances a
        JOIN bookings b ON b.id = a.booking_id
        JOIN time_slots s ON s.id = b.time_slot_id
-       WHERE a.status = 'present' AND b.status = 'confirmed' AND b.deleted_at IS NULL AND s.starts_at BETWEEN $1 AND $2`,
+       JOIN users u ON u.id = b.user_id
+       WHERE a.status = 'present' AND b.status = 'confirmed' AND b.deleted_at IS NULL AND s.starts_at BETWEEN $1 AND $2
+         AND u.deleted_at IS NULL AND u.role = 'client'`,
       [businessDayStart(date), businessDayEnd(date)],
     );
     return count;
