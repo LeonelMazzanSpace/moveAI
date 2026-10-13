@@ -463,7 +463,7 @@ Si tenés un plan de Performance vigente y no estás en pausa, una vez por mes r
 
 Ingresá desde **Ingresar** con tu usuario de staff: la plataforma te lleva al panel. La barra lateral tiene **Dashboard**, **Clientes**, **Turnos y asistencia**, **Pagos**, **Seguimiento** (con un número de alertas abiertas y el subitem **Check-in**) y **Configuración**. En el celular la barra lateral se reemplaza por un botón de menú (☰) arriba a la izquierda, con las mismas secciones. Los servicios se llaman igual en todo el panel: **Performance**, **Fisioterapia** (Rehab) y **Recovery**. Los usuarios de staff los crea el equipo técnico (ver [Primer staff de producción](#primer-staff-de-producción)); los clientes no pueden entrar al panel.
 
-Las acciones que **cancelan o eliminan** algo (**Cancelar** una reserva, **Cancelar turno**, **Eliminar** un plan) se ven siempre igual: un solo botón rojo, en mayúsculas, que se confirma en un diálogo antes de hacer nada.
+El botón de confirmación de las acciones que **cancelan o eliminan** algo en el panel (**Cancelar reserva**, **Cancelar turno**, **Eliminar** un plan) es siempre el mismo: rojo y en mayúsculas, dentro de un diálogo que pide confirmar antes de hacer nada. **Eliminar** también aparece en rojo en la tabla de planes. En **Turnos y asistencia**, el **Cancelar** de cada alumno es un botón gris que se pone rojo al pasar el mouse, y **Cancelar turno** está en el menú **⋯** del turno; los dos abren ese diálogo de confirmación.
 
 ### Dashboard
 
@@ -728,7 +728,7 @@ Requisitos: Node 24 (`nvm use` lee `.nvmrc`), pnpm 10 (`corepack enable`) y Dock
 
    Más detalle en [`docs/development.md`](../development.md).
 
-   **Pruebas end to end de la web (con navegador).** Además de lo anterior, la web tiene una suite de Playwright que recorre las pantallas en escritorio y en celular. Corre con `pnpm e2e:reset && pnpm test:e2e:web` sobre una base propia (`move_e2e`) y puertos propios (API 3150, web 3250); las contraseñas del staff y de los clientes de prueba se pasan por las variables `E2E_STAFF_PASSWORD` y `E2E_CLIENT_PASSWORD`, nunca en un archivo. Los pasos completos están en [Pruebas end to end](../development.md#pruebas-end-to-end) de `docs/development.md`.
+   **Pruebas end to end de la web (con navegador).** Además de lo anterior, la web tiene una suite de Playwright que recorre las pantallas en escritorio y en celular. Corre con `pnpm e2e:reset && pnpm test:e2e:web` sobre una base propia (`move_e2e`) y puertos propios (API 3150, web 3250); las contraseñas del staff y de los clientes de prueba se pasan por las variables `E2E_STAFF_PASSWORD` y `E2E_CLIENT_PASSWORD`, nunca en un archivo. El navegador se instala una sola vez con `pnpm exec playwright install chromium`, y la suite no corre en el pipeline de Bitbucket. Los pasos completos están en [Pruebas end to end](../development.md#pruebas-end-to-end) de `docs/development.md`.
 
 ### Producción, en orden
 
@@ -1131,6 +1131,7 @@ node scripts/manual/render-diagram.mjs    # solo si cambió docs/manual/arquitec
 pnpm manual:pdf             # genera docs/manual/manual-de-usuario.pdf (A4, imágenes embebidas)
 ```
 
+- **Exportá siempre `API_URL` y `WEB_URL`** con los puertos de tu API y tu web: si no están definidas, los scripts usan 3001 y 3000, así que asegurate de que ahí no corra otra aplicación con datos reales. Los dos scripts rechazan una URL que no sea local (localhost, 127.0.0.1 o ::1) y `manual:screenshots` imprime su destino (`Destino: API …; web …`) antes de empezar.
 - Para cambiar solo el texto o el diagrama no hace falta la base ni la API: alcanza con editar el Markdown (o `arquitectura.html` y correr `render-diagram.mjs`) y correr `pnpm manual:pdf`.
 - `manual:demo-data` hace estas comprobaciones **antes de escribir** nada: `API_URL` y `DB_HOST` (si está definido) son locales, Docker y la base responden (`SELECT 1`), y la base no tiene ya datos de demostración. Imprime la base destino (`Base destino: …`) y, si algo no se cumple, termina con un mensaje claro. La historia (asistencias pasadas y planes que vencen o vencieron) no se puede crear por la API porque no admite reservar ni marcar asistencia en el pasado: esos datos se insertan con SQL en la base de desarrollo mediante `docker exec <contenedor> psql` (contenedor `move-postgres`, o `MANUAL_DB_CONTAINER`), solo para los clientes de demostración.
 - `manual:screenshots` captura primero en un directorio temporal y **reemplaza las imágenes de `docs/manual/img/` solo si salieron todas las capturas esperadas (38)**: arma una carpeta nueva al lado y la renombra en el lugar de la actual, así que si algo falla las imágenes actuales quedan intactas y nunca queda un juego a medias. No toca `arquitectura.png`. Al agregar o quitar una pantalla hay que actualizar `EXPECTED_IMAGE_COUNT` en `scripts/manual/capture.mjs`.
