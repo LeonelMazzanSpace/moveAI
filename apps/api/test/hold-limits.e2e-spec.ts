@@ -121,6 +121,8 @@ describe('payment holds and checkout throttling (e2e)', () => {
       } finally {
         await gate.commitTransaction();
         await gate.release();
+        // On the error path the requests are still in flight: let them end before the app closes.
+        await pending?.then(() => undefined, () => undefined);
       }
       const results = await pending;
       expect(results.map((r) => r.status).sort((x, y) => x - y)).toEqual([201, 409]);

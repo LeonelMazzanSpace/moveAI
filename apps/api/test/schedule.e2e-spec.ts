@@ -427,6 +427,21 @@ describe('schedule (e2e)', () => {
       expect(await job.execute({ force: true })).toEqual({ ran: true, result: { created: 0 } });
     });
 
+    it('covers today through today + bookingWindowDays - 1 when staff run it manually', async () => {
+      const { agent } = await signUpStaff(ctx.app, ctx.dataSource);
+      await everyWeekday(agent);
+      await ctx.dataSource.query(`DELETE FROM time_slots`);
+      const windowDays = await ctx.app.get(SettingsService).get('bookingWindowDays');
+      const lastDay = addDays(businessToday(), windowDays - 1);
+
+      const run = await ctx.app.get(GenerateSlotsJob).executeManually();
+      expect(run.ran).toBe(true);
+      const dates = await slotDates();
+      expect(dates).toContain(lastDay);
+      expect(dates).not.toContain(addDays(lastDay, 1));
+      expect(run.result.created).toBe(dates.length);
+    });
+
     it('takes an explicit number of days over the default', async () => {
       const { agent } = await signUpStaff(ctx.app, ctx.dataSource);
       await everyWeekday(agent);
@@ -476,6 +491,23 @@ describe('schedule (e2e)', () => {
       await agent.patch(`/api/staff/professionals/${pro}`).send({ active: true }).expect(200);
       const again = await agent.post('/api/staff/schedule/generate').send({ days: 60 }).expect(201);
       expect(again.body.created).toBeGreaterThan(0);
+    });
+  });
+
+  describe('soft-deleted professionals', () => {
+    it('generates no slots for a template whose professional was deleted', async () => {
+      const { agent } = await signUpStaff(ctx.app, ctx.dataSource);
+      const pro = await createProfessional(agent);
+      await agent.post('/api/staff/schedule/templates').send({
+        service: 'rehab', weekday: isoWeekday(tomorrow()), startTime: '10:00', durationMinutes: 60, capacity: 1, professionalId: pro,
+      }).expect(201);
+      expect(await countSlots()).toBeGreaterThan(0);
+      await ctx.dataSource.query(`DELETE FROM time_slots`);
+      await ctx.dataSource.query(`UPDATE professionals SET deleted_at = now() WHERE id = $1`, [pro]);
+
+      await agent.post('/api/staff/schedule/generate').send({ days: 60 }).expect(201).expect((r) => expect(r.body).toEqual({ created: 0 }));
+      expect(await ctx.app.get(GenerateSlotsJob).executeManually(60)).toEqual({ ran: true, result: { created: 0 } });
+      expect(await countSlots()).toBe(0);
     });
   });
 

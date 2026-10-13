@@ -4,9 +4,8 @@ import { isUUID } from 'class-validator';
 import { QueryFailedError, Repository, type FindOptionsWhere } from 'typeorm';
 import { AppError } from '../../../common/errors/app-error.js';
 import type { CreatePlanDto } from '../dto/create-plan.dto.js';
-import { PLAN_LIMITS } from '../dto/create-plan.dto.js';
 import type { UpdatePlanDto } from '../dto/update-plan.dto.js';
-import { SLUG_PATTERN, validatePlanShape } from '../domain/plan-rules.js';
+import { isPlanSlug, validatePlanShape } from '../domain/plan-rules.js';
 import { Plan, type Service } from '../entities/plan.entity.js';
 import { toPlanDto, type PlanModel } from '../models/plan.model.js';
 
@@ -17,7 +16,7 @@ function definedFields<T extends object>(fields: T): Partial<T> {
   return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)) as Partial<T>;
 }
 
-// The only unique column besides the primary key is `slug`.
+// The only unique rule besides the primary key is the slug of plans that are not deleted.
 function rethrowSlugTaken(error: unknown): never {
   const code = error instanceof QueryFailedError ? (error.driverError as { code?: string }).code : undefined;
   if (code === UNIQUE_VIOLATION) throw new AppError('SLUG_TAKEN');
@@ -46,7 +45,7 @@ export class CatalogService {
 
   async findActiveBySlug(slug: string): Promise<PlanModel> {
     // Rejects NUL bytes and oversized values before they reach Postgres.
-    if (slug.length > PLAN_LIMITS.slugMax || !SLUG_PATTERN.test(slug)) throw new AppError('PLAN_NOT_FOUND');
+    if (!isPlanSlug(slug)) throw new AppError('PLAN_NOT_FOUND');
     const plan = await this.plans.findOneBy({ slug, active: true });
     if (!plan) throw new AppError('PLAN_NOT_FOUND');
     return toPlanDto(plan);

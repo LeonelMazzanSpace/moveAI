@@ -3,6 +3,23 @@ import type { PlanKind, Service } from '../entities/plan.entity.js';
 
 export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
+// Ranges shared with the web settings form (D38).
+export const PLAN_LIMITS = {
+  name: { min: 2, max: 80 },
+  slugMax: 80,
+  descriptionMax: 500,
+  featuresMax: 10,
+  featureMax: 120,
+  price: { min: 0, max: 10_000_000 },
+  periodMonths: { min: 1, max: 36 },
+  periodDays: { min: 1, max: 365 },
+  sessionsIncluded: { min: 1, max: 100 },
+  durationMinutes: { min: 15, max: 240 },
+  sortOrder: { min: 0, max: 999 },
+} as const;
+
+export const isPlanSlug = (slug: string): boolean => slug.length <= PLAN_LIMITS.slugMax && SLUG_PATTERN.test(slug);
+
 export type PlanShapeInput = {
   service: Service;
   kind: PlanKind;
