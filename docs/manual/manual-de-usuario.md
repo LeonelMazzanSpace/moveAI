@@ -2,13 +2,179 @@
 
 Plataforma de **Performance, Rehab y Recovery** de MOVE (Uruguay): registro, planes, pagos, reservas, asistencia, seguimiento y renovación en un solo lugar.
 
-Este manual tiene tres partes y una captura de cada pantalla:
+Este manual es la guía única para clientes, staff de MOVE y equipo técnico. Tiene una captura de cada pantalla y se ordena así:
 
-1. [Parte 1: Clientes](#parte-1-clientes): cómo usar el sitio, contratar un plan y reservar.
-2. [Parte 2: Staff de MOVE](#parte-2-staff-de-move): el panel de gestión (clientes, turnos, pagos, seguimiento y configuración).
-3. [Parte 3: Equipo técnico](#parte-3-equipo-técnico): cómo correr todo en una computadora, qué está simulado hoy y qué falta para publicarlo.
+1. [Estado actual frente a MOVE.pdf](#estado-actual-frente-a-movepdf): qué está hecho, qué está simulado en local y qué falta, sección por sección del documento de alcance.
+2. [Parte 1: Clientes](#parte-1-clientes): cómo usar el sitio, contratar un plan y reservar.
+3. [Parte 2: Staff de MOVE](#parte-2-staff-de-move): el panel de gestión (clientes, turnos, pagos, seguimiento y configuración).
+4. [Parte 3: Cómo levantar todo](#parte-3-cómo-levantar-todo): el sistema completo en una computadora, paso a paso, y el orden para publicarlo en producción.
+5. [Parte 4: Proveedores, uno por uno](#parte-4-proveedores-uno-por-uno): qué falta configurar en Neon, AWS, Vercel, el dominio, Mercado Pago, Google, Brevo y Bitbucket, con los links a la documentación oficial.
+6. [Parte 5: Puesta en marcha y mantenimiento](#parte-5-puesta-en-marcha-y-mantenimiento): primer usuario de staff, checklist posterior al deploy, rollback y cómo regenerar este manual.
 
-> **Sobre los datos de las capturas.** Todas las imágenes salen de una base de demostración con personas, emails y teléfonos **inventados** (emails `@example.com`), cargada el 13/10/2026. Los planes, precios, horarios y umbrales que se ven son **provisorios** hasta que MOVE los confirme (ver [Reglas y valores provisorios](#reglas-y-valores-provisorios)). Hoy no hay una versión publicada: todo corre localmente (ver la Parte 3).
+> **Sobre los datos de las capturas.** Todas las imágenes salen de una base de demostración con personas, emails y teléfonos **inventados** (emails `@example.com`), cargada el 13/10/2026. Los planes, precios, horarios y umbrales que se ven son **provisorios** hasta que MOVE los confirme (ver [Reglas y valores provisorios](#reglas-y-valores-provisorios)). Hoy no hay una versión publicada: todo corre localmente (ver la [Parte 3](#parte-3-cómo-levantar-todo)).
+
+## Estado actual frente a MOVE.pdf
+
+`MOVE.pdf` es el documento de alcance del MVP. Las tablas siguen sus secciones, en el mismo orden. Estados:
+
+- **Hecho**: implementado y probado en local (tests automáticos y la pantalla indicada).
+- **Simulado en local**: el código está completo, pero hoy funciona contra un reemplazo de desarrollo porque faltan las credenciales del proveedor.
+- **Pendiente**: no se hizo en este proyecto; los pasos están en este manual.
+
+**Resumen.** Toda la funcionalidad de clientes y staff está hecha y corre en local. Nada está publicado: no hay ambientes de desarrollo ni de producción en la nube, y Mercado Pago, Brevo y Google no tienen credenciales cargadas. Lo que falta para salir a producción es configuración de proveedores y deploy ([Parte 3](#producción-en-orden) y [Parte 4](#parte-4-proveedores-uno-por-uno)), más la confirmación de los valores provisorios por parte de MOVE.
+
+### Perfiles de usuario y sitio público
+
+| Requisito | Estado | Evidencia |
+|---|---|---|
+| Perfiles Visitante, Cliente/Alumno y Staff MOVE | Hecho | Roles `client` y `staff`; el visitante navega sin cuenta. La API responde 401 sin sesión y 403 a un cliente en `/api/staff/*`; la web redirige según el rol |
+| Inicio, Performance, Rehab, Recovery y Planes | Hecho | Capturas 01–09 |
+| Acceso al perfil, registro e inicio de sesión | Hecho | Capturas 12, 13 y 17 |
+| Contratar o reservar sin ser cliente, creando el usuario en el proceso | Hecho | Rehab y sesión individual de Recovery admiten invitados (capturas 05 y 07). Contratar un plan o paquete pide ingresar primero |
+
+### Performance, reservas y asistencia
+
+| Requisito | Estado | Evidencia |
+|---|---|---|
+| Planes con reserva previa, sin límite semanal | Hecho | Captura 02; un plan vigente permite reservar cualquier turno con cupo |
+| Capacidad máxima por horario | Hecho | Captura 03 (`5 / 14 cupos`); dos clientes por el último cupo: se confirma uno solo (`SLOT_FULL` al otro) |
+| Consultar plan y vencimiento, renovar, ver horarios, reservar, cancelar, próximas reservas e historial | Hecho | Capturas 17, 18 y 22–24; cancelar hasta 2 h antes (configurable) |
+| Plan vencido bloquea nuevas reservas y lleva a renovar | Hecho | Error `PLAN_REQUIRED` y aviso "Tu plan venció" con link a Planes |
+| Reserva vs. asistencia efectiva: presente, ausente y no show | Hecho | Captura 29; última asistencia, frecuencia, cancelaciones y no shows en el detalle del cliente (captura 28) |
+
+### Rehab
+
+| Requisito | Estado | Evidencia |
+|---|---|---|
+| Evaluación → fecha y horario → pago → reserva confirmada → confirmación al cliente | Hecho (pago simulado en local) | Capturas 04, 05, 23 y 24; email `booking-confirmed` (en dry-run en local) |
+| Abierta a alumnos y externos; se vincula al perfil o crea un usuario | Hecho | Checkout de invitado; si el email ya tiene cuenta pide ingresar (`LOGIN_REQUIRED`) |
+| Tratamientos posteriores no se venden online | Hecho | Solo la evaluación tiene precio en la web |
+| Seguimiento fisioterapéutico definido individualmente | Hecho | El staff lo habilita por cliente (captura 28); el cliente reserva desde su perfil (capturas 19 y 20), sin cobro online |
+
+### Recovery
+
+| Requisito | Estado | Evidencia |
+|---|---|---|
+| Abierto a clientes y público general; sesiones individuales y paquetes mensuales | Hecho | Capturas 06, 07 y 09; paquetes de 4 y 8 sesiones válidos 30 días |
+| Selección de sesión o plan → reserva → pago → confirmación | Hecho (pago simulado en local) | Capturas 07, 22–24 |
+| La operación queda asociada al perfil o crea un usuario | Hecho | Igual que Rehab |
+
+### Perfil del cliente
+
+| Requisito | Estado | Evidencia |
+|---|---|---|
+| Plan activo y vencimiento; comprar o renovar | Hecho | Captura 17; renovar antes de vencer extiende desde el vencimiento |
+| Reservar Performance, Recovery y Fisioterapia; próximas reservas | Hecho | Capturas 11, 17, 19 y 20 |
+| Historial de actividad | Hecho | Captura 18 |
+| Avisos y comunicaciones de seguimiento | Hecho | Bloque Avisos y campana (captura 17); check-in mensual (captura 21) |
+
+### Panel de gestión MOVE
+
+| Requisito | Estado | Evidencia |
+|---|---|---|
+| Estado, plan, inicio y vencimiento, pagos y renovaciones, última asistencia, frecuencia, reservas y cancelaciones, uso de Rehab y Recovery, historial de contactos | Hecho | Capturas 26 y 28 |
+| Personas registradas en cada turno y marcado ágil de asistencia | Hecho | Captura 29 |
+| Pagos (agregado en el proyecto) | Hecho | Capturas 30 y 31: operaciones de Mercado Pago y pagos manuales en efectivo o transferencia |
+| Configuración de planes, horarios, profesionales y reglas (agregado) | Hecho | Capturas 35–38 |
+
+### Seguimiento y retención
+
+| Requisito | Estado | Evidencia |
+|---|---|---|
+| Plan por vencer, vencido sin renovar, una semana sin asistir, inactividad prolongada, baja de frecuencia, re-contacto en fecha | Hecho | Captura 32; detección diaria (07:00) y botón **Ejecutar detección ahora**; umbrales provisorios en Configuración |
+| Motivos de inactividad (lesión, vacaciones, pausa temporal, falta de tiempo, mudanza, volver más adelante) | Hecho | Captura 28; el cliente en pausa no recibe alertas ni emails automáticos salvo el re-contacto |
+| Registro de contactos | Hecho | Captura 33 |
+
+### Check-in de clientes
+
+| Requisito | Estado | Evidencia |
+|---|---|---|
+| Consultas breves a alumnos activos (evolución, molestias, objetivos) | Hecho (emails en dry-run en local) | Capturas 21 y 34; envío mensual el primer lunes 10:00 y manual con **Enviar check-in** |
+| Alerta cuando una respuesta requiere intervención | Hecho | Alertas "Molestia reportada" y "Cambio de objetivos"; **Derivar a Rehab** |
+
+### Infraestructura
+
+| Requisito | Estado | Evidencia |
+|---|---|---|
+| Web Next.js en Vercel | Pendiente | El código está listo (`apps/web`); pasos en [Vercel](#vercel-web) |
+| API NestJS en AWS Elastic Beanstalk | Pendiente | Paquete con `bash scripts/package-api-eb.sh`; pasos en [AWS](#aws-elastic-beanstalk-api). La cuenta de AWS está por confirmar |
+| PostgreSQL en Neon, base nueva | Pendiente (hoy Postgres 17 en Docker) | Esquema completo por migraciones; pasos en [Neon](#neon-base-de-datos) |
+| Usuarios, roles, servicios, planes, compras, pagos, suscripciones, horarios, cupos, reservas, asistencias, historiales, seguimientos, motivos de inactividad y configuración de automatizaciones en la base | Hecho | Migraciones en `apps/api/src/database/migrations` |
+
+### Autenticación
+
+| Requisito | Estado | Evidencia |
+|---|---|---|
+| Better Auth sobre PostgreSQL, sin proveedor de identidad pago | Hecho | Montado en la API en `/api/auth/*` |
+| Registro por email, inicio de sesión, recuperación de acceso | Hecho (el email de recuperación sale en dry-run en local) | Capturas 12–15 |
+| Inicio de sesión con Google | Pendiente de credenciales | El código está; el botón queda oculto hasta configurar Google ([Google OAuth](#google-oauth-inicio-de-sesión-con-google)) |
+| Roles de cliente y staff; protección de rutas y operaciones | Hecho | Guard global en la API y guards en los layouts de la web |
+
+### Sistema de reservas y calendario
+
+| Requisito | Estado | Evidencia |
+|---|---|---|
+| Calendario propio sobre PostgreSQL, sin plataforma externa | Hecho | Tabla única de turnos para los tres servicios |
+| Componentes de calendario (FullCalendar, React Big Calendar o equivalente) | Hecho con equivalente propio | Grillas de días y horarios como en los mockups (capturas 03, 05, 07, 29) |
+| Performance: horarios recurrentes, cupo, plan vigente, cancelación con límite configurable, presente/ausente/no show | Hecho | Capturas 03, 29, 36 y 38 |
+| Rehab: disponibilidad por profesional, fecha y horario, bloqueo automático del horario, asociación al cliente | Hecho | El turno queda retenido 15 minutos mientras se paga (configurable) |
+| Recovery: horarios, control de disponibilidad, reserva individual o con paquete | Hecho | Captura 07 |
+| Disponibilidad administrada desde el panel | Hecho | Capturas 36 y 37 (horarios, turnos puntuales y profesionales) |
+
+### Pagos (Mercado Pago)
+
+| Requisito | Estado | Evidencia |
+|---|---|---|
+| Crear la operación, asociarla al usuario, plan o reserva, recibir y validar la confirmación, registrar el estado, activar planes, confirmar reservas, registrar renovaciones | Simulado en local | Simulador de pagos (captura 23). El código real usa Checkout Pro, webhook firmado e idempotente y conciliación cada 10 minutos |
+| Revisar la integración existente y validar credenciales y entornos de prueba | Pendiente | [Mercado Pago](#mercado-pago-pagos) |
+
+### Automatizaciones y seguimiento
+
+| Requisito | Estado | Evidencia |
+|---|---|---|
+| Tareas programadas con `@nestjs/schedule` dentro de la API | Hecho | Seis jobs: vencimiento de reservas retenidas (cada minuto), conciliación de pagos (cada 10 minutos), generación de turnos (03:00), detección de seguimiento (07:00), recordatorios de vencimiento (09:00) y check-ins mensuales (10:00, primer lunes); horas de Montevideo |
+| Reglas y fechas en PostgreSQL; sin infraestructura extra | Hecho | Umbrales en Configuración (captura 38); un lock de Postgres evita que un job corra dos veces a la vez |
+
+### Comunicaciones (Brevo)
+
+| Requisito | Estado | Evidencia |
+|---|---|---|
+| Confirmación de reservas, de pagos, avisos de vencimiento, recuperación de acceso, check-ins | Simulado en local | Nueve plantillas (ver [qué emails manda el sistema](#qué-emails-manda-el-sistema)); sin `BREVO_API_KEY` se registran en `email_logs` con estado `skipped` y no se envían |
+| Seguimientos automáticos | Hecho en parte | Los clientes reciben el check-in mensual y los avisos de vencimiento. Las alertas de inactividad y baja de frecuencia **no** mandan email al cliente: llegan al staff, que contacta a la persona |
+| Integración directa desde NestJS | Hecho | API REST de Brevo con `fetch`, sin SDK |
+
+### CI/CD y ambientes
+
+| Requisito | Estado | Evidencia |
+|---|---|---|
+| Ambientes separados de desarrollo y producción | Pendiente | Diseño en [Ambientes separados](#ambientes-separados-de-desarrollo-y-producción) |
+| Vercel con previews y producción desde el repositorio | Pendiente | [Vercel](#vercel-web) |
+| Elastic Beanstalk con configuración y variables separadas del código | Pendiente | Las variables se validan al arrancar; ninguna va en el repositorio |
+| Validación automática en cada cambio | Pendiente (configurado, nunca ejecutado) | `bitbucket-pipelines.yml` define lint, tests, e2e de la API y build (sin deploy), y esos mismos pasos pasan en local. Pero el repositorio no está conectado a Bitbucket y, con D67, el código se publica en GitHub, donde ese archivo no corre (ver [Dónde vive el repositorio](#dónde-vive-el-repositorio)). La primera corrida real puede pedir ajustes: el paso usa `size: 2x`, que cuenta el doble de minutos de build |
+
+### Fuera del MVP y cambios de alcance
+
+- **Fuera del MVP, como dice `MOVE.pdf`:** gestión de planificaciones de entrenamiento e Inteligencia Artificial (análisis de comportamiento, riesgo de abandono, planificaciones).
+- **Sin demos semanales en Loom (decisión D50):** el documento pide un Loom al cierre de cada semana; se decidió no hacerlos. Este manual, con sus capturas, cumple el rol de demostración.
+- **Sin CI ejecutado:** el pipeline existe pero nunca corrió en Bitbucket (ver la tabla de CI/CD).
+- **Sin deploy en este proyecto (D51):** el plan de 4 semanas suponía accesos a Vercel, Neon, Brevo, Mercado Pago, Google y AWS desde el inicio. No hubo accesos, así que todo se desarrolló contra reemplazos locales y el deploy quedó documentado (partes 3 y 4).
+- **Sin penalidades** por ausencia o no show en el MVP: los tres estados se registran, pero no tienen consecuencias.
+- **El staff no reserva en nombre de clientes:** sí cancela reservas y marca asistencia.
+- **Valores provisorios:** planes, precios, horarios y umbrales son los del mockup hasta que MOVE los confirme (Configuración → Reglas).
+- **Dominio:** el sitio actual de MOVE está en `moveperformance.uy`. El dominio de la plataforma nueva **no está decidido**; este manual usa `<dominio>` (y `api.<dominio>` para la API) como marcador. El código no tiene ningún dominio fijo: todo sale de variables de entorno.
+
+### Deuda conocida que afecta al usuario o al deploy
+
+| Tema | Efecto | Qué hacer por ahora |
+|---|---|---|
+| Vaciar un campo numérico opcional al editar un plan | No tiene efecto: el valor anterior queda | Desactivar el plan y crear uno nuevo con los valores correctos |
+| Navegación móvil del staff y del cliente | En pantallas chicas no hay menú de navegación (fiel al mockup) | Usar el panel de staff en computadora o tablet |
+| Links de invitación y de restablecer contraseña | Vencen a la hora | Pedir un link nuevo desde **¿Olvidaste tu contraseña?** |
+| `PORT` y `DB_PORT` | La validación y la lectura no interpretan igual valores raros (por ejemplo `0x1F`) | Escribir solo dígitos (`8080`, `5432`) |
+| `DB_SSL` | `DB_SSL=1` pasa la validación pero **no** activa SSL | Usar exactamente `DB_SSL=true` |
+| Límite de intentos del checkout | Se guarda en la memoria de cada instancia: con N instancias el límite real es hasta N veces el configurado, y se reinicia con cada deploy | Aceptable con una instancia; ver [AWS](#aws-elastic-beanstalk-api) |
+| Compras de reserva vencidas | La conciliación las vuelve a consultar en Mercado Pago durante 7 días por si llega un pago tardío | Nada: es intencional; si aparece una compra "Requiere atención", resolverla a mano |
+| Botón de Google | Oculto hasta configurar las credenciales | [Google OAuth](#google-oauth-inicio-de-sesión-con-google) |
 
 ---
 
@@ -94,7 +260,7 @@ Si querés reservar Rehab o Recovery sin ser alumno, no hace falta registrarte a
 
 **Volvés a donde estabas.** Si te piden ingresar cuando querías abrir una página (por ejemplo, el checkout de un plan o tu historial), después de ingresar la plataforma te lleva a **esa misma página**, con su dirección exacta, y no al inicio de tu perfil. Solo se vuelve a páginas internas permitidas para tu tipo de cuenta: un cliente nunca termina en el panel de staff, ni al revés.
 
-> El botón de ingreso con Google está oculto: Google es una integración pendiente (ver la Parte 3). Cuando esté activo, si intentás entrar con Google con un email que ya tiene una cuenta con contraseña, la pantalla de ingreso muestra **"Ya tenés una cuenta con ese email. Ingresá con tu contraseña."**: ingresá con tu contraseña.
+> El botón de ingreso con Google está oculto: Google es una integración pendiente (ver [Google OAuth](#google-oauth-inicio-de-sesión-con-google)). Cuando esté activo, si intentás entrar con Google con un email que ya tiene una cuenta con contraseña, la pantalla de ingreso muestra **"Ya tenés una cuenta con ese email. Ingresá con tu contraseña."**: ingresá con tu contraseña.
 
 #### Recuperar y restablecer la contraseña
 
@@ -128,7 +294,7 @@ Cuando el pago se aprueba, ves el resultado y podés ir a tu perfil: el plan que
 
 Si el pago de un plan sigue pendiente después de la espera (por ejemplo, porque Mercado Pago tarda en acreditarlo), la pantalla te muestra "Confirmando tu pago" mientras espera y, pasado un minuto aproximadamente, **"Pago en proceso"**: "Tu pago está en proceso. Te avisamos por email cuando se acredite." Debajo aparece **Intentar de nuevo**, que te lleva otra vez al checkout de ese plan para probar con otro medio de pago. Si el pago fue rechazado o no se completó, la pantalla muestra enseguida "Pago no completado" y el botón **Intentar de nuevo** también aparece ahí.
 
-**Límites del checkout.** Para evitar abusos, cada persona puede tener como máximo **2 reservas pendientes de pago** a la vez: si intentás una tercera, ves "Ya tenés reservas pendientes de pago. Completá el pago o esperá a que venzan." (las retenidas vencen a los 15 minutos). Además, el checkout acepta hasta 10 intentos por minuto desde una misma conexión y, al reservar una sesión de Rehab o Recovery, hasta 20 intentos por hora desde esa misma conexión: si superás cualquiera de los dos límites, ves "Hiciste demasiados intentos. Esperá un rato y probá de nuevo."
+**Límites del checkout.** Para evitar abusos, cada persona puede tener como máximo **2 reservas pendientes de pago** a la vez: si intentás una tercera, ves "Ya tenés reservas pendientes de pago. Completá el pago o esperá a que venzan." (las retenidas vencen a los 15 minutos). Además, el checkout acepta hasta 10 intentos por minuto desde una misma conexión y, al reservar una sesión de Rehab o Recovery, hasta 20 intentos por hora desde esa misma conexión: si superás cualquiera de los dos límites, ves "Hiciste demasiados intentos. Esperá un rato y probá de nuevo." Los intentos se cuentan por conexión a internet: las personas que usan la misma red (por ejemplo, el wifi del gimnasio) comparten el límite.
 
 ### Mi perfil
 
@@ -177,7 +343,7 @@ Si tenés un plan de Performance vigente y no estás en pausa, una vez por mes r
 
 ## Parte 2: Staff de MOVE
 
-Ingresá desde **Ingresar** con tu usuario de staff: la plataforma te lleva al panel. La barra lateral tiene **Dashboard**, **Clientes**, **Turnos y asistencia**, **Pagos**, **Seguimiento** (con un número de alertas abiertas y el subitem **Check-in**) y **Configuración**. Los usuarios de staff los crea el equipo técnico (ver la Parte 3); los clientes no pueden entrar al panel.
+Ingresá desde **Ingresar** con tu usuario de staff: la plataforma te lleva al panel. La barra lateral tiene **Dashboard**, **Clientes**, **Turnos y asistencia**, **Pagos**, **Seguimiento** (con un número de alertas abiertas y el subitem **Check-in**) y **Configuración**. Los usuarios de staff los crea el equipo técnico (ver [Primer staff de producción](#primer-staff-de-producción)); los clientes no pueden entrar al panel.
 
 ### Dashboard
 
@@ -317,36 +483,57 @@ Mientras el aviso **"Valores provisorios — confirmar con MOVE"** esté visible
 
 ---
 
-## Parte 3: Equipo técnico
+## Parte 3: Cómo levantar todo
 
-### Qué hay hoy
+### Arquitectura
 
-MOVE es un monorepo con la web (Next.js) y la API (NestJS + PostgreSQL). **No hay ningún ambiente publicado**: todo corre en la máquina de desarrollo con Postgres en Docker. Hoy están **simulados**:
+MOVE es un monorepo con dos aplicaciones: la web (`apps/web`, Next.js) y la API (`apps/api`, NestJS + PostgreSQL). La web muestra las pantallas; la API tiene toda la lógica, los datos, el inicio de sesión (Better Auth), los pagos, los emails y los jobs programados. En producción la web va en Vercel, la API en AWS Elastic Beanstalk y la base en Neon:
 
-| Pieza | Estado actual | Qué hace en su lugar |
+![Arquitectura de producción](img/arquitectura.png)
+
+1. El navegador pide las páginas a la web (Vercel).
+2. Las pantallas llaman a la API directamente, con la cookie de sesión.
+3. La web también llama a la API desde el servidor (Server Components), reenviando la misma cookie. Por eso web y API tienen que compartir el dominio raíz (ver [Dominio y cookies](#dominio-y-cookies)).
+4. La API guarda todo en PostgreSQL (Neon) por una conexión con SSL.
+5. Para cobrar, la API crea una preferencia en Mercado Pago y consulta los pagos; Mercado Pago avisa cada pago a la API con un webhook firmado.
+6. La API manda los emails por Brevo.
+7. El navegador paga en la página de Mercado Pago y vuelve a la web (`/checkout/resultado`).
+8. Con Google, el navegador pasa por la pantalla de consentimiento y Google vuelve a la API (`/api/auth/callback/google`).
+
+Hoy **nada de esto está en la nube**: todo corre en una computadora, con Postgres en Docker y reemplazos de desarrollo para los proveedores:
+
+| Pieza | En local, sin credenciales | Con credenciales |
 |---|---|---|
-| Mercado Pago | Sin credenciales | Simulador de pagos (sin `MP_ACCESS_TOKEN`): el checkout lleva a una pantalla para aprobar o rechazar la compra. El simulador solo existe fuera de producción: con `NODE_ENV=production` la API ni siquiera lo monta (aunque `NODE_ENV` se defina solo en el `.env`) |
-| Brevo (email) | Sin credenciales | Modo *dry-run*: no envía nada; cada email queda registrado en la tabla `email_logs` con estado `skipped` (y como línea de log con ids, sin datos personales) |
-| Google OAuth | Sin credenciales | El botón de Google está oculto (`NEXT_PUBLIC_GOOGLE_ENABLED=false`): integración pendiente |
-| Deploy | No existe | Solo el runbook [`docs/deploy.md`](../deploy.md) |
+| Base de datos | Postgres 17 en Docker (`pnpm db:up`, contenedor `move-postgres`) | Neon |
+| Mercado Pago | **Simulador de pagos**: el checkout lleva a `/checkout/simulado`, donde se aprueba o rechaza la compra. Solo existe sin `MP_ACCESS_TOKEN` y con `NODE_ENV` distinto de `production` (en producción la API ni siquiera lo monta) | Checkout Pro real, webhook y conciliación |
+| Brevo | **Dry-run**: no sale ningún email; cada uno queda en la tabla `email_logs` con estado `skipped` y como línea de log (`email skipped <plantilla> user=<id>`), sin datos personales | Envío real |
+| Google | Botón oculto | Botón **Continuar con Google** |
+| Jobs | Corren dentro de la API, igual que en producción | Igual |
 
-El pipeline de Bitbucket (`bitbucket-pipelines.yml`) solo valida (lint, tests, e2e de la API y build); no despliega.
-
-### Correr todo en local, paso a paso
+### Local, paso a paso
 
 Requisitos: Node 24 (`nvm use` lee `.nvmrc`), pnpm 10 (`corepack enable`) y Docker.
 
-1. **Instalar y configurar.** Desde la raíz del repo:
+1. **Instalar.** Desde la raíz del repo:
 
    ```bash
    pnpm install
-   cp apps/api/.env.example apps/api/.env
-   cp apps/web/.env.example apps/web/.env.local
    ```
 
-   El `.env.example` de la API trae valores de desarrollo listos para usar (puertos por defecto: web 3000 y API 3001).
+2. **Variables de entorno.** La API valida sus variables al arrancar y no arranca si falta una obligatoria. Hay dos formas de dárselas:
 
-2. **Levantar Postgres, crear el esquema y cargar los datos iniciales.**
+   - Copiar los ejemplos, que traen valores de desarrollo listos para usar (web en el puerto 3000, API en el 3001):
+
+     ```bash
+     cp apps/api/.env.example apps/api/.env
+     cp apps/web/.env.example apps/web/.env.local
+     ```
+
+   - O exportar esas mismas variables en el shell, sin crear archivos (la API, las migraciones, el seed y los scripts del manual leen el entorno del proceso).
+
+   La web necesita `NEXT_PUBLIC_API_URL=http://localhost:3001/api` (está en `apps/web/.env.example`). La lista completa de variables está en [Variables por proveedor](#variables-por-proveedor).
+
+3. **Postgres, esquema y datos iniciales.**
 
    ```bash
    pnpm db:up                                # Postgres 17 en Docker (contenedor move-postgres, puerto 5432)
@@ -354,7 +541,7 @@ Requisitos: Node 24 (`nvm use` lee `.nvmrc`), pnpm 10 (`corepack enable`) y Dock
    pnpm --filter @move/api seed              # planes, horarios y configuración provisorios (idempotente)
    ```
 
-3. **Crear el primer usuario de staff.** La contraseña va por variable de entorno, nunca por argumento:
+4. **Primer usuario de staff.** La contraseña va por variable de entorno, nunca por argumento:
 
    ```bash
    read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD
@@ -362,42 +549,442 @@ Requisitos: Node 24 (`nvm use` lee `.nvmrc`), pnpm 10 (`corepack enable`) y Dock
    unset CREATE_STAFF_PASSWORD
    ```
 
-   El comando imprime solo el id. La contraseña debe tener al menos 8 caracteres. Si ya existe una cuenta con ese email, el comando **se niega** y avisa:
+   El comando imprime solo el id. La contraseña debe tener al menos 8 caracteres y el nombre entre 2 y 80. Si ya existe una cuenta con ese email, el comando **se niega** y avisa:
 
    ```text
    Ya existe una cuenta con ese email; usá --promote-existing para convertirla en staff.
    ```
 
-   Con `--promote-existing` esa cuenta se convierte en staff, se le fija la contraseña indicada, se marca su email como verificado y se cierran todas sus sesiones abiertas; el comando avisa que reutilizó una cuenta existente.
+   Con `--promote-existing` esa cuenta se convierte en staff, se le fija la contraseña indicada, se marca su email como verificado y se cierran todas sus sesiones abiertas; el comando avisa que reutilizó una cuenta existente. `--name` sigue siendo obligatorio, pero con `--promote-existing` el nombre de la cuenta no cambia.
 
    ```bash
-   pnpm --filter @move/api user:create-staff -- --email persona@ejemplo.com --name "Nombre Apellido" --promote-existing
+   pnpm --filter @move/api user:create-staff -- --email persona@example.com --name "Nombre Apellido" --promote-existing
    ```
 
-4. **Levantar la API y la web.**
+5. **API y web.**
 
    ```bash
-   pnpm dev          # web en :3000 y API en :3001 (/api); GET /api/health debe responder {"status":"ok"}
+   pnpm dev          # web en :3000 y API en :3001 (o por separado: pnpm dev:api y pnpm dev:web)
+   curl http://localhost:3001/api/health      # {"status":"ok"}
    ```
 
-   Al arrancar, la API genera los turnos de los próximos días a partir de los horarios del seed. Los jobs (vencimiento de reservas, conciliación de pagos, generación de turnos, detección de seguimiento, recordatorios y check-ins mensuales) corren dentro de la API; `SCHEDULER_ENABLED=false` los apaga.
+   Al arrancar, la API genera los turnos de los próximos días a partir de los horarios del seed (si `SCHEDULER_ENABLED` no es `false`).
 
-5. **Probar.** Registrá un cliente en `http://localhost:3000/registro`, comprá un plan (el simulador de pagos aparece en el checkout), reservá y, con el usuario de staff, abrí `http://localhost:3000/staff`.
+6. **Recorrer la plataforma.** Registrá un cliente en `http://localhost:3000/registro`, contratá un plan desde **Planes**, aprobá el pago en el **simulador** (`/checkout/simulado`) y reservá un turno de Performance. Con el usuario de staff abrí `http://localhost:3000/staff` y marcá la asistencia en **Turnos y asistencia**. El simulador llama a `POST /api/payments/dev/simulate`; un pago rechazado deja la compra pendiente para reintentar.
 
-6. **Correr un job a mano** con sesión de staff: `POST /api/staff/automations/run/<job>` con `followup-detect`, `checkins-monthly`, `expiry-reminders`, `generate-slots`, `expire-holds` o `reconcile-payments`. Es idempotente y respeta el mismo lock que el cron.
+7. **Ver los emails en dry-run.** Los emails no salen, pero quedan registrados (solo plantilla, usuario y estado; nunca el contenido ni el link):
 
-7. **Tests.** `pnpm lint`, `pnpm test`, `pnpm build`; los e2e de la API necesitan `E2E_DATABASE_NAME` (ver [`docs/development.md`](../development.md#tests)).
+   ```bash
+   docker exec move-postgres psql -U move -d move \
+     -c "SELECT template, status, created_at FROM email_logs ORDER BY created_at DESC LIMIT 10"
+   ```
 
-Las variables de entorno y los proveedores están descritos en [`docs/development.md`](../development.md) y [`docs/deploy.md`](../deploy.md#variables-de-entorno-de-la-api).
+   Como el link no se guarda, en dry-run no se puede completar un restablecimiento de contraseña ni la invitación de un cliente nuevo: para probar esos flujos de punta a punta hace falta Brevo configurado (ver [Brevo](#brevo-emails)).
+
+8. **Correr un job a mano.** Desde el panel: **Seguimiento → Ejecutar detección ahora** (`followup-detect`), **Configuración → Horarios → Generar turnos ahora** (`generate-slots`) y **Seguimiento → Check-in → Enviar check-in** (envío manual de check-ins). Cualquier job también se corre con sesión de staff:
+
+   ```bash
+   curl -X POST http://localhost:3001/api/staff/automations/run/<job> --cookie "<cookie de sesión del staff>"
+   ```
+
+   Jobs: `followup-detect`, `checkins-monthly`, `expiry-reminders`, `generate-slots`, `expire-holds` y `reconcile-payments`. La cookie se copia del header `Cookie` de cualquier request a la API en las herramientas de desarrollo del navegador. La corrida manual funciona aunque `SCHEDULER_ENABLED=false`, usa el mismo lock que el cron y es idempotente.
+
+9. **Tests.**
+
+   ```bash
+   pnpm lint                                              # oxlint (API) y ESLint (web)
+   pnpm test                                              # unit de la API y de la web
+   docker exec move-postgres createdb -U move move_test   # una sola vez
+   E2E_DATABASE_NAME=move_test pnpm test:e2e              # e2e de la API contra Postgres (base dedicada)
+   pnpm build
+   ```
+
+   Más detalle en [`docs/development.md`](../development.md).
+
+### Producción, en orden
+
+Nada de esto se ejecutó todavía. Cada paso remite a su proveedor en la [Parte 4](#parte-4-proveedores-uno-por-uno); el runbook técnico con los comandos está en [`docs/deploy.md`](../deploy.md).
+
+1. **Decidir los dominios** (hoy pendientes): el de producción y un dominio registrable distinto para desarrollo ([Ambientes separados](#ambientes-separados-de-desarrollo-y-producción)).
+2. **Conseguir los accesos** de la tabla [Accesos necesarios](#accesos-necesarios).
+3. **Neon:** una base por ambiente, SSL, host directo ([Neon](#neon-base-de-datos)).
+4. **Generar el paquete de la API**, correr las migraciones y el seed contra Neon desde ese mismo paquete ([Neon](#neon-base-de-datos), paso de migraciones).
+5. **AWS:** entorno de Elastic Beanstalk con Node.js 24, variables, health check, HTTPS y logs ([AWS](#aws-elastic-beanstalk-api)).
+6. **Mercado Pago:** resolver la decisión [D68](#decisión-d68-avisos-de-mercado-pago); credenciales de prueba en desarrollo, webhook y clave secreta ([Mercado Pago](#mercado-pago-pagos)).
+7. **Brevo:** dominio autenticado, remitente y API key ([Brevo](#brevo-emails)).
+8. **Google** (opcional): consentimiento y cliente web ([Google OAuth](#google-oauth-inicio-de-sesión-con-google)).
+9. **Vercel:** proyecto con raíz `apps/web` y variables por ambiente ([Vercel](#vercel-web)).
+10. **DNS y cookies:** `<dominio>` a Vercel, `api.<dominio>` a Beanstalk, `COOKIE_DOMAIN` ([Dominio y cookies](#dominio-y-cookies)).
+11. **Primer staff** de producción y **checklist** ([Parte 5](#parte-5-puesta-en-marcha-y-mantenimiento)).
+12. **Confirmar los valores provisorios** con MOVE y cargarlos en Configuración.
+
+En producción (`NODE_ENV=production`) la API exige `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`, `BREVO_API_KEY` y `BREVO_SENDER_EMAIL`, usa cookies `Secure` y no monta el simulador de pagos.
+
+---
+
+## Parte 4: Proveedores, uno por uno
+
+Esta parte dice qué falta configurar en cada proveedor que nombra `MOVE.pdf`. Los pasos de consola se verificaron el 13/10/2026 en la documentación oficial (link en cada sección); las consolas cambian seguido, así que cada paso dice también **para qué** es, para poder encontrarlo si un menú se movió. Ningún valor de este manual es real: `<...>` marca lo que hay que completar. Los secretos van **solo** en la configuración de cada proveedor (variables de entorno de Beanstalk, Vercel y Bitbucket), nunca en el repositorio ni en este manual.
+
+### Accesos necesarios
+
+| Proveedor | Para qué | Acceso que hace falta | Quién lo da | Situación según `MOVE.pdf` |
+|---|---|---|---|---|
+| Neon | Base de datos | Miembro de la organización o proyecto de Neon, con permiso para crear branches, roles y bases | MOVE | MOVE ya tiene cuenta |
+| AWS | API (Elastic Beanstalk), certificados (ACM) y logs (CloudWatch) | Usuario IAM con permisos de Elastic Beanstalk e IAM para crear los roles (ver [AWS](#aws-elastic-beanstalk-api)) | MOVE (dueña de la cuenta y de la facturación) | **A crear o confirmar** |
+| Vercel | Web | Miembro del equipo de Vercel con permiso para crear proyectos y dominios; el equipo tiene que poder conectarse al repositorio | MOVE | MOVE ya tiene cuenta |
+| DNS de los dominios | Dominios de web, API, email y certificados | Acceso al panel donde está delegado cada dominio (producción y desarrollo) | MOVE (producción); MOVE o SpaceDev (desarrollo) | Dominios a decidir (hoy `moveperformance.uy`) |
+| Mercado Pago | Pagos | Ser la cuenta dueña de la aplicación o tener acceso a **Tus integraciones** de esa cuenta | MOVE | MOVE ya tiene cuenta e integración |
+| Google Cloud | Inicio de sesión con Google | Rol en el proyecto de Google Cloud que permita editar la plataforma de autenticación y crear clientes OAuth | MOVE | MOVE ya tiene configuración de Google OAuth |
+| Brevo | Emails | Usuario de la cuenta con acceso a **Settings** (remitentes, dominios, API keys y seguridad) | MOVE | MOVE ya tiene cuenta |
+| Repositorio y CI | Código, validación y deploy | Administrador del repositorio para cargar variables y conectar Vercel | SpaceDev / MOVE | Ver [Bitbucket Pipelines](#bitbucket-pipelines-ci) |
+
+### Ambientes separados de desarrollo y producción
+
+`MOVE.pdf` pide ambientes separados. Cada ambiente tiene su base, su entorno de API, sus credenciales y sus URLs; se comparten las cuentas de los proveedores y, mientras no se resuelva la decisión D68, la aplicación de Mercado Pago (y con ella la clave secreta del webhook, ver [Mercado Pago](#mercado-pago-pagos)). Marcadores: `<dominio>` es el dominio final de producción y `<dominio-dev>` un dominio **registrable distinto** para desarrollo (por ejemplo, uno de SpaceDev o de MOVE dedicado a pruebas; no un subdominio de `<dominio>`):
+
+| Pieza | Desarrollo | Producción |
+|---|---|---|
+| Web (Vercel) | Rama de desarrollo (por ejemplo `develop`, a crear) con el dominio fijo `<dominio-dev>` | Rama `main` con `<dominio>` |
+| API (Elastic Beanstalk) | Entorno `move-api-dev` en `api.<dominio-dev>` | Entorno `move-api-prod` en `api.<dominio>` |
+| Base (Neon) | Branch `development` con su propio rol y su propia base | Branch `production` |
+| `NODE_ENV` | `production` | `production` |
+| `COOKIE_DOMAIN` | `.<dominio-dev>` | `.<dominio>` |
+| Mercado Pago | Credenciales **de prueba** y URL de webhook de modo pruebas (con la opción recomendada de D68, una aplicación propia con su clave secreta) | Credenciales **productivas** y URL de modo producción |
+| Brevo | API key propia (`move-dev`) | API key propia (`move-prod`) |
+| Google | URIs de `api.<dominio-dev>` (y de `localhost`) | URIs de `api.<dominio>` |
+| `BETTER_AUTH_SECRET` | Propio | Propio (distinto) |
+
+- **`NODE_ENV=production` también en desarrollo.** En la API, `production` no significa "datos reales": significa "desplegado". Exige las credenciales de proveedores, usa cookies `Secure` y nunca monta el simulador de pagos. `development` queda para las computadoras de los desarrolladores.
+- **Previews de Vercel.** Cada rama genera un preview con una URL automática (`*.vercel.app`). Esas URLs **no** pueden usar la API de desarrollo desde el navegador: la API solo acepta llamadas (CORS) y cookies del origen de su `WEB_URL`. Sirven para mirar páginas; para probar flujos completos (ingresar, reservar, pagar) se usa `<dominio-dev>`. Nunca apuntar un preview a la API de producción.
+- **Por qué desarrollo va en otro dominio, no en `dev.<dominio>`.** La cookie de sesión de producción se emite para `.<dominio>` y el navegador la manda a **todos** sus subdominios. Si desarrollo viviera en `dev.<dominio>` / `api.dev.<dominio>`:
+  - la sesión de producción (también la del **staff**) llegaría al servidor de la web de desarrollo, que corre código de la rama de desarrollo, todavía no revisado para producción; ese código podría leerla;
+  - `dev.<dominio>` sería el **mismo sitio** que `api.<dominio>` para el navegador, así que la protección `SameSite=Lax` de la cookie no frena un formulario enviado desde una página de desarrollo a la API de producción, que lo procesaría con la sesión de quien lo abra;
+  - las dos cookies tienen el mismo nombre, así que además se pisan.
+
+  Con un dominio registrable distinto (`COOKIE_DOMAIN=.<dominio-dev>`) nada de eso pasa. **Si igual se elige `dev.<dominio>`** (decisión abierta, ver [Valores provisorios y decisiones abiertas](#valores-provisorios-y-decisiones-abiertas)), es un riesgo de seguridad aceptado y pasa a ser **regla**, no recomendación: el staff y el equipo usan perfiles de navegador separados para producción y desarrollo, y nunca abren desarrollo con una sesión de producción abierta en el mismo perfil.
+
+### Variables por proveedor
+
+Todas las variables de la API se validan al arrancar (`apps/api/src/config/env.validation.ts`): si falta una obligatoria o tiene un valor inválido, la API no arranca y el log dice cuál. Las de la web se incrustan en el build.
+
+| Variable | Proveedor | Dónde se obtiene | Desarrollo | Producción |
+|---|---|---|---|---|
+| `NODE_ENV` | — | Fijo | `production` | `production` |
+| `PORT` | AWS | Fijo; Beanstalk configura Nginx para reenviar a este puerto | `8080` | `8080` |
+| `WEB_URL` | Vercel / DNS | Dominio de la web, sin barra final | `https://<dominio-dev>` | `https://<dominio>` |
+| `API_PUBLIC_URL` | AWS / DNS | Dominio de la API, sin `/api` | `https://api.<dominio-dev>` | `https://api.<dominio>` |
+| `DB_HOST` | Neon | **Connect** con *Connection pooling* apagado (host sin `-pooler`) | host del branch `development` | host del branch `production` |
+| `DB_PORT` | Neon | Fijo | `5432` | `5432` |
+| `DB_USER` / `DB_PASSWORD` | Neon | Rol creado en el branch (la contraseña se ve una sola vez) | rol de desarrollo | rol de producción |
+| `DB_NAME` | Neon | Base creada en el branch | `<base de desarrollo>` | `<base de producción>` |
+| `DB_SSL` | Neon | Fijo (Neon exige SSL) | `true` | `true` |
+| `BETTER_AUTH_SECRET` | — | Generarlo: `openssl rand -base64 48` (32+ caracteres; cambiarlo cierra todas las sesiones) | propio | propio |
+| `COOKIE_DOMAIN` | DNS | Dominio raíz del ambiente, con punto inicial | `.<dominio-dev>` | `.<dominio>` |
+| `TRUST_PROXY_HOPS` | AWS | Fijo para ALB + Nginx | `2` | `2` |
+| `SCHEDULER_ENABLED` | AWS | `true` en una sola instancia | `true` | `true` |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google | Cliente OAuth web (el secreto se ve una sola vez) | opcional | opcional (las dos o ninguna) |
+| `MP_ACCESS_TOKEN` | Mercado Pago | **Tus integraciones** → la aplicación → credenciales | de prueba | productivo |
+| `MP_WEBHOOK_SECRET` | Mercado Pago | **Webhooks** de la aplicación → clave secreta | de la aplicación | de la aplicación |
+| `BREVO_API_KEY` | Brevo | **Settings → SMTP & API → API Keys** (se ve una sola vez) | `move-dev` | `move-prod` |
+| `BREVO_SENDER_EMAIL` | Brevo | Remitente verificado (por ejemplo `no-reply@<dominio>`) | remitente | remitente |
+| `BREVO_SENDER_NAME` | Brevo | Opcional (default `MOVE`) | `MOVE (dev)` | `MOVE` |
+| `NEXT_PUBLIC_API_URL` (web) | Vercel | URL de la API **con** `/api` | `https://api.<dominio-dev>/api` | `https://api.<dominio>/api` |
+| `NEXT_PUBLIC_GOOGLE_ENABLED` (web) | Vercel | `true` solo si la API de ese ambiente tiene Google | `true` / vacío | `true` / vacío |
+
+No van a ningún ambiente en la nube: `E2E_DATABASE_NAME` (solo tests) y `CREATE_STAFF_PASSWORD` (solo para el comando de alta de staff).
+
+### Neon (base de datos)
+
+**Acceso:** organización o proyecto de Neon de MOVE (ya existe). Se crea una base **nueva**: no se reutiliza ni se migra el esquema del sistema anterior.
+
+**Pasos** ([proyectos](https://neon.com/docs/manage/projects), [branches](https://neon.com/docs/manage/branches), [roles](https://neon.com/docs/manage/roles), [bases](https://neon.com/docs/manage/databases)):
+
+1. **Proyecto.** En la consola, **New Project**: nombre (por ejemplo `move`), región (la misma región de AWS que el entorno de Beanstalk, o la más cercana) y, en *Postgres database*, **Postgres version 17** (la misma que usa el desarrollo local y el CI). El proyecto nace con un branch `production`, una base `neondb` y un rol `neondb_owner`.
+2. **Producción.** En el branch `production`, **Roles → Add role** (por ejemplo `move_prod`; copiar la contraseña, se muestra una sola vez) y **Databases → Add database** (por ejemplo `move`) con ese rol como dueño. La API y las migraciones usan ese rol.
+3. **Desarrollo.** **Branches → New branch** desde `production`, con nombre `development` y la opción *Schema only* (o *Current data* si producción todavía está vacía). **Destildar "Automatically delete branch after"**: la consola lo marca por defecto con 1 día y borraría el ambiente. Un branch hereda los roles y, salvo que el padre sea un *protected branch* (en ese caso Neon genera contraseñas nuevas para el hijo), también sus contraseñas ([protected branches](https://neon.com/docs/guides/protected-branches)). En cualquier caso, en `development` crear **otro rol** (por ejemplo `move_dev`) y **otra base** de la que sea dueño (por ejemplo `move_dev`), y usar solo esos en desarrollo: las credenciales de desarrollo nunca deben servir para producción.
+4. **Datos de conexión.** Con el branch elegido, **Connect** abre "Connect to your branch". **Apagar "Connection pooling"**: el host tiene que ser el directo (`ep-xxx.<región>.aws.neon.tech`, sin `-pooler`). Los jobs usan locks de sesión de Postgres, que el pooler en modo transacción rompe ([pooling](https://neon.com/docs/connect/connection-pooling)). De ahí salen `DB_HOST`, `DB_USER`, `DB_PASSWORD` y `DB_NAME`; `DB_PORT=5432` y `DB_SSL=true`.
+5. **Migraciones y seed**, desde el mismo paquete que se va a desplegar (el bundle no trae el CLI de Nest, por eso se llama a TypeORM directo), con las variables exportadas en la sesión en lugar de un `.env`:
+
+   ```bash
+   bash scripts/package-api-eb.sh                       # genera artifacts/move-api-<sha>.zip
+   unzip artifacts/move-api-<sha>.zip -d /tmp/move-api && cd /tmp/move-api
+   export DB_HOST=<host directo> DB_PORT=5432 DB_USER=<rol> DB_NAME=<base> DB_SSL=true
+   read -rs DB_PASSWORD && export DB_PASSWORD
+   node_modules/.bin/typeorm migration:run -d dist/database/data-source.js
+   node dist/database/seed.js                            # planes, horarios y configuración provisorios (idempotente)
+   ```
+
+   Las migraciones se corren **antes** de cambiar el tráfico a la versión nueva. El esquema cambia solo por migraciones, nunca con `synchronize`.
+
+**Cómo probarlo:** las migraciones terminan sin error y `node dist/database/seed.js` imprime `Seed inserted plans=… professionals=… templates=…`; en la consola de Neon (*Tables*) aparecen las tablas en la base del ambiente; la API arranca y `GET /api/health` responde.
+
+**Errores comunes:**
+
+- **La conexión falla o se corta:** falta `DB_SSL=true` (Neon exige SSL; `DB_SSL=1` **no** lo activa).
+- **Jobs que se pisan o errores raros de locks:** se usó el host `-pooler`. Cambiar al host directo.
+- **`permission denied for schema public` al migrar:** el rol no es dueño de la base. Crear la base con ese rol como dueño.
+- **El branch de desarrollo desapareció:** quedó tildado el borrado automático del paso 3.
+- **Costo:** la API consulta la base cada minuto (vencimiento de reservas retenidas), así que el compute no llega a suspenderse por inactividad. Tenerlo en cuenta al elegir el plan.
+
+**Rollback de datos:** el branch `production` admite *instant restore* a un momento anterior dentro de la ventana de historia del plan ([instant restore](https://neon.com/docs/introduction/branch-restore)).
+
+### AWS Elastic Beanstalk (API)
+
+**Acceso:** cuenta de AWS de MOVE (**a crear o confirmar**). Para operar hace falta un usuario IAM con la política administrada `AdministratorAccess-AWSElasticBeanstalk` ([políticas administradas](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/AWSHowTo.iam.managed-policies.html)) y permiso para crear los dos roles de abajo; nada de usuarios con `AdministratorAccess` general para el día a día. Elegir la región una sola vez (la misma para Beanstalk, ACM y, si se puede, Neon).
+
+**Pasos** ([plataformas](https://docs.aws.amazon.com/elasticbeanstalk/latest/platforms/platforms-supported.html), [variables](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/environments-cfg-softwaresettings.html), [Procfile](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/nodejs-configuration-procfile.html)):
+
+1. **Roles de IAM (mínimo privilegio).**
+   - **Perfil de instancia** `aws-elasticbeanstalk-ec2-role`: Beanstalk **ya no lo crea solo**. En IAM, **Create role** → *AWS service* → *Elastic Beanstalk* → caso de uso *Elastic Beanstalk – Compute* ([perfil de instancia](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/iam-instanceprofile.html)). Para un entorno web alcanza con `AWSElasticBeanstalkWebTier` (incluye subir logs a CloudWatch); si los secretos se guardan en Secrets Manager o Parameter Store, sumar solo el permiso de lectura de **esos** secretos.
+   - **Rol de servicio** `aws-elasticbeanstalk-service-role`: la consola lo crea con `AWSElasticBeanstalkEnhancedHealth` y `AWSElasticBeanstalkManagedUpdatesCustomerRolePolicy` ([rol de servicio](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/iam-servicerole.html)).
+2. **Aplicación y entornos.** Una aplicación `move-api` con dos entornos *Web server*: `move-api-dev` y `move-api-prod`. Plataforma **Node.js 24 on Amazon Linux 2023** (existe y es la que pide `.nvmrc`). Al crear, en las opciones avanzadas elegir **High availability** con **Application Load Balancer** dedicado: el tipo de balanceador **no se puede cambiar después**, el certificado HTTPS va en el balanceador y `TRUST_PROXY_HOPS=2` supone ALB + Nginx ([ALB](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/environments-cfg-alb.html)). En **Capacity**, mínimo y máximo **1 instancia** (ver Scheduler, abajo).
+3. **Etiquetas.** En la página de tags al crear (o después en **Tags** del entorno): `Project=MOVE`, `Environment=development` o `production`, `Owner=<responsable>`. Beanstalk las propaga a los recursos que crea ([tags](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/using-features.tagging.html)).
+4. **Variables de entorno.** **Configuration → Updates, monitoring, and logging → Edit → Runtime environment variables**: cargar todas las de la [tabla de variables](#variables-por-proveedor). Los secretos (`DB_PASSWORD`, `BETTER_AUTH_SECRET`, `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`, `BREVO_API_KEY`, `GOOGLE_CLIENT_SECRET`) conviene cargarlos con origen **Secrets Manager** o **SSM Parameter Store** en vez de texto plano. Por línea de comandos: `eb setenv CLAVE=valor …`. **`PORT` hay que definirlo** (por ejemplo `8080`): la API exige la variable y Beanstalk configura Nginx para reenviar a ese puerto; sin ella, Nginx reenvía al 5000 ([proxy](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/nodejs-platform-proxy.html)).
+5. **Subir la versión.** Subir `artifacts/move-api-<sha>.zip` (generado con `bash scripts/package-api-eb.sh`) como versión nueva y desplegarla. El zip trae `Procfile` (`web: node dist/main.js`), `package.json`, `dist/` y los `node_modules` de producción; no lleva `.env` ni código fuente. Como incluye `node_modules`, conviene generarlo en Linux (CI o Docker `node:24`) si algún día se suman dependencias con binarios nativos; hoy no hay.
+6. **Health check.** **Configuration → Load balancer → Edit → Processes** → proceso `default` → **Health check** → **Path** `/api/health` (por archivo de configuración: `aws:elasticbeanstalk:environment:process:default`, `HealthCheckPath`) ([opciones](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/command-options-general.html)). Responde `{"status":"ok"}` sin sesión.
+7. **HTTPS con ACM.** En AWS Certificate Manager, **Request a certificate** público para `api.<dominio>` (y `api.<dominio-dev>`) con **DNS validation**; crear en el DNS los CNAME que muestra ACM y **dejarlos** (sirven para la renovación automática) ([ACM](https://docs.aws.amazon.com/acm/latest/userguide/acm-public-certificates.html), [validación DNS](https://docs.aws.amazon.com/acm/latest/userguide/dns-validation.html)). El certificado se pide en la misma región del entorno. Después, **Configuration → Load balancer → Edit → Add listener**: puerto 443, HTTPS, ese certificado ([HTTPS](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/configuring-https-elb.html)).
+8. **Logs en CloudWatch con retención.** **Updates, monitoring, and logging → Instance log streaming to CloudWatch Logs**: activar *Log streaming*, **Retention** (por ejemplo 30 días en desarrollo y 90 en producción; el default es 7) y *Lifecycle* "Keep logs after terminating environment" ([CloudWatch](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/AWSHowTo.cloudwatchlogs.html)). La salida de la API queda en el grupo `/aws/elasticbeanstalk/<entorno>/var/log/web.stdout.log`. Los logs solo tienen ids y nombres de job, nunca datos personales.
+
+**Proxy y límites que dependen de AWS:**
+
+- **`TRUST_PROXY_HOPS=2`.** La request pasa por el ALB y por el Nginx de la instancia; con `2` la API toma la IP real del cliente para el límite de intentos del checkout. Un solo dígito de 0 a 5; **nunca `true`**: confiaría en todo el header `X-Forwarded-For`, que el cliente puede escribir. Un valor mayor que la cantidad real de proxies tiene el mismo problema; uno menor (o `0`) hace que todos los clientes compartan un contador y el checkout se bloquee para todos. Si cambia la topología (por ejemplo, se agrega CloudFront), ajustar el valor y repetir la prueba de IP del [checklist](#checklist-posterior-al-deploy).
+- **Límite de intentos en memoria.** El checkout acepta 10 intentos por minuto por IP y, al reservar Rehab o Recovery, 20 por hora. Los contadores viven en la memoria de cada instancia: con N instancias el límite real es hasta N veces el configurado. Personas en la misma red (por ejemplo, el wifi del gimnasio) comparten el límite.
+- **Body de `/api/auth/*`.** La API rechaza con 413 los bodies de más de 64 KB o con `Transfer-Encoding` sin `content-length`. Nginx tiene que reenviar `content-length`: no desactivar `proxy_request_buffering` (está activo por defecto).
+- **Scheduler en una sola instancia.** Los jobs corren dentro de la API. Un lock de Postgres evita que dos instancias corran el mismo job a la vez, pero igual: dejar **una instancia**, o si se escala, `SCHEDULER_ENABLED=true` en una y `false` en las demás (solo esos dos valores).
+
+**Cómo probarlo:** el entorno queda en verde (*Ok*); `curl https://api.<dominio>/api/health` responde `{"status":"ok"}`; en CloudWatch aparecen las líneas de los jobs `expire-holds` y `reconcile-payments`.
+
+**Errores comunes:**
+
+- **El entorno queda en rojo y el log dice qué variable falta o es inválida:** la API valida todo al arrancar. Revisar la tabla de variables (`SCHEDULER_ENABLED` solo `true`/`false`; `TRUST_PROXY_HOPS` un dígito; `PORT` y `DB_PORT` solo dígitos).
+- **502 Bad Gateway de Nginx:** `PORT` no definido o distinto del que espera Nginx; definirlo explícitamente.
+- **Health check en rojo con la API funcionando:** el path quedó en `/` (default); cambiarlo a `/api/health`.
+- **Todos los clientes reciben "Hiciste demasiados intentos":** falta `TRUST_PROXY_HOPS=2`.
+- **El certificado queda en *Pending validation*:** faltan los CNAME de ACM en el DNS, o el proveedor de DNS duplicó el dominio en el nombre del registro. Pasadas 72 h sin validar, ACM lo da por vencido.
+- **Los emails dejan de salir después de reemplazar una instancia:** ver la protección por IP de [Brevo](#brevo-emails).
+
+### Vercel (web)
+
+**Acceso:** equipo de Vercel de MOVE (ya existe), con permiso para crear el proyecto y agregar dominios. El equipo tiene que poder leer el repositorio: Vercel se conecta a GitHub y a Bitbucket, pero un equipo *Hobby* no puede desplegar repositorios privados de un workspace de Bitbucket ([Git](https://vercel.com/docs/git)).
+
+**Pasos:**
+
+1. **Importar el proyecto.** **Add New… → Project → Import** del repositorio, y en **Root Directory** elegir `apps/web` ([monorepos](https://vercel.com/docs/monorepos), [build](https://vercel.com/docs/builds/configure-a-build)). Framework Next.js; Vercel detecta pnpm por `packageManager` y el lockfile de la raíz.
+2. **Node.js 24.** **Settings → Build and Deployment → Node.js Version → 24.x** ([versiones](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions)).
+3. **Rama de producción.** `main` (Vercel la toma por defecto; se cambia en **Settings → Environments → Production → Branch Tracking**).
+4. **Variables por ambiente.** En **Environment Variables** ([variables](https://vercel.com/docs/environment-variables/managing-environment-variables)):
+   - *Production*: `NEXT_PUBLIC_API_URL=https://api.<dominio>/api` y, si Google está configurado en esa API, `NEXT_PUBLIC_GOOGLE_ENABLED=true`.
+   - *Preview* (para la rama de desarrollo y el resto de las ramas): `NEXT_PUBLIC_API_URL=https://api.<dominio-dev>/api` y `NEXT_PUBLIC_GOOGLE_ENABLED` según la API de desarrollo.
+   - Son públicas (se ven en el navegador): tipo *Config*, no *Secret*. Se incrustan en el build ([Next.js](https://nextjs.org/docs/app/guides/environment-variables)): **cambiarlas exige un redeploy**.
+5. **Dominios.** **Settings → Domains → Add Domain**: `<dominio>` para producción. Para desarrollo, agregar `<dominio-dev>` y en **Edit → Connect to an environment** elegir *Preview* con la **Git Branch** de desarrollo ([dominio por rama](https://vercel.com/docs/domains/working-with-domains/assign-domain-to-a-git-branch)). Vercel muestra en la tarjeta de cada dominio los registros DNS exactos a crear (ver [Dominio y cookies](#dominio-y-cookies)).
+
+**Cómo probarlo:** el build termina en verde; `https://<dominio>` muestra los planes (vienen de la API); la consola del navegador no muestra errores de CORS; en desarrollo, `https://<dominio-dev>` apunta a `api.<dominio-dev>`.
+
+**Errores comunes:**
+
+- **La web sigue llamando a la API vieja después de cambiar `NEXT_PUBLIC_API_URL`:** faltó redeploy.
+- **Error de CORS:** el `WEB_URL` de la API no es exactamente el origen de la web (esquema, subdominio, sin barra final), o se está usando un preview con URL automática.
+- **El build falla buscando archivos fuera de `apps/web`:** revisar que **Root Directory** sea `apps/web`.
+- **Rollback:** *Instant Rollback* desde el deploy de producción ([rollback](https://vercel.com/docs/instant-rollback)); no cambia las variables, y después hay que reactivar la asignación automática de dominios (**Undo Rollback** o promover un deploy).
+
+### Dominio y cookies
+
+La web y la API **tienen que compartir el dominio raíz**: la cookie de sesión la emite la API y la necesitan tanto el navegador (para llamar a la API) como el servidor de la web (para armar Mi perfil y el panel de staff). Con `COOKIE_DOMAIN=.<dominio>` la cookie vale para `<dominio>` y todos sus subdominios. Si la web y la API quedaran en dominios distintos (por ejemplo, la API en `*.elasticbeanstalk.com`), el ingreso no funcionaría como está diseñado.
+
+**El dominio no está decidido.** El sitio actual de MOVE está en `moveperformance.uy`; el código y `docs/deploy.md` usan `move.uy` solo como ejemplo. Si se usa `moveperformance.uy`, apuntar el dominio raíz a Vercel **reemplaza el sitio actual**: coordinar ese cambio con MOVE. Desarrollo usa otro dominio registrable, `<dominio-dev>` (ver [Ambientes separados](#ambientes-separados-de-desarrollo-y-producción)); sus registros van en el DNS de ese dominio.
+
+| Registro | Tipo | Valor | Para qué |
+|---|---|---|---|
+| `<dominio>` | A (o el método que indique Vercel) | El que muestra la tarjeta del dominio en Vercel (no copiar una IP de otro lado: puede cambiar por proyecto) ([dominios](https://vercel.com/docs/domains/working-with-domains/add-a-domain)) | Web de producción |
+| `<dominio-dev>` | A (o el método que indique Vercel) | El que muestra Vercel para ese dominio, en el DNS de `<dominio-dev>` | Web de desarrollo |
+| `api.<dominio>` | CNAME | La URL del entorno `move-api-prod` (`<entorno>.<región>.elasticbeanstalk.com`) | API de producción |
+| `api.<dominio-dev>` | CNAME | La URL del entorno `move-api-dev`, en el DNS de `<dominio-dev>` | API de desarrollo |
+| Validación de ACM | CNAME | Los que muestra ACM para cada certificado | HTTPS de la API (dejar siempre) |
+| Brevo | TXT / CNAME | Código de Brevo, DKIM y DMARC (ver [Brevo](#brevo-emails)) | Entregabilidad de los emails |
+
+Valores de cada ambiente:
+
+| Variable | Desarrollo | Producción |
+|---|---|---|
+| `WEB_URL` | `https://<dominio-dev>` | `https://<dominio>` |
+| `API_PUBLIC_URL` | `https://api.<dominio-dev>` | `https://api.<dominio>` |
+| `COOKIE_DOMAIN` | `.<dominio-dev>` | `.<dominio>` |
+| `NEXT_PUBLIC_API_URL` | `https://api.<dominio-dev>/api` | `https://api.<dominio>/api` |
+
+**Cómo probarlo:** después de ingresar, en las herramientas del navegador la cookie de sesión tiene dominio `.<dominio>` (`.<dominio-dev>` en desarrollo) y la marca `Secure`; recargar Mi perfil mantiene la sesión.
+
+**Errores comunes:** el ingreso "funciona" pero Mi perfil vuelve a pedir ingresar → falta `COOKIE_DOMAIN` (la cookie quedó atada a `api.<dominio>`); la cookie no se guarda → se está probando por HTTP (en producción la cookie es `Secure`).
+
+### Mercado Pago (pagos)
+
+**Acceso:** la cuenta de Mercado Pago de MOVE (ya existe, con una integración del sitio actual), con acceso a **Tus integraciones**. La plataforma usa **Checkout Pro**: la API crea una preferencia, el cliente paga en la página de Mercado Pago y vuelve a la web; la confirmación llega por webhook firmado y, como respaldo, por la conciliación cada 10 minutos ([Checkout Pro](https://www.mercadopago.com.uy/developers/es/docs/checkout-pro/overview)).
+
+**Pasos:**
+
+1. **Aplicación.** En **Tus integraciones**, usar o crear la aplicación de la plataforma nueva (Checkout Pro) ([crear aplicación](https://www.mercadopago.com.uy/developers/es/docs/checkout-pro-preferences/create-application)). Revisar la integración existente antes de reutilizarla: el webhook de la plataforma nueva va a otra URL.
+2. **Credenciales de prueba → desarrollo.** En **Datos de integración → Pruebas → Credenciales de prueba**, copiar el **Access Token** a `MP_ACCESS_TOKEN` del ambiente de desarrollo ([credenciales](https://www.mercadopago.com.uy/developers/es/docs/checkout-pro-preferences/additional-content/credentials)). La plataforma no usa la Public Key (todo el pago se arma en la API).
+3. **Webhook y clave secreta.** En la aplicación, **Webhooks → Configurar notificaciones** ([webhooks](https://www.mercadopago.com.uy/developers/es/docs/your-integrations/notifications/webhooks)):
+   - **URL modo pruebas:** `https://api.<dominio-dev>/api/payments/webhook/mercadopago`.
+   - **URL modo producción:** `https://api.<dominio>/api/payments/webhook/mercadopago`.
+   - Evento: **Pagos** (`payment`). La API ignora los demás tipos.
+   - Al guardar se genera la **clave secreta** de esa aplicación: copiarla a `MP_WEBHOOK_SECRET`. Con una sola aplicación, la misma clave queda en los dos ambientes (la única credencial compartida); con la opción (b) de [D68](#decisión-d68-avisos-de-mercado-pago), cada ambiente tiene su aplicación y su clave. **Restablecer** la cambia: actualizar la variable enseguida, o los avisos firmados empiezan a responder 401.
+
+   La API verifica la firma de cada aviso con formato Webhooks (`x-signature` con HMAC-SHA256 sobre `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`): sin firma válida responde 401 sin efectos. Hoy, además, cada preferencia lleva su propia `notification_url` (`${API_PUBLIC_URL}/api/payments/webhook/mercadopago`), que según Mercado Pago tiene prioridad sobre la URL del panel; por eso `API_PUBLIC_URL` tiene que ser pública y HTTPS. Mientras sea así (decisión abierta [D68](#decisión-d68-avisos-de-mercado-pago)):
+   - A una `notification_url` Mercado Pago también puede mandar avisos con formato **IPN** (`?topic=…&id=…`), que no se pueden validar con la clave secreta ([IPN](https://www.mercadopago.com.uy/developers/es/docs/your-integrations/notifications/ipn)). La API los responde **401**: es **esperado** y no tiene efectos (el pago entra por el aviso con formato Webhooks o por la conciliación). **No "arreglarlo" restableciendo `MP_WEBHOOK_SECRET`**: eso rompe los avisos que sí estaban bien.
+   - Mercado Pago documenta la firma para la URL configurada en **Tus integraciones**, pero no documenta si los avisos con formato Webhooks que llegan a la `notification_url` de una preferencia traen un `x-signature` válido con esa clave. Hay que **confirmarlo con el primer pago real** (ver "Cómo probarlo").
+4. **URLs de retorno.** No se configuran en el panel: la API las manda en cada preferencia (`back_urls` a `${WEB_URL}/checkout/resultado?ref=<referencia>`, con `auto_return: approved`) ([URLs de retorno](https://www.mercadopago.com.uy/developers/es/docs/checkout-pro-preferences/configure-back-urls)).
+5. **Cuentas y tarjetas de prueba.** En la aplicación, **Cuentas de prueba → Crear cuenta de prueba**: una **Vendedor** y una **Comprador**, país Uruguay (no se puede cambiar después) ([cuentas de prueba](https://www.mercadopago.com.uy/developers/es/docs/checkout-pro-preferences/test-accounts)). Pagar con la cuenta compradora en una ventana privada, con las tarjetas de prueba de Uruguay; el nombre del titular define el resultado (`APRO` aprobado, `OTHE` rechazado, etc.) ([compras de prueba](https://www.mercadopago.com.uy/developers/es/docs/checkout-pro-preferences/integration-test/test-purchases)).
+6. **Pasaje a producción.** Cuando el circuito completo funciona en desarrollo: **Datos de integración → Credenciales → Productivas → Activar credenciales** (industria, sitio web, términos), y copiar el Access Token productivo a `MP_ACCESS_TOKEN` del ambiente de producción ([salir a producción](https://www.mercadopago.com.uy/developers/es/docs/checkout-pro-preferences/go-to-production)). Mercado Pago exige HTTPS en producción.
+
+**Cómo probarlo.** Los pagos hechos con credenciales de prueba pueden no generar avisos, así que en desarrollo la firma y el pago se prueban por separado:
+
+1. **Firma (desarrollo):** desde **Webhooks → Simular** ([notificaciones de Checkout Pro](https://www.mercadopago.com.uy/developers/es/docs/checkout-pro-preferences/payment-notifications)) mandar un aviso a la URL de modo pruebas. Con el *Data ID* de un pago de prueba real la API responde 200; con un id inventado responde 502 (no encuentra el pago), lo que igual confirma que la firma es válida (una firma inválida da 401).
+2. **Pago (desarrollo):** contratar un plan desde `https://<dominio-dev>/planes` y pagar con la cuenta compradora de prueba (titular `APRO`). Si no llega ningún aviso, el pago entra por la **conciliación**: el job corre cada 10 minutos y consulta las compras pendientes con más de `reconcileAfterMinutes` (10, provisorio, en Configuración → Reglas), así que el plan puede tardar en activarse. Para no esperar, correr `reconcile-payments` a mano (paso 8 de [Local, paso a paso](#local-paso-a-paso)) pasados esos minutos.
+3. El plan queda activo en Mi perfil y la operación figura aprobada en **Pagos** del panel de staff. Repetir la conciliación o el aviso no duplica la suscripción ni extiende la vigencia dos veces.
+4. **Producción, con el primer pago real:** en CloudWatch tiene que aparecer `webhook payment=<id>` (aviso firmado aceptado). Si para ese pago solo hay respuestas 401 y el plan se activa recién con la conciliación, la firma de los avisos a la `notification_url` no valida: resolver [D68](#decisión-d68-avisos-de-mercado-pago) antes de seguir.
+
+**Errores comunes:**
+
+- **401 en el webhook:** primero mirar el formato. Los avisos IPN (`?topic=…&id=…`) siempre dan 401 y son esperados (D68): no tocar la clave por eso. Si los avisos con formato Webhooks (`?data.id=…&type=payment`) también dan 401, `MP_WEBHOOK_SECRET` no coincide con la clave del panel (por ejemplo, después de **Restablecer**) o se da el caso que D68 deja por confirmar.
+- **El pago se aprueba pero el plan tarda en activarse (hasta unos 20 minutos):** no llegó ningún aviso y el pago entra por la conciliación, que solo consulta las compras pendientes con más de `reconcileAfterMinutes` (10) y corre cada 10 minutos. En desarrollo es normal: los pagos con credenciales de prueba pueden no generar avisos. En producción, revisar `API_PUBLIC_URL` (con ella se arma la `notification_url` de cada preferencia, que tiene prioridad sobre la URL del panel; tiene que ser pública y HTTPS) y el historial de notificaciones de la aplicación.
+- **"No pudimos iniciar el pago" (502 `PAYMENT_PROVIDER_ERROR`):** token inválido o de otro ambiente, o Mercado Pago rechazó la preferencia. Con credenciales reales, `WEB_URL` y `API_PUBLIC_URL` tienen que ser públicas y HTTPS: en una computadora local se usa el simulador, no credenciales reales.
+- **No aparece el simulador en desarrollo en la nube:** es lo esperado; con `NODE_ENV=production` o con `MP_ACCESS_TOKEN` el simulador no existe.
+- **Comportamiento a conocer:** un pago de plan rechazado deja la compra pendiente para reintentar; la conciliación vuelve a consultar durante 7 días las compras vencidas por si llega un pago tardío; si un pago se aprueba cuando la reserva retenida ya venció y el turno se llenó, la compra queda aprobada y en **Requieren atención** (sin reembolso automático).
+
+### Google OAuth (inicio de sesión con Google)
+
+**Acceso:** el proyecto de Google Cloud de MOVE donde está su configuración de Google OAuth, con permiso para editar la *Google Auth Platform* y crear clientes. Es opcional: sin estas variables el botón de Google no aparece y todo lo demás funciona.
+
+**Pasos** ([Google Auth Platform](https://support.google.com/cloud/answer/15544987)):
+
+1. **Branding** ([branding](https://support.google.com/cloud/answer/15549049)): nombre de la app (MOVE), email de soporte, links a la página de inicio, privacidad y términos, **Authorized domains** con `<dominio>` (y `<dominio-dev>` si el mismo cliente sirve a desarrollo) y contacto del desarrollador. Subir un logo dispara una verificación de Google para apps externas.
+2. **Audience** ([audience](https://support.google.com/cloud/answer/15549945)): tipo **External**. En estado **Testing** solo pueden ingresar hasta 100 usuarios de prueba cargados a mano: para producción, **Publish app** (estado *In production*). Como la plataforma solo pide nombre, email y foto, no debería requerir una verificación larga, pero lo decide Google.
+3. **Clients → Create client** → tipo **Web application** ([clientes](https://support.google.com/cloud/answer/15549257)):
+   - **Authorized JavaScript origins:** `https://<dominio>`, `https://<dominio-dev>` y, para los desarrolladores, `http://localhost:3000`.
+   - **Authorized redirect URIs** (el callback lo atiende la **API**, no la web): `https://api.<dominio>/api/auth/callback/google`, `https://api.<dominio-dev>/api/auth/callback/google` y `http://localhost:3001/api/auth/callback/google`. Tienen que coincidir exactamente con `${API_PUBLIC_URL}/api/auth/callback/google` ([Better Auth](https://better-auth.com/docs/authentication/google)).
+   - Se puede usar un cliente por ambiente en lugar de uno compartido.
+4. **Credenciales.** Copiar el **Client ID** a `GOOGLE_CLIENT_ID` y el **Client secret** a `GOOGLE_CLIENT_SECRET` de la API (las dos o ninguna). **El secreto se muestra una sola vez**: guardarlo directo en la configuración del ambiente. Google borra los clientes que pasan 6 meses sin usarse (avisa por email 30 días antes).
+5. **Web.** `NEXT_PUBLIC_GOOGLE_ENABLED=true` en Vercel para ese ambiente y redeploy.
+
+**Cómo probarlo:** en `/ingresar` aparece **Continuar con Google**; ingresa con una cuenta de Google y vuelve a la plataforma. Hay una cuenta por email: Google se vincula a la cuenta que ya exista con ese email. Si la vinculación no es posible, la pantalla de ingreso muestra "Ya tenés una cuenta con ese email. Ingresá con tu contraseña." y la persona entra con su contraseña.
+
+**Errores comunes:**
+
+- **`redirect_uri_mismatch`:** el redirect URI no coincide exactamente (esquema, subdominio, `/api/auth/callback/google`, barra final) con `API_PUBLIC_URL`. Los cambios en Google pueden tardar de 5 minutos a unas horas.
+- **"Access blocked" para usuarios reales:** la app sigue en *Testing*.
+- **El botón aparece pero falla:** `NEXT_PUBLIC_GOOGLE_ENABLED=true` en la web sin `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` en la API de ese ambiente.
+
+### Brevo (emails)
+
+**Acceso:** la cuenta de Brevo de MOVE (ya existe), con acceso a **Settings** (remitentes, dominios, API keys y seguridad). La API usa la API transaccional de Brevo (`POST https://api.brevo.com/v3/smtp/email`) ([API](https://developers.brevo.com/reference/send-transac-email)).
+
+**Pasos:**
+
+1. **Autenticar el dominio.** **Settings → Senders, Domains, IPs → Domains → Add a domain** y crear en el DNS los registros que indica Brevo: **código de Brevo** (TXT), **DKIM** y **DMARC** (TXT); después **Authenticate this email domain**. La propagación puede tardar hasta 48 h. Brevo no pide SPF ni MX salvo con IP dedicada ([dominio](https://help.brevo.com/hc/en-us/articles/12163873383186-Authenticate-your-domain-with-Brevo-Brevo-code-DKIM-DMARC)).
+2. **Remitente.** **Senders → Add a sender**: nombre `MOVE` y un email del dominio autenticado (por ejemplo `no-reply@<dominio>`); con el dominio autenticado queda verificado solo ([remitentes](https://help.brevo.com/hc/en-us/articles/208836149-Create-a-new-sender-From-name-and-From-email)). Ese email va a `BREVO_SENDER_EMAIL` y el nombre a `BREVO_SENDER_NAME`.
+3. **API keys.** **Settings → SMTP & API → API Keys & MCP → Generate a new API key**, una por ambiente (`move-dev`, `move-prod`); la clave se ve una sola vez ([API keys](https://help.brevo.com/hc/en-us/articles/209467485-Create-and-manage-your-API-keys)). Según esa página, una API key se desactiva si pasa **90 días sin una llamada exitosa**, aunque se haya elegido "No expiration" (Brevo avisa por email 7 días antes): si el ambiente de desarrollo queda quieto, revisar la clave antes de probar.
+4. **IPs autorizadas (importante con Elastic Beanstalk).** Brevo aprende las IPs que usan cada clave y, si no ve IPs nuevas durante 30 días, **activa solo** el bloqueo de IPs desconocidas ([IPs autorizadas](https://help.brevo.com/hc/en-us/articles/5740111683858-Authorize-and-block-IP-addresses-for-API-and-SMTP-security)). Una instancia de Beanstalk reemplazada sale con otra IP y sus emails quedarían bloqueados. El objetivo es que la API pueda mandar emails aunque cambie su IP de salida. Opciones: desactivar el bloqueo de IPs desconocidas solo para las API keys (hoy en **Settings → Security → Authorized IPs**, sección *Blocking unauthorized IP addresses*, fila *API keys*, botón *Deactivate for API*; Brevo advierte que baja la seguridad de las claves), o darle a la API una IP de salida fija (NAT con IP elástica) y autorizarla en esa misma página. Decidirlo antes de salir a producción.
+
+**Cómo probarlo:** en desarrollo, **¿Olvidaste tu contraseña?** con una cuenta de prueba: llega el email y su link abre **Nueva contraseña**. En la base, `email_logs` registra el envío con estado `sent`; en Brevo se ve en **Transactional → Logs** ([logs](https://help.brevo.com/hc/en-us/articles/360021533839-Manage-your-transactional-logs-and-email-previews)).
+
+**Errores comunes:**
+
+- **Estado `failed` con `error_code` 401 en `email_logs`:** clave inválida, desactivada por falta de uso o bloqueada por IP.
+- **Estado `failed` con 400:** Brevo rechazó el envío; revisar primero que el remitente de `BREVO_SENDER_EMAIL` esté verificado.
+- **Los emails llegan a spam:** falta autenticar el dominio (DKIM y DMARC).
+- **La API no arranca en producción:** faltan `BREVO_API_KEY` o `BREVO_SENDER_EMAIL` (obligatorias con `NODE_ENV=production`).
+
+#### Qué emails manda el sistema
+
+Todos salen después de que se guarda la operación, se registran en `email_logs` antes de enviarse y no se repiten (cada uno tiene una clave de idempotencia).
+
+| Email | Asunto | Cuándo |
+|---|---|---|
+| `password-reset` | Restablecé tu contraseña de MOVE | El cliente pide restablecer su contraseña (link válido 1 hora) |
+| `account-invitation` | Activá tu cuenta de MOVE | El staff crea un cliente nuevo, o un invitado sin cuenta reserva la evaluación de Rehab o una sesión individual de Recovery (link válido 1 hora) |
+| `booking-confirmed` | Tu reserva en MOVE está confirmada | Reserva confirmada, con plan o paquete o al aprobarse su pago |
+| `booking-cancelled` | Tu reserva en MOVE fue cancelada | El staff cancela una reserva |
+| `purchase-approved` | Recibimos tu pago | Se aprueba una compra |
+| `plan-expiring` | Tu plan de MOVE vence pronto | Job de recordatorios (09:00), plan por vencer |
+| `plan-expired` | Tu plan de MOVE venció | Job de recordatorios, plan vencido |
+| `checkin-invite` | ¿Cómo venís? Contanos en 1 minuto | Check-in mensual o envío manual |
+| `rehab-referral` | Te habilitamos el seguimiento fisioterapéutico | **Derivar a Rehab** desde un check-in |
+
+Los clientes en pausa no reciben emails automáticos.
+
+### Bitbucket Pipelines (CI)
+
+**Qué valida hoy.** `bitbucket-pipelines.yml` corre en cada pull request y en `main` y `feature/*`, sobre `node:24` con un Postgres 17 de servicio: `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm test`, e2e de la API contra una base `move_ci_test` y `pnpm build`. **No despliega nada.**
+
+**Acceso:** administrador del repositorio en Bitbucket.
+
+**Pasos:**
+
+1. **Variable `CI_BETTER_AUTH_SECRET`.** **Repository settings → Pipelines → Repository variables → Add variable**, marcada como **Secured**, con 32 o más caracteres aleatorios (`openssl rand -base64 48`) ([variables](https://support.atlassian.com/bitbucket-cloud/docs/variables-and-secrets/)). Es la única variable que necesita el CI; el resto son valores de desarrollo escritos en el propio pipeline. No reutilizar el secreto de ningún ambiente.
+2. **Habilitar Pipelines** en el repositorio si no lo está.
+
+**Cómo probarlo:** abrir un pull request: el paso "Lint, test, e2e and build" termina en verde. Es la primera corrida real: el paso usa `size: 2x` (disponible en todos los planes, pero cuenta el doble de minutos de build, a revisar contra el plan de Bitbucket de la cuenta) e instala `postgresql-client` con `apt-get` dentro del paso.
+
+#### Dónde vive el repositorio
+
+El cierre de este proyecto publica la rama en GitHub (decisión D67) y el repositorio todavía no está conectado a Bitbucket, así que **el pipeline nunca se ejecutó**. `bitbucket-pipelines.yml` solo corre si el repositorio está en Bitbucket: si el repositorio principal queda en GitHub, hay que decidir si se espeja en Bitbucket o si el mismo gate se pasa a otro CI. Vercel se conecta a cualquiera de los dos.
+
+**Sumar el deploy más adelante** (hoy es manual, siguiendo esta guía):
+
+- Usar los ambientes de deployment de Bitbucket (**Repository settings → Pipelines → Deployments**; vienen *Test*, *Staging* y *Production*, renombrables) con un paso por ambiente marcado con `deployment: <ambiente>` ([deployments](https://support.atlassian.com/bitbucket-cloud/docs/set-up-and-monitor-deployments/), [opciones de step](https://support.atlassian.com/bitbucket-cloud/docs/step-options/)).
+- Las credenciales de AWS van como **variables de deployment** seguras de cada ambiente, de un usuario o rol con permiso solo para desplegar esa aplicación de Beanstalk.
+- El paso de deploy reutiliza lo que ya existe: `bash scripts/package-api-eb.sh` (en Linux, como pide el bundle), migraciones con el bundle y despliegue de la versión en el entorno correspondiente. Producción con disparo manual.
+- La web no necesita pasos: Vercel despliega solo desde la rama conectada.
+- Orden de ambientes: desarrollo primero; producción solo desde `main`, nunca un deploy manual a producción fuera del pipeline una vez automatizado.
+
+---
+
+## Parte 5: Puesta en marcha y mantenimiento
+
+### Primer staff de producción
+
+Los clientes se registran desde la web; el staff se crea por línea de comandos, contra la base del ambiente. Desde el paquete de la API descomprimido (el mismo zip que se despliega), con las variables del ambiente exportadas en la sesión y la contraseña por variable:
+
+```bash
+cd /tmp/move-api          # bundle descomprimido: unzip artifacts/move-api-<sha>.zip -d /tmp/move-api
+read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD
+# exportar también NODE_ENV, PORT, WEB_URL, API_PUBLIC_URL, DB_*, BETTER_AUTH_SECRET, MP_*, BREVO_* del ambiente
+SCHEDULER_ENABLED=false node dist/cli/create-staff.js --email <email> --name "<Nombre Apellido>"
+unset CREATE_STAFF_PASSWORD
+```
+
+El comando arranca la aplicación, por eso necesita las mismas variables que la API (con `SCHEDULER_ENABLED=false` para que no corran jobs). Si el email ya tiene una cuenta, agregar `--promote-existing` (ver el paso 4 de [Local, paso a paso](#local-paso-a-paso)). Después, entrar a la web con ese usuario y cambiar la contraseña si se usó una temporal. El comando completo está en [`docs/deploy.md`](../deploy.md#7-crear-el-primer-staff).
+
+### Checklist posterior al deploy
+
+- [ ] `GET https://api.<dominio>/api/health` responde `200` y `{"status":"ok"}`, y el health check de Beanstalk está en verde.
+- [ ] La web carga en `https://<dominio>` y la lista de planes viene de la API (sin errores de CORS en la consola del navegador).
+- [ ] Registro de un cliente nuevo y login: la cookie de sesión queda con `Secure` y dominio `.<dominio>`; recargar mantiene la sesión, también en páginas que se arman en el servidor (Mi perfil, panel de staff).
+- [ ] `POST /api/auth/sign-in/email` con un body JSON normal no responde 413 (el proxy reenvía `content-length`).
+- [ ] `GET /api/staff/dashboard` responde 401 sin sesión y 403 con la sesión de un cliente.
+- [ ] IP real detrás del proxy (`TRUST_PROXY_HOPS=2`): desde una red, 11 `POST /api/checkout/booking` seguidos con ids inexistentes dan 404 los primeros 10 y 429 el 11.º; agregar `-H 'X-Forwarded-For: 1.2.3.4'` no lo evita; y en el mismo minuto, desde otra red (por ejemplo datos móviles), la primera request da 404, no 429.
+- [ ] Ingreso del staff y apertura de Dashboard, Clientes y Configuración.
+- [ ] Pago de prueba de punta a punta con credenciales de prueba de Mercado Pago (en desarrollo) hasta ver la suscripción activa.
+- [ ] Webhook: en desarrollo, **Webhooks → Simular** a la URL de pruebas responde 200 (o 502 con un id inventado, nunca 401). En producción, con el primer pago real, aparece `webhook payment=<id>` en el log y la compra pasa a aprobada sin esperar la conciliación; si solo hay 401, ver [D68](#decisión-d68-avisos-de-mercado-pago). Los 401 a avisos IPN (`?topic=…`) son esperados. Reenviar un aviso no duplica nada.
+- [ ] Email recibido: restablecer la contraseña de una cuenta de prueba y recibir el correo (o verlo en los logs de Brevo).
+- [ ] Jobs en los logs: aparecen las líneas de `expire-holds` y `reconcile-payments` (corren solas) y, tras **Ejecutar detección ahora**, la de `followup-detect`. Con varias instancias, solo una registra los jobs.
+- [ ] Neon: las tablas existen en la base del ambiente y la conexión usa SSL.
+- [ ] Google (si se activó): **Continuar con Google** ingresa y vuelve a la plataforma.
+- [ ] Reemplazar los valores provisorios de Configuración (aviso "Valores provisorios — confirmar con MOVE") con los que defina MOVE y tildar **Marcar los valores como confirmados**.
+
+### Rollback
+
+- **API:** volver a desplegar la versión anterior desde Elastic Beanstalk (cada zip subido queda como versión de la aplicación). Las migraciones no se revierten solas: si una migración nueva no es compatible hacia atrás, revertirla **antes** con el bundle nuevo (`node_modules/.bin/typeorm migration:revert -d dist/database/data-source.js`).
+- **Web:** en Vercel, *Instant Rollback* a un deploy anterior ([documentación](https://vercel.com/docs/instant-rollback)).
+- **Base:** Neon guarda historial para restaurar un branch a un momento anterior ([documentación](https://neon.com/docs/introduction/branch-restore)); usarlo solo si el problema es de datos.
 
 ### Regenerar este manual
 
-Este manual y sus capturas se generan con datos de demostración inventados. Las contraseñas **nunca** van en el manual, en los scripts ni en los logs: se pasan por variables de entorno.
-
-Los scripts **no necesitan archivos `.env`**: toman todo del entorno del proceso. `manual:demo-data` usa `DB_NAME` y `DB_USER` del entorno (para la historia por SQL) y solo si faltan los lee de `apps/api/.env`, si ese archivo existe; si no hay ni entorno ni archivo, falla con un mensaje claro.
+Este manual y sus capturas se generan con datos de demostración inventados. Las contraseñas **nunca** van en el manual, en los scripts ni en los logs: se pasan por variables de entorno. Los scripts **no necesitan archivos `.env`**: toman todo del entorno del proceso. `manual:demo-data` usa `DB_NAME` y `DB_USER` del entorno (para la historia por SQL) y solo si faltan los lee de `apps/api/.env`, si ese archivo existe; si no hay ni entorno ni archivo, falla con un mensaje claro.
 
 ```bash
-# 1. Base de demostración vacía (migrada y con seed) y un staff creado con user:create-staff (paso 3 de arriba),
+# 1. Base de demostración vacía (migrada y con seed) y un staff creado con user:create-staff (paso 4 de "Local, paso a paso"),
 #    usando como CREATE_STAFF_PASSWORD la misma contraseña que se va a pasar en MANUAL_STAFF_PASSWORD
 # 2. API y web corriendo, con la web compilada para producción (pnpm --filter @move/web build, con NODE_ENV=production
 #    si el shell tiene otro valor, y pnpm --filter @move/web start). Definir DB_NAME (y DB_USER si no es "move"),
@@ -408,56 +995,29 @@ read -rs MANUAL_CLIENT_PASSWORD && export MANUAL_CLIENT_PASSWORD     # mínimo 8
 pnpm exec playwright install chromium     # una sola vez
 pnpm manual:demo-data       # carga 10 clientes de ejemplo en distintos estados, reservas, pagos, alertas y check-ins
 pnpm manual:screenshots     # una captura por pantalla en docs/manual/img/ (1440×900)
+node scripts/manual/render-diagram.mjs    # solo si cambió docs/manual/arquitectura.html: regenera img/arquitectura.png
 # editar docs/manual/manual-de-usuario.md si cambió algo
 pnpm manual:pdf             # genera docs/manual/manual-de-usuario.pdf (A4, imágenes embebidas)
 ```
 
+- Para cambiar solo el texto o el diagrama no hace falta la base ni la API: alcanza con editar el Markdown (o `arquitectura.html` y correr `render-diagram.mjs`) y correr `pnpm manual:pdf`.
 - `manual:demo-data` falla con un mensaje claro si la base ya tiene datos de demostración. La historia (asistencias pasadas y planes que vencen o vencieron) no se puede crear por la API porque no admite reservar ni marcar asistencia en el pasado: esos datos se insertan con SQL en la base de desarrollo mediante `docker exec <contenedor> psql` (contenedor `move-postgres`, o `MANUAL_DB_CONTAINER`), solo para los clientes de demostración.
 - `manual:screenshots` compra un paquete de Recovery con el cliente de demostración Nicolás Acosta (checkout → simulador → resultado); volver a correrlo agrega otra compra, así que para repetir las capturas conviene recrear la base de demostración. La captura de Recovery (`07`) se toma sin sesión iniciada, como un invitado.
 - Usuarios de la demostración: staff `staff@example.com` (o `MANUAL_STAFF_EMAIL`) con la contraseña de `MANUAL_STAFF_PASSWORD`; clientes `sofia.martinez@example.com`, `martin.rodriguez@example.com`, `lucia.pereira@example.com`, `andres.silva@example.com`, `camila.fernandez@example.com`, `joaquin.techera@example.com`, `valentina.gomez@example.com`, `federico.alvarez@example.com`, `diego.machado@example.com` y `nicolas.acosta@example.com`, todos con la contraseña de `MANUAL_CLIENT_PASSWORD`.
 
-### Pasos faltantes para el deploy
-
-Fuente completa: [`docs/deploy.md`](../deploy.md). Nada de esto se ejecutó todavía; requiere los accesos a Neon, AWS, Vercel y los proveedores. En orden:
-
-1. **Base de datos en Neon.** Crear una base nueva (Postgres 17, sin reutilizar el esquema anterior). Usar el host **directo** (sin `-pooler`: los jobs usan locks de sesión). Definir `DB_*` con `DB_SSL=true`. Correr las migraciones **antes** de cambiar el tráfico, desde el mismo bundle que se despliega (`node_modules/.bin/typeorm migration:run -d dist/database/data-source.js`) y cargar el seed (`node dist/database/seed.js`).
-2. **API en AWS Elastic Beanstalk (Node 24).** Generar el zip con `bash scripts/package-api-eb.sh`, crear el entorno *Web server* con la plataforma Node.js 24, cargar las variables de entorno de la API, subir el zip y configurar el health check en `GET /api/health`. HTTPS con certificado en ACM y dominio `api.move.uy`.
-3. **Proxy y límite de body de auth.** `/api/auth/*` responde 413 a cualquier request de más de 64 KB o con `Transfer-Encoding` sin `content-length`. El proxy (Nginx de Beanstalk o el ALB) tiene que **reenviar `content-length`**: dejar `proxy_request_buffering on` (el default).
-4. **IP del cliente detrás del proxy (`TRUST_PROXY_HOPS`).** El checkout limita los intentos por IP (10 por minuto y, en reservas, 20 por hora). Detrás del ALB y el Nginx de Beanstalk la API recibe todas las requests desde el proxy, así que hay que definir `TRUST_PROXY_HOPS=2` (un solo dígito de 0 a 5; el default `0` ignora `X-Forwarded-For`). **Nunca `true`**: confiaría en todo el header, que el cliente puede escribir, y cualquiera podría saltarse el límite cambiando su IP. Un valor mayor que la cantidad real de proxies tiene el mismo problema; uno menor (o dejar `0`) hace que todos los clientes compartan un solo contador y el checkout se bloquee para todos. Si cambia la topología (por ejemplo, se agrega CloudFront), ajustar el valor y repetir la verificación "IP real detrás del proxy" del checklist. Además, los contadores viven en la memoria de cada instancia: con N instancias el límite efectivo es hasta N veces el configurado. Detalle en [`docs/deploy.md`](../deploy.md#proxy-ip-del-cliente-y-límites-de-checkout).
-5. **Scheduler en una sola instancia.** Dejar el entorno con una instancia, o `SCHEDULER_ENABLED=true` en una y `false` en las demás (solo se aceptan esos dos valores).
-6. **Web en Vercel.** Importar el repo con *Root Directory* `apps/web`, Node 24, definir `NEXT_PUBLIC_API_URL` (con `/api`) y, si corresponde, `NEXT_PUBLIC_GOOGLE_ENABLED`. Producción desde `main`; los previews apuntan a la API de **desarrollo**, nunca a la de producción.
-7. **Dominio raíz y cookies.** Web y API bajo el mismo dominio raíz para que la cookie de sesión sea first-party: `COOKIE_DOMAIN=.move.uy` (con el punto inicial), `WEB_URL=https://move.uy`, `API_PUBLIC_URL=https://api.move.uy`, `NEXT_PUBLIC_API_URL=https://api.move.uy/api`. `api.move.uy` es un CNAME al entorno de Beanstalk y `move.uy` usa los registros que indique Vercel. En producción las cookies son `Secure`: probar siempre por HTTPS.
-8. **Primer staff de producción.** Con las variables `DB_*` de producción y `CREATE_STAFF_PASSWORD` por variable: `node dist/cli/create-staff.js --email <email> --name "<Nombre Apellido>"` desde el bundle descomprimido (con `SCHEDULER_ENABLED=false`). Si el email ya tiene una cuenta, agregar `--promote-existing` (ver el paso 3 de "Correr todo en local").
-9. **Checklist posterior al deploy** (ver el detalle en `docs/deploy.md`): health, IP real detrás del proxy (`TRUST_PROXY_HOPS=2`), carga de la web sin errores de CORS, registro y login con cookie `Secure` y dominio `.move.uy`, `/api/staff/dashboard` con 401 sin sesión y 403 con sesión de cliente, pago de prueba de punta a punta, webhook recibido, email recibido, crons en los logs, y **reemplazar los valores provisorios** de Configuración.
-
-En producción (`NODE_ENV=production`) la API exige las credenciales de proveedores y deshabilita el simulador de pagos.
-
-### Pasos faltantes por integración
-
-#### Mercado Pago
-
-1. Probar de punta a punta primero con las **credenciales de prueba** (usuarios y tarjetas de prueba) en un entorno de staging; recién después pasar a las de producción.
-2. Cargar `MP_ACCESS_TOKEN` (access token de la aplicación).
-3. En *Tus integraciones → Webhooks* configurar la **URL pública** `https://<api>/api/payments/webhook/mercadopago` con el evento de pagos y copiar la clave secreta a `MP_WEBHOOK_SECRET`.
-4. La API verifica la firma de cada notificación (firma inválida: 401 sin efectos) y es idempotente: repetir una notificación, o recibirla además por la conciliación periódica, no duplica la suscripción ni extiende la vigencia dos veces.
-5. A tener en cuenta: los pagos de plan rechazados quedan `pending` (el cliente puede reintentar); si un pago se aprueba cuando la reserva ya venció y el turno no tiene cupo, la compra queda aprobada y marcada para atención del staff.
-
-#### Brevo
-
-1. Verificar el dominio o el remitente en Brevo y crear una API key.
-2. Cargar `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` (el **remitente verificado**) y, si se quiere, `BREVO_SENDER_NAME` (default `MOVE`).
-3. Sin `BREVO_API_KEY` la API no envía nada (dry-run). En producción la variable es obligatoria.
-
-#### Google OAuth (opcional)
-
-1. En Google Cloud Console crear un cliente OAuth tipo *Web application*.
-2. Orígenes autorizados: `https://move.uy`. URI de redirección autorizada: `https://<api>/api/auth/callback/google` (por ejemplo `https://api.move.uy/api/auth/callback/google`).
-3. Cargar `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` (las dos o ninguna) en la API y `NEXT_PUBLIC_GOOGLE_ENABLED=true` en Vercel. Una cuenta por email: Google se vincula a la cuenta que ya exista con ese email.
-
-#### Dominio y cookies
-
-Ver el paso 7 del deploy. Si la web y la API quedaran en dominios distintos, la cookie de sesión dejaría de ser first-party y el login no funcionaría como está diseñado.
-
 ### Valores provisorios y decisiones abiertas
 
-Los planes, precios, horarios y umbrales son los del mockup y deben ser confirmados por MOVE. Hasta entonces la pantalla de Reglas muestra "Valores provisorios — confirmar con MOVE".
+- Planes, precios, horarios y umbrales son los del mockup y deben ser confirmados por MOVE. Hasta entonces la pantalla de Reglas muestra "Valores provisorios — confirmar con MOVE".
+- Dominio final de la plataforma (hoy `moveperformance.uy` es el sitio anterior) y dominio registrable de desarrollo (`<dominio-dev>`). Si en lugar de eso se elige `dev.<dominio>`, es un riesgo de seguridad aceptado (la sesión de producción, también la del staff, llega al código de desarrollo) y los perfiles de navegador separados pasan a ser regla (ver [Ambientes separados](#ambientes-separados-de-desarrollo-y-producción)).
+- Dónde vive el repositorio y qué CI lo valida (ver [Dónde vive el repositorio](#dónde-vive-el-repositorio)).
+- Cuenta de AWS: crear o confirmar la de MOVE.
+- Si se escala la API a varias instancias: mover el límite de intentos del checkout a un almacén compartido (hoy en memoria) y dejar el scheduler en una sola.
+
+#### Decisión D68: avisos de Mercado Pago
+
+Abierta; no implementada en código en este proyecto. Hoy la API manda una `notification_url` en cada preferencia y responde 401 a todo aviso sin firma válida, incluidos los avisos IPN, que Mercado Pago puede mandar a esa URL y que no se pueden firmar. Antes de salir a producción, elegir una opción:
+
+- **(a)** Que la API responda 200 sin efectos a los avisos con formato IPN o que no sean de pagos, **antes** de verificar la firma, y siga verificando la firma de los avisos de pago.
+- **(b) Recomendada.** Quitar la `notification_url` de cada preferencia y usar solo la URL configurada en el panel (**Webhooks**), con **una aplicación de Mercado Pago por ambiente**. Así cada ambiente tiene también su propia clave secreta (hoy es la única credencial compartida entre desarrollo y producción).
+
+Cualquiera de las dos se confirma con un pago real: en el log aparece `webhook payment=<id>` y la compra se aprueba sin esperar la conciliación.
