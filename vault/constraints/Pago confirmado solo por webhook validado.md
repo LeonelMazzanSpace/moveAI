@@ -1,18 +1,20 @@
 ---
 type: constraint
-status: todo
+status: shipped
 semana: 2
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p11
-  - move/MOVE.pdf#p12
+  - move/apps/api/src/modules/payments/domain/webhook-signature.ts
+  - move/apps/api/src/modules/payments/controllers/webhook.controller.ts
+  - move/apps/api/test/webhook.e2e-spec.ts
 ---
 # Pago confirmado solo por webhook validado
 
-El PDF pide que el backend reciba y valide las confirmaciones de Mercado Pago. El
-mecanismo es propuesta del vault: el estado se toma solo de una notificación con firma
-`x-signature` válida y re-consultada en la API de Mercado Pago, nunca de la
-redirección del navegador.
+El estado de un pago de Mercado Pago se toma solo de una notificación con firma
+`x-signature` válida, re-consultada en la API del proveedor, o de la conciliación;
+nunca de la redirección del navegador. Una firma inválida responde 401 sin efectos.
+Las otras vías de alta son el pago manual del staff y el simulador, que no existe en
+producción.
 
 ## Structural
 - constrains → [[Modulo pagos]]

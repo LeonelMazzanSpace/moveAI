@@ -1,18 +1,20 @@
 ---
 type: system
-status: todo
+status: shipped
 semana: 1
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p4
-  - move/MOVE.pdf#p9
-  - move/MOVE.pdf#p11
+  - move/apps/api/src/modules/bookings/bookings.module.ts
+  - move/apps/api/src/modules/bookings/services/bookings.service.ts
+  - move/apps/api/src/modules/bookings/services/attendance.service.ts
+  - move/apps/api/src/modules/bookings/domain/booking-rules.ts
+  - move/apps/api/src/modules/bookings/jobs/expire-holds.job.ts
 ---
 # Modulo reservas
 
-Módulo de reservas, cancelaciones y asistencia de los tres servicios. Valida plan
-vigente y cupo al reservar, y deja al staff marcar presente, ausente o no show por
-turno.
+Reservas, retenciones pendientes de pago, cancelaciones y asistencia de los tres
+servicios. Valida plan, paquete o habilitación de seguimiento y cupo dentro de una
+transacción con bloqueo del turno; el staff cancela y marca asistencia.
 
 ## Structural
 - is part of → [[API NestJS]]
@@ -20,3 +22,5 @@ turno.
 - depends on → [[Modulo suscripciones]]
 - depends on → [[Modulo usuarios]]
 - depends on → [[Modulo auth]] because reservar exige sesión o crearla en el flujo
+- depends on → [[Modulo notificaciones]] because emails de confirmación y cancelación
+- depends on → [[Modulo configuracion]] because límite de cancelación y vencimiento de retenciones

@@ -1,11 +1,10 @@
 ---
 type: concept
-status: todo
+status: shipped
 updated: 2026-10-13
 source:
   - move/MOVE.pdf#p3
-  - move/imagenes/htmls/02-perfiles-usuario.html
-  - move/imagenes/finales/02-perfiles-usuario.png
+  - move/apps/web/src/components/checkout/guest-form.tsx
 ---
 # Perfil Visitante
 

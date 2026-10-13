@@ -31,7 +31,7 @@ Correr `python3 _meta/check.py` después de editar.
 | status | En una nota de sistema, pantalla o restricción | En una falla |
 | --- | --- | --- |
 | `shipped` | Existe en el repo y se verificó en la fecha de `updated` (para reglas de proceso: vigente) | Ya hay una defensa activa en el código |
-| `built-off-by-default` | Existe en el código pero está apagada por configuración | — |
+| `built-off-by-default` | Existe en el código pero está apagada por configuración | La defensa existe pero hay que activarla por configuración al desplegar |
 | `todo` | Confirmada por `MOVE.pdf`, por un estándar SpaceDev (el texto lo dice) o por una decisión del equipo; todavía no implementada | No hay defensa implementada |
 | `proposed` | Diseño inferido por el vault que **no está en el PDF**: confirmarlo con el equipo | — |
 | `draft` | Decisión abierta o dato del cliente que falta: **bloquea**, preguntar | — |

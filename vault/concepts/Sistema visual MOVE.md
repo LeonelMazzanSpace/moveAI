@@ -1,6 +1,6 @@
 ---
 type: concept
-status: todo
+status: shipped
 updated: 2026-10-13
 source:
   - move/imagenes/htmls/01-sitio-publico.html
@@ -8,10 +8,10 @@ source:
 ---
 # Sistema visual MOVE
 
-Estética de los mockups: modo oscuro puro (bg #000, soft #0c0c0c, card #121212,
-línea #262626, muted #9a9a9a), Archivo 800–900 en mayúsculas para títulos, Inter para
-texto, etiquetas con tracking amplio y bordes de radio chico. Estados en emerald,
-amber y red con fondo al 10%.
+Estética de los mockups: modo oscuro puro con fondos en escala de grises, Archivo
+800–900 en mayúsculas para títulos, Inter para texto, etiquetas con tracking amplio y
+radio chico. Estados en verde, ámbar y rojo con fondo tenue. Está cargado como tokens
+del tema en `globals.css`.
 
 ## Structural
 - constrains → [[App web Next]]

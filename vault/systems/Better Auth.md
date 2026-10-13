@@ -1,13 +1,14 @@
 ---
 type: system
-status: todo
+status: shipped
 semana: 1
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p10
+  - move/apps/api/package.json
+  - move/apps/api/src/modules/auth/better-auth.factory.ts
 ---
 # Better Auth
 
-Librería de autenticación self-hosted que persiste usuarios y sesiones en
-PostgreSQL, sin costo de un IdP administrado. Cubre registro por email, login,
-recuperación de acceso, login con Google y roles.
+Librería de autenticación self-hosted que persiste usuarios, sesiones, cuentas y
+verificaciones en PostgreSQL. Hay una sola instancia, creada en el módulo auth de la
+API; cubre registro por email, login, recuperación de contraseña y Google.

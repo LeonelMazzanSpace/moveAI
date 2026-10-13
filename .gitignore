@@ -13,3 +13,7 @@ vault/.obsidian/plugins/
 
 # Claude Code runtime
 .claude/scheduled_tasks.lock
+
+# Orchestration (local)
+SCRATCHPAD.md
+artifacts/

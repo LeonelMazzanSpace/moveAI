@@ -6,15 +6,33 @@ copy lives in the origin note, this is only the reverse lookup.
 ## ADR arquitectura hexagonal por modulo
 - ADR modulos simples por dominio — supersedes → ADR arquitectura hexagonal por modulo
 
+## ADR conciliacion de compras de plan vencidas
+- ADR conciliacion re-consulta compras vencidas — supersedes → ADR conciliacion de compras de plan vencidas
+
+## ADR desarrollo sin accesos a proveedores
+- ADR simulador registrado con ConditionalModule — requires → ADR desarrollo sin accesos a proveedores
+
+## ADR manual de usuario con capturas
+- ADR manual con guia de proveedores — requires → ADR manual de usuario con capturas
+
 ## ADR modulos simples por dominio
 - ADR arquitectura hexagonal por modulo — contrasts with → ADR modulos simples por dominio
+
+## ADR pago de plan rechazado deja la compra pendiente
+- ADR reintento visible para plan rechazado — requires → ADR pago de plan rechazado deja la compra pendiente
+
+## ADR pago tardio sin lugar queda para el staff
+- ADR conciliacion re-consulta compras vencidas — requires → ADR pago tardio sin lugar queda para el staff
+- ADR retencion vencida sin lugar no se reconfirma — requires → ADR pago tardio sin lugar queda para el staff
 
 ## ADR ubicacion de Better Auth
 - ADR Better Auth con Google OAuth — opens a question about → ADR ubicacion de Better Auth
 
 ## API NestJS
 - ADR NestJS 12 en ESM — constrains → API NestJS
+- ADR errores 4xx fuera de contrato como validacion — constrains → API NestJS
 - ADR modulos simples por dominio — constrains → API NestJS
+- ADR un parser por variable de entorno — constrains → API NestJS
 - App web Next — depends on → API NestJS because toda la lógica de negocio vive en la API
 - CORS restringido a la web — constrains → API NestJS
 - Contrato front-back definido antes de implementar — constrains → API NestJS
@@ -22,11 +40,15 @@ copy lives in the origin note, this is only the reverse lookup.
 - Entidades ORM no salen del servicio — constrains → API NestJS
 - Errores internos no expuestos — constrains → API NestJS
 - Esquema solo via migraciones — constrains → API NestJS
+- IP real del cliente detras del proxy — constrains → API NestJS
 - Imports relativos con extension js — constrains → API NestJS
+- Manual de usuario — depends on → API NestJS because carga los datos de demo por HTTP
 - Modulo agenda — is part of → API NestJS
 - Modulo auth — is part of → API NestJS
 - Modulo automatizaciones — is part of → API NestJS
 - Modulo catalogo — is part of → API NestJS
+- Modulo clientes — is part of → API NestJS
+- Modulo configuracion — is part of → API NestJS
 - Modulo notificaciones — is part of → API NestJS
 - Modulo pagos — is part of → API NestJS
 - Modulo reservas — is part of → API NestJS
@@ -35,15 +57,22 @@ copy lives in the origin note, this is only the reverse lookup.
 - Modulo usuarios — is part of → API NestJS
 - NestJS Scheduler — is part of → API NestJS
 - Nombres snake_case en DB — constrains → API NestJS
+- Queries crudas con RETURNING via CTE — constrains → API NestJS
 - Sin datos personales en logs — constrains → API NestJS
 - Sin secretos en codigo — constrains → API NestJS
 - Soft delete en datos de negocio — constrains → API NestJS
 - Validacion de entrada con DTOs — constrains → API NestJS
+- Variable de entorno parseada una sola vez — constrains → API NestJS
 - Variables de entorno validadas al arrancar — constrains → API NestJS
+
+## API inalcanzable detras del proxy de Elastic Beanstalk
+- PORT explicito en Elastic Beanstalk — prevents → API inalcanzable detras del proxy de Elastic Beanstalk
 
 ## AWS Elastic Beanstalk
 - ADR Elastic Beanstalk para la API — constrains → AWS Elastic Beanstalk
+- ADR sin deploy en el run del MVP — constrains → AWS Elastic Beanstalk
 - Ambientes dev y produccion separados — constrains → AWS Elastic Beanstalk
+- PORT explicito en Elastic Beanstalk — constrains → AWS Elastic Beanstalk
 - Web y API bajo el mismo dominio raiz — constrains → AWS Elastic Beanstalk
 
 ## Accesos y definiciones operativas al inicio
@@ -67,6 +96,9 @@ copy lives in the origin note, this is only the reverse lookup.
 - Jobs programados idempotentes — prevents → Alertas o emails duplicados
 - Webhook duplicado procesado dos veces — causes → Alertas o emails duplicados
 
+## Ambiente dev en dominio registrable propio
+- Ambientes dev y produccion separados — requires → Ambiente dev en dominio registrable propio because las previews automáticas no llegan a la API de dev
+
 ## Ambientes dev y produccion separados
 - ADR Vercel para la web — establishes → Ambientes dev y produccion separados
 
@@ -74,11 +106,14 @@ copy lives in the origin note, this is only the reverse lookup.
 - ADR Next App Router en lugar de Vite — constrains → App web Next
 - ADR capa de datos del frontend — constrains → App web Next
 - ADR shadcn base-nova sobre Base UI — constrains → App web Next
+- ADR volver a la pagina exacta tras ingresar — constrains → App web Next
 - Area cliente web — is part of → App web Next
 - Area publica web — is part of → App web Next
 - Contrato front-back definido antes de implementar — constrains → App web Next
 - Estilos via tokens del tema — constrains → App web Next
 - Formularios validados con Zod — constrains → App web Next
+- Helpers compartidos fuera de modulos use client — constrains → App web Next
+- Manual de usuario — depends on → App web Next because captura las pantallas reales
 - Panel staff web — is part of → App web Next
 - Sin secretos en codigo — constrains → App web Next
 - Sistema visual MOVE — constrains → App web Next
@@ -112,12 +147,20 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Autorizacion validada en la API
 - ADR Better Auth con Google OAuth — establishes → Autorizacion validada en la API
 
+## Base de dev borrada por expiracion de rama Neon
+- Rama dev de Neon sin expiracion — prevents → Base de dev borrada por expiracion de rama Neon
+
 ## Better Auth
 - ADR Better Auth con Google OAuth — constrains → Better Auth
 - Modulo auth — depends on → Better Auth
 
 ## Brevo
+- ADR desarrollo sin accesos a proveedores — constrains → Brevo
+- Bloqueo de IPs de Brevo resuelto antes de produccion — constrains → Brevo
 - Modulo notificaciones — depends on → Brevo
+
+## Build de Next falla con NODE_ENV development
+- ADR sin archivos env nuevos — enables → Build de Next falla con NODE_ENV development
 
 ## Cancelacion
 - Cancelacion con limite configurable — constrains → Cancelacion
@@ -130,6 +173,10 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Check-in
 - Check-in con molestia genera alerta — constrains → Check-in
 - Envio de check-ins — is part of → Check-in
+
+## Checkout publico limitado por IP
+- ADR IP real detras del proxy y ventana horaria — establishes → Checkout publico limitado por IP
+- ADR limite de retenciones y de checkout por IP — establishes → Checkout publico limitado por IP
 
 ## Circuito principal MOVE
 - ADR alcance MVP en cuatro semanas — constrains → Circuito principal MOVE
@@ -150,6 +197,9 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Conexion SSL a la base en produccion
 - ADR Neon como base productiva — establishes → Conexion SSL a la base en produccion
+
+## Config leida al importar antes de cargar el entorno
+- Variables de entorno validadas al arrancar — mitigates → Config leida al importar antes de cargar el entorno
 
 ## Configuracion operativa administrada por staff
 - ADR calendario propio — establishes → Configuracion operativa administrada por staff
@@ -215,16 +265,24 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Email automatico indebido al cliente
 - Clientes en pausa excluidos de alertas — prevents → Email automatico indebido al cliente
 
+## Emails bloqueados por IP nueva en Brevo
+- ADR Elastic Beanstalk para la API — enables → Emails bloqueados por IP nueva en Brevo
+- Bloqueo de IPs de Brevo resuelto antes de produccion — prevents → Emails bloqueados por IP nueva en Brevo
+
 ## Entidad ORM expuesta en la API
 - Entidades ORM no salen del servicio — prevents → Entidad ORM expuesta en la API
 
 ## Entidades ORM no salen del servicio
 - ADR modulos simples por dominio — establishes → Entidades ORM no salen del servicio
 
+## Errores internos no expuestos
+- ADR errores 4xx fuera de contrato como validacion — establishes → Errores internos no expuestos
+
 ## Esquema solo via migraciones
 - ADR TypeORM con migraciones por CLI — establishes → Esquema solo via migraciones
 
 ## Estado del cliente
+- ADR renovacion programada no cuenta como por vencer — constrains → Estado del cliente
 - Alerta de seguimiento — depends on → Estado del cliente
 
 ## Estilos via tokens del tema
@@ -243,7 +301,15 @@ copy lives in the origin note, this is only the reverse lookup.
 - ADR capa de datos del frontend — establishes → Formularios validados con Zod
 
 ## Google OAuth
+- ADR desarrollo sin accesos a proveedores — constrains → Google OAuth
 - Modulo auth — depends on → Google OAuth
+
+## Guard muerto por UPDATE RETURNING sin CTE
+- Queries crudas con RETURNING via CTE — prevents → Guard muerto por UPDATE RETURNING sin CTE
+
+## Helper de modulo use client rompe un Server Component
+- ADR sin E2E web de demos — enables → Helper de modulo use client rompe un Server Component
+- Helpers compartidos fuera de modulos use client — prevents → Helper de modulo use client rompe un Server Component
 
 ## Historial del cliente
 - Circuito principal MOVE — depends on → Historial del cliente
@@ -262,9 +328,14 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Horario retenido por pago abandonado
 - Reserva pendiente de pago expira — prevents → Horario retenido por pago abandonado
+- Retenciones masivas de invitados — causes → Horario retenido por pago abandonado
 
 ## IA y planificaciones fuera del MVP
 - ADR alcance MVP en cuatro semanas — establishes → IA y planificaciones fuera del MVP
+
+## IP real del cliente detras del proxy
+- ADR IP real detras del proxy y ventana horaria — establishes → IP real del cliente detras del proxy
+- Checkout publico limitado por IP — requires → IP real del cliente detras del proxy because sin la IP real todos comparten un contador
 
 ## Imports relativos con extension js
 - ADR NestJS 12 en ESM — establishes → Imports relativos con extension js
@@ -291,7 +362,13 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Logica de negocio fuera de Mercado Pago
 - ADR Mercado Pago como procesador de pagos — establishes → Logica de negocio fuera de Mercado Pago
 
+## Manual de usuario
+- ADR manual con guia de proveedores — constrains → Manual de usuario
+- ADR manual de usuario con capturas — constrains → Manual de usuario
+- ADR sin archivos env nuevos — constrains → Manual de usuario
+
 ## Mercado Pago
+- ADR desarrollo sin accesos a proveedores — constrains → Mercado Pago
 - Modulo pagos — depends on → Mercado Pago
 - Pago — depends on → Mercado Pago
 
@@ -305,7 +382,8 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Modulo agenda
 - ADR calendario propio — constrains → Modulo agenda
-- Accesos y definiciones operativas al inicio — constrains → Modulo agenda because horarios, cupos y límite de cancelación
+- ADR profesionales inactivos fuera de la agenda — constrains → Modulo agenda
+- Accesos y definiciones operativas al inicio — constrains → Modulo agenda because horarios y cupos reales
 - Configuracion operativa administrada por staff — constrains → Modulo agenda
 - Horario — is part of → Modulo agenda
 - Modulo reservas — depends on → Modulo agenda
@@ -315,6 +393,7 @@ copy lives in the origin note, this is only the reverse lookup.
 - Pantalla configuracion staff — depends on → Modulo agenda
 
 ## Modulo auth
+- ADR Better Auth endurecido — constrains → Modulo auth
 - ADR ubicacion de Better Auth — constrains → Modulo auth
 - Area cliente web — depends on → Modulo auth
 - Autorizacion validada en la API — constrains → Modulo auth
@@ -326,6 +405,7 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Modulo automatizaciones
 - ADR automatizaciones con NestJS Scheduler — constrains → Modulo automatizaciones
+- ADR renovacion programada no cuenta como por vencer — constrains → Modulo automatizaciones
 - Clientes en pausa excluidos de alertas — constrains → Modulo automatizaciones
 - Fechas en zona horaria de Uruguay — constrains → Modulo automatizaciones
 - Jobs programados idempotentes — constrains → Modulo automatizaciones
@@ -347,21 +427,42 @@ copy lives in the origin note, this is only the reverse lookup.
 - Servicio Recovery — is part of → Modulo catalogo
 - Servicio Rehab — is part of → Modulo catalogo
 
+## Modulo clientes
+- Alta manual de clientes — is part of → Modulo clientes
+- Pantalla clientes staff — depends on → Modulo clientes
+- Pantalla dashboard staff — depends on → Modulo clientes
+- Pantalla perfil cliente — depends on → Modulo clientes
+
+## Modulo configuracion
+- Configuracion operativa administrada por staff — constrains → Modulo configuracion
+- Modulo agenda — depends on → Modulo configuracion because ventana de reserva y valores operativos
+- Modulo reservas — depends on → Modulo configuracion because límite de cancelación y vencimiento de retenciones
+- Modulo seguimiento — depends on → Modulo configuracion because umbrales de detección
+- Pantalla configuracion staff — depends on → Modulo configuracion
+
 ## Modulo notificaciones
 - ADR Brevo para emails — constrains → Modulo notificaciones
 - Integraciones externas encapsuladas en un servicio — constrains → Modulo notificaciones
 - Modulo automatizaciones — depends on → Modulo notificaciones
+- Modulo reservas — depends on → Modulo notificaciones because emails de confirmación y cancelación
 - Pantalla Recovery — depends on → Modulo notificaciones because email de confirmación
 - Pantalla Rehab — depends on → Modulo notificaciones because email de confirmación
 - Pantalla check-in — depends on → Modulo notificaciones because envío del check-in
 
 ## Modulo pagos
 - ADR Mercado Pago como procesador de pagos — constrains → Modulo pagos
+- ADR conciliacion de compras de plan vencidas — constrains → Modulo pagos
+- ADR conciliacion re-consulta compras vencidas — constrains → Modulo pagos
+- ADR notificaciones de Mercado Pago por ambiente — constrains → Modulo pagos
+- ADR pago de plan rechazado deja la compra pendiente — constrains → Modulo pagos
+- ADR pago tardio sin lugar queda para el staff — constrains → Modulo pagos
 - Activacion en la misma transaccion que el pago — constrains → Modulo pagos
+- Checkout publico limitado por IP — constrains → Modulo pagos
 - Compra — is part of → Modulo pagos
 - Conciliacion periodica de pagos pendientes — constrains → Modulo pagos
 - Integraciones externas encapsuladas en un servicio — constrains → Modulo pagos
 - Logica de negocio fuera de Mercado Pago — constrains → Modulo pagos
+- Modulo clientes — depends on → Modulo pagos
 - Operaciones de pago idempotentes — constrains → Modulo pagos
 - Pago confirmado solo por webhook validado — constrains → Modulo pagos
 - Pantalla Recovery — depends on → Modulo pagos
@@ -369,11 +470,14 @@ copy lives in the origin note, this is only the reverse lookup.
 - Pantalla checkout de pago — depends on → Modulo pagos
 - Pantalla pagos staff — depends on → Modulo pagos
 - Scheduler corre en una sola instancia — constrains → Modulo pagos
+- Simulador de pagos de desarrollo — is part of → Modulo pagos
 - Webhook de Mercado Pago — is part of → Modulo pagos
 
 ## Modulo reservas
+- ADR retencion vencida sin lugar no se reconfirma — constrains → Modulo reservas
 - Asistencia — is part of → Modulo reservas
 - Cancelacion — is part of → Modulo reservas
+- Modulo clientes — depends on → Modulo reservas
 - Modulo pagos — depends on → Modulo reservas because confirma reservas pagas de Rehab y Recovery
 - Modulo seguimiento — depends on → Modulo reservas
 - Pantalla Performance — depends on → Modulo reservas
@@ -388,12 +492,14 @@ copy lives in the origin note, this is only the reverse lookup.
 - Alerta de seguimiento — is part of → Modulo seguimiento
 - Check-in — is part of → Modulo seguimiento
 - Modulo automatizaciones — depends on → Modulo seguimiento
+- Modulo clientes — depends on → Modulo seguimiento
 - Motivo de inactividad — is part of → Modulo seguimiento
 - Pantalla check-in — depends on → Modulo seguimiento
 - Pantalla clientes staff — depends on → Modulo seguimiento
 - Pantalla seguimiento — depends on → Modulo seguimiento
 
 ## Modulo suscripciones
+- Modulo clientes — depends on → Modulo suscripciones
 - Modulo pagos — depends on → Modulo suscripciones because activa o renueva planes
 - Modulo reservas — depends on → Modulo suscripciones
 - Modulo seguimiento — depends on → Modulo suscripciones
@@ -403,7 +509,7 @@ copy lives in the origin note, this is only the reverse lookup.
 - Suscripcion — is part of → Modulo suscripciones
 
 ## Modulo usuarios
-- Alta manual de clientes — is part of → Modulo usuarios
+- ADR create-staff exige promote-existing — constrains → Modulo usuarios
 - Modulo auth — depends on → Modulo usuarios
 - Modulo reservas — depends on → Modulo usuarios
 - Modulo suscripciones — depends on → Modulo usuarios
@@ -415,8 +521,11 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Monorepo MOVE
 - ADR monorepo pnpm sin Turborepo — constrains → Monorepo MOVE
+- ADR push a GitHub y merge por PR — constrains → Monorepo MOVE
 - API NestJS — is part of → Monorepo MOVE
 - App web Next — is part of → Monorepo MOVE
+- Manual de usuario — is part of → Monorepo MOVE
+- Pipeline CI Bitbucket — is part of → Monorepo MOVE
 - Postgres local Docker — is part of → Monorepo MOVE
 
 ## Motivo de inactividad
@@ -424,8 +533,10 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Neon Postgres
 - ADR Neon como base productiva — constrains → Neon Postgres
+- ADR sin deploy en el run del MVP — constrains → Neon Postgres
 - Ambientes dev y produccion separados — constrains → Neon Postgres
 - Conexion SSL a la base en produccion — constrains → Neon Postgres
+- Rama dev de Neon sin expiracion — constrains → Neon Postgres
 
 ## NestJS Scheduler
 - Modulo automatizaciones — depends on → NestJS Scheduler
@@ -439,6 +550,9 @@ copy lives in the origin note, this is only the reverse lookup.
 - ADR Mercado Pago como procesador de pagos — establishes → Operaciones de pago idempotentes
 - Conciliacion periodica de pagos pendientes — requires → Operaciones de pago idempotentes because webhook y conciliación pueden aplicar el mismo pago
 
+## PORT explicito en Elastic Beanstalk
+- ADR Elastic Beanstalk para la API — establishes → PORT explicito en Elastic Beanstalk
+
 ## Paginas publicas renderizadas en servidor
 - ADR Next App Router en lugar de Vite — establishes → Paginas publicas renderizadas en servidor
 
@@ -451,11 +565,16 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Pago aprobado sin activar plan
 - Activacion en la misma transaccion que el pago — prevents → Pago aprobado sin activar plan
 - Conciliacion periodica de pagos pendientes — mitigates → Pago aprobado sin activar plan
+- Pago tardio perdido tras expirar la compra — causes → Pago aprobado sin activar plan
 - Webhook de Mercado Pago — enables → Pago aprobado sin activar plan because si la notificación nunca llega o falla a mitad
 - Webhook legitimo rechazado — causes → Pago aprobado sin activar plan
 
 ## Pago confirmado solo por webhook validado
 - ADR Mercado Pago como procesador de pagos — establishes → Pago confirmado solo por webhook validado
+- ADR notificaciones de Mercado Pago por ambiente — opens a question about → Pago confirmado solo por webhook validado
+
+## Pago tardio perdido tras expirar la compra
+- Conciliacion periodica de pagos pendientes — prevents → Pago tardio perdido tras expirar la compra
 
 ## Panel staff web
 - Asistencia pendiente visible para staff — constrains → Panel staff web
@@ -466,6 +585,12 @@ copy lives in the origin note, this is only the reverse lookup.
 - Pantalla pagos staff — is part of → Panel staff web
 - Pantalla seguimiento — is part of → Panel staff web
 - Pantalla turnos y asistencia — is part of → Panel staff web
+
+## Pantalla checkout de pago
+- ADR reintento visible para plan rechazado — constrains → Pantalla checkout de pago
+
+## Pantalla pagos staff
+- ADR pago tardio sin lugar queda para el staff — constrains → Pantalla pagos staff
 
 ## Paquete Recovery sobreconsumido
 - Sesiones Recovery no exceden el paquete — prevents → Paquete Recovery sobreconsumido
@@ -481,6 +606,9 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Perfil Visitante
 - Cuenta se crea durante la reserva — constrains → Perfil Visitante
 
+## Pipeline CI Bitbucket
+- ADR push a GitHub y merge por PR — opens a question about → Pipeline CI Bitbucket
+
 ## Plan
 - Compra — depends on → Plan
 - Paquete de sesiones Recovery — is a case of → Plan
@@ -488,6 +616,7 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Plan activado sin pago confirmado
 - Pago confirmado solo por webhook validado — prevents → Plan activado sin pago confirmado
+- Simulador de pagos montado en produccion — causes → Plan activado sin pago confirmado
 - Webhook falsificado — causes → Plan activado sin pago confirmado
 
 ## Postgres local Docker
@@ -497,6 +626,12 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Prioridad de horarios Recovery
 - Paquete de sesiones Recovery — opens a question about → Prioridad de horarios Recovery
+
+## Queries crudas con RETURNING via CTE
+- Operaciones de pago idempotentes — requires → Queries crudas con RETURNING via CTE because el guard lee las filas devueltas
+
+## Rama dev de Neon sin expiracion
+- ADR Neon como base productiva — establishes → Rama dev de Neon sin expiracion
 
 ## Regla de automatizacion
 - Alerta de seguimiento — depends on → Regla de automatizacion
@@ -519,6 +654,7 @@ copy lives in the origin note, this is only the reverse lookup.
 - Reserva Performance requiere plan vigente — constrains → Reserva
 - Reserva confirmada solo con pago aprobado — constrains → Reserva
 - Reserva pendiente de pago expira — constrains → Reserva
+- Retenciones de pago limitadas por usuario — constrains → Reserva
 
 ## Reserva con bloqueo transaccional
 - ADR calendario propio — establishes → Reserva con bloqueo transaccional
@@ -529,6 +665,13 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Reserva confirmada sin pago
 - Reserva confirmada solo con pago aprobado — prevents → Reserva confirmada sin pago
+
+## Retenciones de pago limitadas por usuario
+- ADR limite de retenciones y de checkout por IP — establishes → Retenciones de pago limitadas por usuario
+
+## Retenciones masivas de invitados
+- Checkout publico limitado por IP — mitigates → Retenciones masivas de invitados
+- Retenciones de pago limitadas por usuario — mitigates → Retenciones masivas de invitados
 
 ## Retraso por accesos e insumos faltantes
 - Accesos y definiciones operativas al inicio — prevents → Retraso por accesos e insumos faltantes
@@ -554,7 +697,19 @@ copy lives in the origin note, this is only the reverse lookup.
 - Seguimiento fisioterapeutico — is part of → Servicio Rehab
 
 ## Sesion no viaja entre web y API
+- Ambiente dev en dominio registrable propio — mitigates → Sesion no viaja entre web y API
 - Web y API bajo el mismo dominio raiz — prevents → Sesion no viaja entre web y API
+
+## Simulador de pagos de desarrollo
+- Simulador de pagos solo fuera de produccion — constrains → Simulador de pagos de desarrollo
+
+## Simulador de pagos montado en produccion
+- Config leida al importar antes de cargar el entorno — causes → Simulador de pagos montado en produccion
+- Simulador de pagos solo fuera de produccion — prevents → Simulador de pagos montado en produccion
+
+## Simulador de pagos solo fuera de produccion
+- ADR desarrollo sin accesos a proveedores — establishes → Simulador de pagos solo fuera de produccion
+- ADR simulador registrado con ConditionalModule — establishes → Simulador de pagos solo fuera de produccion
 
 ## Sin infraestructura extra en MVP
 - ADR alcance MVP en cuatro semanas — establishes → Sin infraestructura extra en MVP
@@ -578,6 +733,11 @@ copy lives in the origin note, this is only the reverse lookup.
 - Renovacion de plan — depends on → Suscripcion
 - Reserva Performance requiere plan vigente — requires → Suscripcion because la vigencia se evalúa a la fecha del turno
 
+## Throttling por IP ve la IP del proxy
+- ADR Elastic Beanstalk para la API — enables → Throttling por IP ve la IP del proxy
+- ADR limite de retenciones y de checkout por IP — enables → Throttling por IP ve la IP del proxy
+- IP real del cliente detras del proxy — prevents → Throttling por IP ve la IP del proxy
+
 ## Tratamiento vendido sin evaluacion
 - Rehab no vende tratamientos online — prevents → Tratamiento vendido sin evaluacion
 
@@ -586,6 +746,7 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Una cuenta por email
 - ADR Better Auth con Google OAuth — establishes → Una cuenta por email
+- ADR Better Auth endurecido — establishes → Una cuenta por email
 
 ## Usuario
 - Compra — depends on → Usuario
@@ -595,15 +756,25 @@ copy lives in the origin note, this is only the reverse lookup.
 - Roles persistidos cliente y staff — constrains → Usuario
 - Una cuenta por email — constrains → Usuario
 
+## Variable de entorno parseada dos veces con reglas distintas
+- Variable de entorno parseada una sola vez — prevents → Variable de entorno parseada dos veces con reglas distintas
+
+## Variable de entorno parseada una sola vez
+- ADR un parser por variable de entorno — establishes → Variable de entorno parseada una sola vez
+
 ## Vercel
 - ADR Vercel para la web — constrains → Vercel
+- ADR sin deploy en el run del MVP — constrains → Vercel
+- Ambiente dev en dominio registrable propio — constrains → Vercel
 - Ambientes dev y produccion separados — constrains → Vercel
 
 ## Vigencia extendida dos veces
+- Guard muerto por UPDATE RETURNING sin CTE — causes → Vigencia extendida dos veces
 - Webhook duplicado procesado dos veces — causes → Vigencia extendida dos veces
 
 ## Web y API bajo el mismo dominio raiz
 - ADR ubicacion de Better Auth — establishes → Web y API bajo el mismo dominio raiz
+- Ambiente dev en dominio registrable propio — requires → Web y API bajo el mismo dominio raiz
 
 ## Webhook duplicado procesado dos veces
 - Operaciones de pago idempotentes — prevents → Webhook duplicado procesado dos veces

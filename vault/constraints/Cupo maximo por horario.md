@@ -1,18 +1,17 @@
 ---
 type: constraint
-status: todo
+status: shipped
 semana: 2
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p4
-  - move/MOVE.pdf#p11
-  - move/imagenes/htmls/03-performance.html
-  - move/imagenes/finales/03-performance.png
+  - move/apps/api/src/modules/bookings/services/bookings.service.ts
+  - move/apps/api/src/modules/schedule/services/schedule.service.ts
+  - move/apps/web/src/components/booking/slot-grid.tsx
 ---
 # Cupo maximo por horario
 
-Cada horario tiene un cupo máximo configurable. Al llenarse se muestra "Completo"
-y no acepta más reservas.
+Cada turno tiene un cupo editable por el staff (nunca menor a las reservas activas).
+Al llenarse, la web muestra "Completo" y la API responde `SLOT_FULL`.
 
 ## Structural
 - constrains → [[Horario]]

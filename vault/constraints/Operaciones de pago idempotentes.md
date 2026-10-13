@@ -1,18 +1,21 @@
 ---
 type: constraint
-status: proposed
+status: shipped
 semana: 2
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p11
-  - move/MOVE.pdf#p12
+  - move/apps/api/src/modules/payments/services/payments.service.ts
+  - move/apps/api/src/modules/payments/entities/payment.entity.ts
+  - move/apps/api/test/webhook.e2e-spec.ts
 ---
 # Operaciones de pago idempotentes
 
-Procesar la misma notificación dos veces no tiene efecto extra: se guarda el ID de
-pago de Mercado Pago con una restricción única y se ignoran las transiciones de
-estado ya aplicadas.
+Procesar el mismo pago dos veces (webhook repetido, o webhook y conciliación) no
+tiene efecto extra: el ID de pago del proveedor es único y la transición de la compra
+a aprobada solo ocurre una vez, con un guard sobre el `UPDATE … RETURNING`.
+Confirmada por el equipo (D11).
 
 ## Structural
 - constrains → [[Modulo pagos]]
+- requires → [[Queries crudas con RETURNING via CTE]] because el guard lee las filas devueltas
 - prevents → [[Webhook duplicado procesado dos veces]]

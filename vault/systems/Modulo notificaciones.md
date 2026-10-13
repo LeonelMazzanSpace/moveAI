@@ -1,17 +1,19 @@
 ---
 type: system
-status: todo
+status: shipped
 semana: 3
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p12
+  - move/apps/api/src/modules/notifications/notifications.module.ts
+  - move/apps/api/src/modules/notifications/services/notifications.service.ts
+  - move/apps/api/src/modules/notifications/templates/index.ts
+  - move/apps/api/src/modules/notifications/entities/email-log.entity.ts
 ---
 # Modulo notificaciones
 
-Módulo de envío de emails transaccionales y automatizados vía Brevo, detrás de
-un service propio para que el resto del código no conozca al proveedor. Arranca en la
-semana 3 con las confirmaciones de Rehab y Recovery; en la 4 lo usan seguimiento y
-automatizaciones.
+Envío de emails transaccionales y automáticos con plantillas propias, detrás de un
+service que es el único que conoce a Brevo. Cada envío deja antes una fila en
+`email_logs` con clave única, y los emails salen después del commit de la operación.
 
 ## Structural
 - is part of → [[API NestJS]]

@@ -1,16 +1,17 @@
 ---
 type: concept
-status: todo
+status: shipped
 updated: 2026-10-13
 source:
   - move/MOVE.pdf#p5
-  - move/imagenes/htmls/06-recovery.html
-  - move/imagenes/finales/06-recovery.png
+  - move/apps/api/src/modules/subscriptions/domain/vigencia.ts
+  - move/apps/web/src/components/client/packs-card.tsx
 ---
 # Paquete de sesiones Recovery
 
-Plan Recovery mensual con un número fijo de sesiones (4 u 8 en el mockup). A
-diferencia de Performance, lo que se consume son sesiones, no días de vigencia.
+Plan Recovery con un número fijo de sesiones para un período de 30 días desde la
+compra. A diferencia de Performance, lo que se consume son sesiones, no días de
+vigencia.
 
 ## Structural
 - is a case of → [[Plan]]

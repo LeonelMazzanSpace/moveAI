@@ -1,16 +1,15 @@
 ---
 type: concept
-status: todo
+status: shipped
 updated: 2026-10-13
 source:
   - move/MOVE.pdf#p3
-  - move/imagenes/htmls/02-perfiles-usuario.html
-  - move/imagenes/finales/02-perfiles-usuario.png
+  - move/apps/web/src/app/(cliente)/perfil/page.tsx
 ---
 # Perfil Cliente
 
-Alumno o cliente que gestiona sus planes, pagos, reservas, historial y
-comunicaciones desde su perfil.
+Alumno o cliente que gestiona sus planes, pagos, reservas, historial y check-ins
+desde su perfil.
 
 ## Structural
 - is a case of → [[Usuario]]

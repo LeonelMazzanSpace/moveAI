@@ -1,17 +1,19 @@
 ---
 type: system
-status: todo
+status: shipped
 semana: 1
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p10
-  - move/MOVE.pdf#p16
+  - move/apps/api/src/modules/auth/auth.module.ts
+  - move/apps/api/src/modules/auth/mount-auth.ts
+  - move/apps/api/src/modules/auth/better-auth.factory.ts
+  - move/apps/api/src/modules/auth/guards/auth.guard.ts
 ---
 # Modulo auth
 
-Módulo que integra Better Auth en la plataforma: registro, login, recuperación,
-Google y guards de rol para proteger endpoints. Dónde corre Better Auth (web o API)
-está sin decidir.
+Integra Better Auth dentro de la API Nest bajo `/api/auth/*` y aplica un guard global
+que valida la sesión y el rol de cada endpoint (`@Public`, `@Roles`). No exige
+verificar el email para ingresar; Google se suma solo si hay credenciales.
 
 ## Structural
 - is part of → [[API NestJS]]

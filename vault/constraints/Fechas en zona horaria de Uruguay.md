@@ -1,18 +1,18 @@
 ---
 type: constraint
-status: proposed
+status: shipped
 semana: 1
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p3
-  - move/imagenes/htmls/01-sitio-publico.html
-  - move/imagenes/finales/01-sitio-publico.png
+  - move/apps/api/src/common/time/business-time.ts
+  - move/apps/web/src/lib/format.ts
 ---
 # Fechas en zona horaria de Uruguay
 
-Turnos, vencimientos y cron se calculan en `America/Montevideo` y se guardan como
-`timestamptz`. "Vence el 15/11" significa el fin de ese día en Uruguay, no en
-UTC.
+Turnos, vencimientos y cron se calculan en `America/Montevideo` con helpers únicos;
+las fechas de negocio son `YYYY-MM-DD` y los instantes `timestamptz`. "Vence el 15/11"
+permite un turno del 15/11 a las 21:00 locales. La web formatea siempre en esa zona.
+Confirmada por el equipo (D11).
 
 ## Structural
 - constrains → [[Suscripcion]]

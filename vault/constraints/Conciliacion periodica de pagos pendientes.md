@@ -1,17 +1,19 @@
 ---
 type: constraint
-status: proposed
+status: shipped
 semana: 2
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p12
+  - move/apps/api/src/modules/payments/jobs/reconcile-payments.job.ts
+  - move/apps/api/src/modules/payments/services/payments.service.ts
+  - move/apps/api/src/modules/settings/settings.defaults.ts
 ---
 # Conciliacion periodica de pagos pendientes
 
-Un cron del módulo de pagos consulta a Mercado Pago los pagos que siguen
-pendientes después de X minutos y aplica su estado real. Cubre los webhooks que nunca
-llegaron o se rechazaron. Adelanta el scheduler a la semana 2 (el PDF lo pone en la
-4).
+Cada 10 minutos un job consulta a Mercado Pago las compras pendientes con más de
+`reconcile_after_minutes` y aplica su estado real. También re-consulta las compras
+vencidas de los últimos 7 días, de plan y de reserva, para no perder pagos tardíos
+(D60). Cubre los webhooks que nunca llegaron o se rechazaron.
 
 ## Structural
 - constrains → [[Modulo pagos]]
@@ -19,6 +21,7 @@ llegaron o se rechazaron. Adelanta el scheduler a la semana 2 (el PDF lo pone en
 - requires → [[Scheduler corre en una sola instancia]]
 - mitigates → [[Pago aprobado sin activar plan]]
 - mitigates → [[Webhook legitimo rechazado]]
+- prevents → [[Pago tardio perdido tras expirar la compra]]
 
 ## Associative
 - resembles → [[Jobs programados idempotentes]]

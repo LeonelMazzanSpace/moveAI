@@ -1,17 +1,22 @@
 ---
 type: system
-status: todo
+status: shipped
 semana: 4
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p12
-  - move/MOVE.pdf#p18
+  - move/apps/api/src/modules/automations/automations.module.ts
+  - move/apps/api/src/modules/automations/services/automations.service.ts
+  - move/apps/api/src/modules/automations/jobs/followup-detect.job.ts
+  - move/apps/api/src/modules/automations/jobs/expiry-reminders.job.ts
+  - move/apps/api/src/modules/automations/jobs/checkins-monthly.job.ts
+  - move/apps/api/src/modules/automations/controllers/staff-automations.controller.ts
 ---
 # Modulo automatizaciones
 
-Jobs programados que recorren las reglas guardadas en PostgreSQL (vencimientos,
-inactividad, re-contactos, check-ins pendientes) y generan alertas y emails. No
-tiene lógica de negocio propia: delega en seguimiento y notificaciones.
+Jobs programados de detección de alertas, avisos de vencimiento y check-in mensual,
+más un endpoint staff que ejecuta un job en el momento. No tiene reglas propias:
+delega en seguimiento, suscripciones y notificaciones, y corre a través del
+`JobRunner` compartido.
 
 ## Structural
 - is part of → [[API NestJS]]

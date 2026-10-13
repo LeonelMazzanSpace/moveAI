@@ -19,10 +19,10 @@ qué protege cada tramo.
 ## Reglas
 - [[Reserva Performance requiere plan vigente]]
 - [[Cupo maximo por horario]] y [[Reserva con bloqueo transaccional]]
-- [[Cancelacion con limite configurable]] y [[Cancelacion libera el cupo]]
+- [[Cancelacion con limite configurable]] y [[Cancelacion libera el cupo]]; online solo se cancelan reservas de plan, paquete o seguimiento, ver [[Cancelacion]]
 - [[Reserva distinta de asistencia]] y [[Asistencia pendiente visible para staff]]
 - [[Renovacion extiende desde el vencimiento]]
-- [[Fechas en zona horaria de Uruguay]]
+- [[Fechas en zona horaria de Uruguay]], según [[ADR zona horaria de negocio]]
 
 ## Fallas a las que apunta
 [[Sobreventa de cupos]] · [[Reserva con plan vencido]] · [[Cancelacion fuera de plazo aceptada]] ·

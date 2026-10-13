@@ -1,17 +1,17 @@
 ---
 type: constraint
-status: todo
+status: shipped
 semana: 3
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p11
-  - move/imagenes/htmls/05-rehab.html
-  - move/imagenes/finales/05-rehab.png
+  - move/apps/api/src/modules/bookings/services/bookings.service.ts
+  - move/apps/api/src/modules/schedule/domain/slot-generation.ts
 ---
 # Horario Rehab se bloquea al reservar
 
-Al elegir horario de Rehab, esa franja del profesional se bloquea automáticamente
-para otros. Equivale a un cupo de 1 con la misma exigencia de atomicidad.
+Un turno de Rehab es la franja de un profesional con cupo 1, así que al tomarlo (aun
+como retención pendiente de pago) queda bloqueado para otros con la misma
+transacción y bloqueo que el resto de las reservas.
 
 ## Structural
 - constrains → [[Disponibilidad profesional]]

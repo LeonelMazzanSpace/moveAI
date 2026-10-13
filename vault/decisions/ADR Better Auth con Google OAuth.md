@@ -1,15 +1,16 @@
 ---
 type: decision
-status: todo
+status: shipped
 updated: 2026-10-13
 source:
   - move/MOVE.pdf#p10
+  - move/apps/api/src/modules/auth/better-auth.factory.ts
 ---
 # ADR Better Auth con Google OAuth
 
-La autenticación usa Better Auth sobre PostgreSQL más el Google OAuth existente, sin
-un IdP pago. Esto pisa el default de SpaceDev (Clerk para MVPs) porque la propuesta
-prioriza no tener costos recurrentes.
+La autenticación usa Better Auth sobre PostgreSQL más el Google OAuth de MOVE, sin un
+IdP pago. Pisa el default de SpaceDev (Clerk para MVPs) porque la propuesta prioriza
+no tener costos recurrentes. Google queda apagado hasta tener credenciales.
 
 ## Structural
 - constrains → [[Better Auth]]

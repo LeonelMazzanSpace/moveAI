@@ -1,18 +1,19 @@
 ---
 type: system
-status: todo
+status: shipped
 semana: 1
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p3
-  - move/MOVE.pdf#p8
-  - move/MOVE.pdf#p16
+  - move/apps/web/src/app/(public)/layout.tsx
+  - move/apps/web/src/app/(public)/page.tsx
+  - move/apps/web/src/app/(auth)/layout.tsx
 ---
 # Area publica web
 
-Rutas públicas de la app web: inicio, Performance, Rehab, Recovery, planes,
-registro e inicio de sesión. Es la puerta de entrada de visitantes y permite iniciar
-una contratación o reserva sin tener cuenta.
+Rutas públicas: inicio, Performance, Rehab, Recovery, planes, reservar, resultado
+del checkout, simulador de pagos (solo desarrollo) y las páginas de acceso
+(ingresar, registro, recuperar, restablecer). Un visitante puede iniciar una reserva
+paga de Rehab o Recovery sin cuenta.
 
 ## Structural
 - is part of → [[App web Next]]

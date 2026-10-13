@@ -1,18 +1,16 @@
 ---
 type: concept
-status: todo
+status: shipped
 updated: 2026-10-13
 source:
   - move/MOVE.pdf#p6
-  - move/MOVE.pdf#p7
-  - move/imagenes/htmls/09-seguimiento-retencion.html
-  - move/imagenes/finales/09-seguimiento-retencion.png
+  - move/apps/api/src/modules/followup/entities/followup-alert.entity.ts
+  - move/apps/api/src/modules/followup/domain/alert-rules.ts
 ---
 # Alerta de seguimiento
 
-Situación detectada que pide acción del staff, con tipo, cliente, contexto y
-estado (abierta o gestionada). Es la unidad de trabajo de la bandeja de
-seguimiento.
+Situación detectada que pide acción del staff, con tipo, cliente, período y estado
+(abierta o gestionada). Es la unidad de trabajo de la bandeja de seguimiento.
 
 ## Structural
 - depends on → [[Regla de automatizacion]]

@@ -1,18 +1,18 @@
 ---
 type: screen
-status: todo
+status: shipped
 semana: 2
 updated: 2026-10-13
 source:
   - move/imagenes/htmls/03-performance.html
-  - move/imagenes/finales/03-performance.png
-  - move/MOVE.pdf#p4
+  - move/apps/web/src/app/(public)/performance/page.tsx
+  - move/apps/web/src/components/booking/performance-schedule.tsx
 ---
 # Pantalla Performance
 
-Página del servicio con tres planes (Mensual, Trimestral, Semestral) y la grilla
-de horarios del día con ocupación `n / cupo`, botón Reservar o "Completo". Muestra el
-bloqueo por plan vencido con un llamado a renovar.
+Página del servicio con los planes de período y la grilla de turnos del día con
+ocupación `n / cupo`, botón Reservar o "Completo". Sin plan vigente muestra el bloqueo
+con el llamado a contratar o renovar.
 
 ## Structural
 - is part of → [[Area publica web]]

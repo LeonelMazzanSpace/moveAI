@@ -1,19 +1,18 @@
 ---
 type: concept
-status: draft
+status: shipped
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p5
-  - move/MOVE.pdf#p6
-  - move/imagenes/htmls/07-perfil-cliente.html
-  - move/imagenes/finales/07-perfil-cliente.png
+  - move/apps/api/src/modules/clients/dto/rehab-followup.dto.ts
+  - move/apps/web/src/components/booking/followup-booking.tsx
+  - move/apps/web/src/app/(cliente)/reservar/fisioterapia/page.tsx
 ---
 # Seguimiento fisioterapeutico
 
-Servicio de Rehab posterior a la evaluación que el cliente reserva desde su perfil
-("Fisioterapia — Seguimiento fisioterapéutico · 60 min" en el mockup). Frecuencia y
-modalidad las define el equipo para cada caso. Falta definir cómo se habilita (¿lo
-asigna el staff?), cómo se paga y si consume la disponibilidad del profesional.
+Resuelto (D6): el staff lo habilita por cliente después de la evaluación o al derivar
+a Rehab, y el cliente habilitado reserva desde su perfil sobre la disponibilidad del
+profesional, sin cobro online. Sin habilitación la API responde
+`REHAB_FOLLOWUP_NOT_ENABLED`.
 
 ## Structural
 - is part of → [[Servicio Rehab]]

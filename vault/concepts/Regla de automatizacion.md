@@ -1,17 +1,17 @@
 ---
 type: concept
-status: todo
+status: shipped
 updated: 2026-10-13
 source:
   - move/MOVE.pdf#p6
-  - move/MOVE.pdf#p7
-  - move/MOVE.pdf#p12
+  - move/apps/api/src/modules/followup/domain/alert-rules.ts
+  - move/apps/api/src/modules/settings/settings.defaults.ts
 ---
 # Regla de automatizacion
 
-Regla guardada en PostgreSQL que un job evalúa: plan próximo a vencer, vencido
-sin renovar, una semana sin asistir, inactividad prolongada, baja de frecuencia,
-re-contacto pedido y seguimiento periódico pendiente.
+Regla que un job evalúa con umbrales guardados en PostgreSQL: plan por vencer,
+vencido sin renovar, una semana sin asistir, inactividad prolongada, baja de
+frecuencia y re-contacto pedido.
 
 ## Structural
 - is part of → [[Modulo automatizaciones]]

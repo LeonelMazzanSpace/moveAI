@@ -1,16 +1,17 @@
 ---
 type: concept
-status: draft
+status: shipped
 updated: 2026-10-13
 source:
-  - move/imagenes/htmls/08-panel-gestion.html
-  - move/imagenes/finales/08-panel-gestion.png
+  - move/apps/api/src/modules/clients/dto/create-client.dto.ts
+  - move/apps/api/src/modules/clients/services/clients.service.ts
+  - move/apps/web/src/app/staff/clientes/nuevo/page.tsx
 ---
 # Alta manual de clientes
 
-El panel tiene un botón "Nuevo cliente" pero el PDF no describe el alta por staff.
-Falta definir qué datos se cargan, si se le asigna un plan y un pago manual, y cómo
-recibe el cliente el acceso a su cuenta.
+"Nuevo cliente" del panel crea la cuenta con los datos personales y le manda al
+cliente un email para definir su contraseña (D7). Plan y pago se registran aparte,
+como pago manual.
 
 ## Structural
-- is part of → [[Modulo usuarios]]
+- is part of → [[Modulo clientes]]

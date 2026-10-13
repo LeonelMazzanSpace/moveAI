@@ -1,16 +1,18 @@
 ---
 type: constraint
-status: todo
+status: shipped
 semana: 1
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p9
+  - move/apps/api/src/modules/users/entities/user.entity.ts
+  - move/apps/api/src/modules/bookings/entities/booking.entity.ts
+  - move/apps/api/src/modules/payments/entities/purchase.entity.ts
 ---
 # Soft delete en datos de negocio
 
-Estándar SpaceDev. Clientes, suscripciones, pagos, reservas y asistencias usan
-`deletedAt` en lugar de borrado físico, porque el historial que centraliza la base es
-el activo del negocio.
+Estándar SpaceDev. Usuarios, planes, profesionales, plantillas, suscripciones,
+compras y reservas usan `deleted_at` en lugar de borrado físico, y los KPIs excluyen
+lo borrado. El historial que centraliza la base es el activo del negocio.
 
 ## Structural
 - constrains → [[API NestJS]]

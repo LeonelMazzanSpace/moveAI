@@ -13,6 +13,6 @@ source:
 # Monorepo MOVE
 
 Monorepo pnpm workspaces (`apps/*`) sin Turborepo, Node 24, pnpm 10. Contiene
-`apps/web` y `apps/api`, y un `docker-compose.yml` con Postgres para desarrollo. Los
-scripts raíz (`pnpm dev`, `build`, `lint`, `test`, `db:up`) orquestan ambas apps;
-verificados el 2026-10-13.
+`apps/web` y `apps/api`, un `docker-compose.yml` con Postgres para desarrollo, los
+scripts del manual y el empaquetado de la API para Elastic Beanstalk. Los scripts
+raíz orquestan ambas apps.

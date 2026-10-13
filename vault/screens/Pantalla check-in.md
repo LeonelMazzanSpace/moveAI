@@ -1,17 +1,17 @@
 ---
 type: screen
-status: todo
+status: shipped
 semana: 4
 updated: 2026-10-13
 source:
   - move/imagenes/htmls/10-checkin-clientes.html
-  - move/imagenes/finales/10-checkin-clientes.png
-  - move/MOVE.pdf#p7
+  - move/apps/web/src/app/(cliente)/check-in/page.tsx
+  - move/apps/web/src/app/staff/seguimiento/check-in/page.tsx
 ---
 # Pantalla check-in
 
-Dos caras: el formulario del alumno (cómo se siente, molestia con detalle,
-cambio de objetivos) y la vista staff con enviados, respondidos, los que requieren
+Dos caras: el formulario del alumno (cómo se siente, molestia con detalle, cambio de
+objetivos) y la vista staff con enviados, respondidos y los que requieren
 intervención; Derivar a Rehab solo aparece ante una molestia.
 
 ## Structural

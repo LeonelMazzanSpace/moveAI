@@ -1,16 +1,18 @@
 ---
 type: constraint
-status: todo
+status: shipped
 semana: 1
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p15
+  - move/apps/api/src/common/errors/all-exceptions.filter.ts
+  - move/apps/api/src/common/errors/error-codes.ts
+  - move/apps/api/src/common/errors/app-error.ts
 ---
 # Errores internos no expuestos
 
-Estándar SpaceDev. Las respuestas de error usan excepciones HTTP de Nest con
-mensajes genéricos. Un filtro global evita que se filtren stack traces, SQL o errores
-del proveedor.
+Estándar SpaceDev. Toda respuesta de error sale de un filtro global con un código del
+contrato y un mensaje genérico; los errores desconocidos son 500 `INTERNAL_ERROR` con
+el detalle solo en el log. Nunca viajan stack traces, SQL ni errores del proveedor.
 
 ## Structural
 - constrains → [[API NestJS]]

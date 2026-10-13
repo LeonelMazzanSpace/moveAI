@@ -1,19 +1,19 @@
 ---
 type: constraint
-status: todo
+status: shipped
 semana: 3
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p3
-  - move/MOVE.pdf#p4
-  - move/MOVE.pdf#p5
-  - move/imagenes/htmls/02-perfiles-usuario.html
-  - move/imagenes/finales/02-perfiles-usuario.png
+  - move/apps/api/src/modules/payments/services/checkout.service.ts
+  - move/apps/web/src/components/checkout/guest-form.tsx
+  - move/apps/api/test/checkout.e2e-spec.ts
 ---
 # Cuenta se crea durante la reserva
 
-Un visitante puede contratar o reservar Rehab y Recovery sin cuenta previa; el
-flujo le crea el usuario. Si ya tenía cuenta, la operación se vincula a su perfil.
+Un visitante puede reservar y pagar Rehab o Recovery sin cuenta previa; el checkout
+le crea el usuario. Si el email ya tiene cuenta, la API responde `LOGIN_REQUIRED` y la
+web pide ingresar antes de seguir, para que nadie opere en nombre de otra cuenta
+(D21).
 
 ## Structural
 - constrains → [[Perfil Visitante]]

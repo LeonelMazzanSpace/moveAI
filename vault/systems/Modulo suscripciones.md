@@ -1,18 +1,18 @@
 ---
 type: system
-status: todo
+status: shipped
 semana: 2
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p4
-  - move/MOVE.pdf#p9
-  - move/MOVE.pdf#p17
+  - move/apps/api/src/modules/subscriptions/subscriptions.module.ts
+  - move/apps/api/src/modules/subscriptions/services/subscriptions.service.ts
+  - move/apps/api/src/modules/subscriptions/domain/vigencia.ts
 ---
 # Modulo suscripciones
 
-Módulo de planes contratados: vigencia (inicio y vencimiento), estado, renovaciones
-y consumo de paquetes Recovery. Responde a la pregunta "¿este cliente tiene un plan
-vigente para este servicio?".
+Planes contratados: vigencia por fechas de negocio, renovaciones programadas y saldo
+de sesiones de paquetes Recovery. Responde si un cliente tiene plan o paquete vigente
+para un servicio en la fecha de un turno.
 
 ## Structural
 - is part of → [[API NestJS]]

@@ -1,0 +1,162 @@
+<!doctype html>
+<!-- Fuente del diagrama de arquitectura del manual. Se renderiza a img/arquitectura.png con
+     `node scripts/manual/render-diagram.mjs` (Chromium de Playwright). Fondo blanco para el PDF A4. -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>MOVE — Arquitectura</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #fff; font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; color: #1a1a1a; }
+  #diagram { width: 1400px; padding: 28px 32px 24px; background: #fff; }
+  h1 { font-size: 30px; margin: 0 0 4px; }
+  .sub { font-size: 17px; color: #444; margin: 0 0 14px; }
+  svg text { font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; fill: #1a1a1a; }
+  .box { fill: #fff; stroke: #1a1a1a; stroke-width: 2.5; }
+  .ext { fill: #f4f4f4; stroke: #1a1a1a; stroke-width: 2.5; }
+  .zone { fill: #fafafa; stroke: #888; stroke-width: 2; stroke-dasharray: 8 6; }
+  .title { font-size: 24px; font-weight: 700; }
+  .zone-title { font-size: 19px; font-weight: 700; fill: #444; }
+  .line { font-size: 17px; }
+  .mono { font-family: Menlo, Consolas, monospace; font-size: 15px; }
+  .arrow { stroke: #1a1a1a; stroke-width: 2.5; fill: none; marker-end: url(#head); }
+  .arrow.dash { stroke-dasharray: 9 6; }
+  .label { font-size: 16px; }
+  .label-bg { fill: #fff; }
+  .legend { font-size: 15px; fill: #444; }
+</style>
+</head>
+<body>
+<div id="diagram">
+  <h1>MOVE — Arquitectura de producción (objetivo)</h1>
+  <p class="sub">Hoy todo corre en local (Postgres en Docker, simulador de pagos y emails en dry-run). Dominios de ejemplo: el dominio final es una decisión pendiente.</p>
+  <svg width="1336" height="860" viewBox="0 0 1336 860" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#1a1a1a" />
+      </marker>
+    </defs>
+
+    <!-- Navegador -->
+    <rect class="box" x="20" y="20" width="300" height="120" rx="8" />
+    <text class="title" x="40" y="58">Navegador</text>
+    <text class="line" x="40" y="88">Clientes, invitados y staff</text>
+    <text class="line" x="40" y="114">Cookie de sesión de Better Auth</text>
+
+    <!-- Vercel -->
+    <rect class="box" x="520" y="20" width="360" height="140" rx="8" />
+    <text class="title" x="540" y="58">Vercel — Web</text>
+    <text class="line" x="540" y="88">Next.js (apps/web)</text>
+    <text class="mono" x="540" y="114">https://&lt;dominio&gt;</text>
+    <text class="line" x="540" y="140">Previews → API de desarrollo</text>
+
+    <!-- AWS zone -->
+    <rect class="zone" x="440" y="230" width="520" height="350" rx="10" />
+    <text class="zone-title" x="460" y="260">AWS (región a definir)</text>
+    <rect class="box" x="470" y="280" width="460" height="64" rx="8" />
+    <text class="title" x="490" y="312">ALB + Nginx</text>
+    <text class="line" x="650" y="312">HTTPS (certificado ACM)</text>
+    <text class="mono" x="490" y="334">TRUST_PROXY_HOPS=2</text>
+    <rect class="box" x="470" y="372" width="460" height="186" rx="8" />
+    <text class="title" x="490" y="406">Elastic Beanstalk — API</text>
+    <text class="line" x="490" y="434">NestJS (apps/api), Node.js 24</text>
+    <text class="mono" x="490" y="460">https://api.&lt;dominio&gt;/api</text>
+    <text class="line" x="490" y="488">Better Auth en /api/auth/*</text>
+    <text class="line" x="490" y="514">Jobs programados (NestJS Scheduler)</text>
+    <text class="line" x="490" y="540">Logs → CloudWatch</text>
+
+    <!-- Neon -->
+    <rect class="ext" x="520" y="660" width="360" height="130" rx="8" />
+    <text class="title" x="540" y="698">Neon — PostgreSQL</text>
+    <text class="line" x="540" y="728">Host directo (sin -pooler), SSL</text>
+    <text class="line" x="540" y="754">Una base o branch por ambiente</text>
+
+    <!-- Mercado Pago -->
+    <rect class="ext" x="1030" y="270" width="290" height="160" rx="8" />
+    <text class="title" x="1050" y="308">Mercado Pago</text>
+    <text class="line" x="1050" y="338">Checkout Pro (preferencias)</text>
+    <text class="line" x="1050" y="364">Consulta de pagos</text>
+    <text class="line" x="1050" y="390">Webhook firmado a la API</text>
+
+    <!-- Brevo -->
+    <rect class="ext" x="1030" y="470" width="290" height="110" rx="8" />
+    <text class="title" x="1050" y="508">Brevo</text>
+    <text class="line" x="1050" y="538">Emails transaccionales</text>
+    <text class="line" x="1050" y="564">→ casilla del cliente</text>
+
+    <!-- Google -->
+    <rect class="ext" x="20" y="300" width="300" height="130" rx="8" />
+    <text class="title" x="40" y="338">Google OAuth</text>
+    <text class="line" x="40" y="368">Pantalla de consentimiento</text>
+    <text class="line" x="40" y="394">Opcional (botón oculto</text>
+    <text class="line" x="40" y="418">hasta configurarlo)</text>
+
+    <!-- Bitbucket -->
+    <rect class="ext" x="20" y="580" width="300" height="130" rx="8" />
+    <text class="title" x="40" y="618">Bitbucket Pipelines</text>
+    <text class="line" x="40" y="648">lint → test → e2e → build</text>
+    <text class="line" x="40" y="674">Sin pasos de deploy</text>
+    <text class="line" x="40" y="698">(deploy manual por runbook)</text>
+
+    <!-- Navegador → Vercel -->
+    <path class="arrow" d="M320 70 L515 70" />
+    <rect class="label-bg" x="352" y="44" width="130" height="20" />
+    <text class="label" x="356" y="60">1. Páginas</text>
+
+    <!-- Navegador → API -->
+    <path class="arrow" d="M240 140 L240 200 Q240 220 260 220 L420 220 Q440 220 440 240 L440 300 L465 300" />
+    <rect class="label-bg" x="250" y="196" width="180" height="20" />
+    <text class="label" x="254" y="212">2. fetch con cookie</text>
+
+    <!-- Vercel → API (SSR) -->
+    <path class="arrow" d="M700 160 L700 275" />
+    <rect class="label-bg" x="710" y="196" width="230" height="20" />
+    <text class="label" x="714" y="212">3. Render en servidor</text>
+
+    <!-- ALB → API -->
+    <path class="arrow" d="M700 344 L700 367" />
+
+    <!-- API → Neon -->
+    <path class="arrow" d="M700 558 L700 655" />
+    <rect class="label-bg" x="710" y="596" width="150" height="20" />
+    <text class="label" x="714" y="612">4. SQL sobre TLS</text>
+
+    <!-- API ↔ Mercado Pago -->
+    <path class="arrow" d="M930 410 L1025 410" />
+    <rect class="label-bg" x="938" y="386" width="80" height="20" />
+    <text class="label" x="940" y="402">5. Pago</text>
+    <path class="arrow dash" d="M1025 312 L935 312" />
+    <rect class="label-bg" x="944" y="288" width="80" height="20" />
+    <text class="label" x="946" y="304">Webhook</text>
+
+    <!-- API → Brevo -->
+    <path class="arrow" d="M930 525 L1025 525" />
+    <rect class="label-bg" x="944" y="500" width="78" height="20" />
+    <text class="label" x="946" y="516">6. Email</text>
+
+    <!-- Navegador → Mercado Pago (pago) -->
+    <path class="arrow dash" d="M320 40 Q400 0 520 0 L1100 0 Q1170 0 1170 40 L1170 265" />
+    <rect class="label-bg" x="900" y="-8" width="250" height="20" />
+    <text class="label" x="904" y="18">7. Pago en Mercado Pago</text>
+
+    <!-- Google -->
+    <path class="arrow dash" d="M170 140 L170 295" />
+    <rect class="label-bg" x="60" y="230" width="104" height="20" />
+    <text class="label" x="62" y="246">8. Ingreso</text>
+    <path class="arrow dash" d="M320 400 L380 400 Q400 400 400 380 L400 330 L465 330" />
+    <rect class="label-bg" x="324" y="406" width="76" height="20" />
+    <text class="label" x="326" y="422">callback</text>
+
+    <!-- Leyenda -->
+    <text class="legend" x="960" y="640">Línea continua: llamada de la plataforma.</text>
+    <text class="legend" x="960" y="664">Línea punteada: redirección del navegador</text>
+    <text class="legend" x="960" y="688">o aviso de un proveedor (webhook).</text>
+    <text class="legend" x="960" y="726">Callbacks en la API:</text>
+    <text class="mono" x="960" y="750">/api/auth/callback/google</text>
+    <text class="mono" x="960" y="774">/api/payments/webhook/mercadopago</text>
+    <text class="legend" x="960" y="824">Health check del balanceador:</text>
+    <text class="mono" x="960" y="848">/api/health</text>
+  </svg>
+</div>
+</body>
+</html>

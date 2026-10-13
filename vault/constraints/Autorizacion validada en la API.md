@@ -1,17 +1,19 @@
 ---
 type: constraint
-status: todo
+status: shipped
 semana: 1
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p10
-  - move/MOVE.pdf#p18
+  - move/apps/api/src/modules/auth/guards/auth.guard.ts
+  - move/apps/api/src/common/auth/roles.decorator.ts
+  - move/apps/api/test/auth.e2e-spec.ts
 ---
 # Autorizacion validada en la API
 
-Cada endpoint declara qué rol lo usa y la API lo verifica con guards. Las
-operaciones de cliente además verifican que el recurso sea del usuario. Ocultar
-rutas en el front no protege nada.
+Un guard global exige sesión salvo en rutas `@Public` y verifica el rol de `@Roles`:
+`/api/staff/*` responde 403 a un cliente y 401 sin sesión. Las operaciones de cliente
+filtran por el dueño del recurso (la reserva ajena responde 404). Ocultar rutas en el
+front no protege nada.
 
 ## Structural
 - constrains → [[Modulo auth]]

@@ -1,17 +1,16 @@
 ---
 type: concept
-status: todo
+status: shipped
 updated: 2026-10-13
 source:
   - move/MOVE.pdf#p4
-  - move/MOVE.pdf#p5
-  - move/MOVE.pdf#p12
+  - move/apps/api/src/modules/subscriptions/domain/vigencia.ts
 ---
 # Renovacion de plan
 
-Compra que extiende una suscripción existente o crea una nueva tras el
-vencimiento. Es el destino al que el sistema manda a quien quiere reservar con el plan
-vencido.
+Compra que crea una suscripción programada a continuación de la vigente, o una nueva
+tras el vencimiento. Es el destino al que el sistema manda a quien quiere reservar con
+el plan vencido.
 
 ## Structural
 - is a case of → [[Compra]]

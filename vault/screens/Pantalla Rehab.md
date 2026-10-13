@@ -1,18 +1,18 @@
 ---
 type: screen
-status: todo
+status: shipped
 semana: 3
 updated: 2026-10-13
 source:
   - move/imagenes/htmls/05-rehab.html
-  - move/imagenes/finales/05-rehab.png
-  - move/MOVE.pdf#p5
+  - move/apps/web/src/app/(public)/rehab/page.tsx
+  - move/apps/web/src/components/checkout/rehab-booking-flow.tsx
 ---
 # Pantalla Rehab
 
-Reserva de Evaluación y Diagnóstico con stepper (Evaluación → Fecha y horario →
-Pago → Confirmación), selector semanal, horarios libres del profesional y resumen
-(60 min, precio). Explica que el tratamiento posterior lo define el equipo.
+Reserva de Evaluación y Diagnóstico con stepper (evaluación → fecha y horario → pago
+→ confirmación), selector semanal y turnos libres del profesional. Explica que el
+tratamiento posterior lo define el equipo.
 
 ## Structural
 - is part of → [[Area publica web]]

@@ -1,20 +1,20 @@
 ---
 type: screen
-status: draft
+status: shipped
 semana: 2
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p11
-  - move/MOVE.pdf#p17
-  - move/imagenes/htmls/08-panel-gestion.html
+  - move/apps/web/src/app/staff/configuracion/page.tsx
+  - move/apps/web/src/components/staff/config/plans-tab.tsx
+  - move/apps/web/src/components/staff/config/schedule-tab.tsx
 ---
 # Pantalla configuracion staff
 
-Ítem "Configuración" del sidebar, sin mockup. Ahí el staff administra planes,
-precios, horarios, cupos, disponibilidad de profesionales, límite de cancelación y
-umbrales de automatización. Necesaria desde la semana 2.
+Configuración del panel, sin mockup (D12): tabs de planes, horarios, profesionales y
+reglas, con el aviso de valores provisorios mientras MOVE no los confirme.
 
 ## Structural
 - is part of → [[Panel staff web]]
 - depends on → [[Modulo catalogo]]
 - depends on → [[Modulo agenda]]
+- depends on → [[Modulo configuracion]]
