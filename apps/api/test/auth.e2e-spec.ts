@@ -9,6 +9,8 @@ import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 import { Public } from '../src/common/auth/public.decorator.js';
 import { Roles } from '../src/common/auth/roles.decorator.js';
+import { BETTER_AUTH } from '../src/modules/auth/auth.constants.js';
+import type { BetterAuthInstance } from '../src/modules/auth/better-auth.factory.js';
 import { AuthService } from '../src/modules/auth/services/auth.service.js';
 import { UsersService } from '../src/modules/users/services/users.service.js';
 import { createTestApp, type TestApp } from './utils/app.js';
@@ -264,6 +266,26 @@ describe('auth (e2e)', () => {
     await expectResetLinkLasts(72);
   });
 
+  // A transient DB error while extending the link must not leave a created user without an invitation.
+  it('still emails the invitation, with the 1-hour link, when extending it to 72 hours fails', async () => {
+    const adapter = (await ctx.app.get<BetterAuthInstance>(BETTER_AUTH).$context).internalAdapter;
+    const extend = vi.spyOn(adapter, 'updateVerificationByIdentifier').mockRejectedValueOnce(new Error('connection reset'));
+    const logged = [vi.spyOn(Logger.prototype, 'warn'), vi.spyOn(Logger.prototype, 'error')];
+    try {
+      const { userId } = await ctx.app.get(AuthService).createInvitedUser({ name: 'Lucía Pereira', email: 'lu-extend@test.move' });
+      expect(extend).toHaveBeenCalledTimes(1);
+      const logs = await ctx.dataSource.query(`SELECT template, user_id AS "userId" FROM email_logs`);
+      expect(logs).toEqual([{ template: 'account-invitation', userId }]);
+      await expectResetLinkLasts(1);
+      const lines = logged.flatMap((spy) => spy.mock.calls.map((call) => call.map(String).join(' ')));
+      expect(lines.some((line) => line.includes(userId))).toBe(true);
+      expect(lines.join('\n')).not.toMatch(/lu-extend|connection reset|reset-password/);
+    } finally {
+      extend.mockRestore();
+      logged.forEach((spy) => spy.mockRestore());
+    }
+  });
+
   it('caps the stored User-Agent at 512 characters', async () => {
     const res = await http().post('/api/auth/sign-up/email').set('Origin', TEST_ORIGIN).set('User-Agent', 'a'.repeat(2000))
       .send({ name: 'Ana Pérez', email: 'ua@test.move', password: 'Secreto123!' }).expect(200);
@@ -368,6 +390,9 @@ describe('UsersService (e2e)', () => {
   it('promotes a user to staff with a verified email inside the given transaction', async () => {
     const { userId } = await signUp(ctx.app);
     const other = await signUp(ctx.app);
+    const updatedAt = async (id: string): Promise<number> =>
+      new Date((await ctx.dataSource.query(`SELECT updated_at FROM users WHERE id = $1`, [id]))[0].updated_at).getTime();
+    const [promotedBefore, otherBefore] = [await updatedAt(userId), await updatedAt(other.userId)];
     await ctx.dataSource.transaction((manager) => users.promoteToStaff(manager, userId));
     const rows = await ctx.dataSource.query(
       `SELECT id, role, email_verified FROM users WHERE id IN ($1, $2)`, [userId, other.userId],
@@ -376,11 +401,29 @@ describe('UsersService (e2e)', () => {
       { id: userId, role: 'staff', email_verified: true },
       { id: other.userId, role: 'client', email_verified: false },
     ]));
+    expect(await updatedAt(userId)).toBeGreaterThan(promotedBefore);
+    expect(await updatedAt(other.userId)).toBe(otherBefore);
     await expect(ctx.dataSource.transaction(async (manager) => {
       await users.promoteToStaff(manager, other.userId);
       throw new Error('rollback');
     })).rejects.toThrow('rollback');
     expect((await users.findById(other.userId))?.role).toBe('client');
+  });
+
+  it('sets only the staff role inside the given transaction and moves updated_at', async () => {
+    const { userId } = await signUp(ctx.app);
+    const read = async () => (await ctx.dataSource.query(`SELECT role, email_verified, updated_at FROM users WHERE id = $1`, [userId]))[0];
+    const before = await read();
+    await ctx.dataSource.transaction((manager) => users.setStaffRole(manager, userId));
+    const after = await read();
+    expect(after).toMatchObject({ role: 'staff', email_verified: false });
+    expect(new Date(after.updated_at).getTime()).toBeGreaterThan(new Date(before.updated_at).getTime());
+    await ctx.dataSource.query(`UPDATE users SET role = 'client' WHERE id = $1`, [userId]);
+    await expect(ctx.dataSource.transaction(async (manager) => {
+      await users.setStaffRole(manager, userId);
+      throw new Error('rollback');
+    })).rejects.toThrow('rollback');
+    expect((await users.findById(userId))?.role).toBe('client');
   });
 });
 

@@ -106,10 +106,14 @@ describe('check-ins — rules (e2e)', () => {
       await holder.query(`INSERT INTO checkins (user_id, period) VALUES ($1, $2)`, [client.userId, period()]);
       pending = Promise.all([checkins.send(period()), checkins.send(period())]);
       await waitForLockWaiters(2);
-    } finally {
+    } catch (error) {
       await holder.rollbackTransaction();
       await holder.release();
+      await Promise.allSettled([pending]);
+      throw error;
     }
+    await holder.rollbackTransaction();
+    await holder.release();
     const results = (await pending) ?? [];
     expect(results.map((r) => r.sent).sort((a, b) => a - b)).toEqual([0, 1]);
     expect(await ctx.dataSource.query(`SELECT count(*)::int AS n FROM checkins`)).toEqual([{ n: 1 }]);
@@ -122,11 +126,14 @@ describe('check-ins — rules (e2e)', () => {
     const orphan = await withPlan();
     const paused = await withPlan();
     const lastMonth = await withPlan();
+    const deleted = await withPlan();
     const insertCheckin = async (userId: string, p: string): Promise<string> =>
       (await ctx.dataSource.query(`INSERT INTO checkins (user_id, period) VALUES ($1, $2) RETURNING id`, [userId, p]))[0].id;
     const orphanId = await insertCheckin(orphan.userId, period());
     await insertCheckin(paused.userId, period());
     await insertCheckin(lastMonth.userId, '2020-01');
+    await insertCheckin(deleted.userId, period());
+    await ctx.dataSource.query(`UPDATE users SET deleted_at = now() WHERE id = $1`, [deleted.userId]);
     await staff.agent.post(`/api/staff/clients/${paused.userId}/inactivity-reasons`).send({ reason: 'injury' }).expect(201);
     const invites = () => ctx.dataSource.query(`SELECT user_id AS "userId", idempotency_key AS key FROM email_logs ORDER BY created_at`);
 
@@ -135,9 +142,12 @@ describe('check-ins — rules (e2e)', () => {
     const [{ id: newId }] = await ctx.dataSource.query(`SELECT id FROM checkins WHERE user_id = $1 AND period = $2`, [lastMonth.userId, period()]);
     const expected = [{ userId: orphan.userId, key: `checkin:${orphanId}` }, { userId: lastMonth.userId, key: `checkin:${newId}` }];
     expect(sortByKey(await invites())).toEqual(sortByKey(expected));
+    // The client who was deleted gets no invite, so no email_logs row either.
+    expect(await ctx.dataSource.query(`SELECT id FROM email_logs WHERE user_id = $1`, [deleted.userId])).toEqual([]);
 
     expect((await staff.agent.post('/api/staff/checkins/send').expect(201)).body.sent).toBe(0);
     expect(sortByKey(await invites())).toEqual(sortByKey(expected));
+    expect(await ctx.dataSource.query(`SELECT id FROM email_logs WHERE user_id = $1`, [deleted.userId])).toEqual([]);
   });
 
   it('lets only the owner answer and validates the answers', async () => {

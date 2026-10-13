@@ -48,7 +48,7 @@ describe('subscriptions (e2e)', () => {
 
   const planBySlug = async (slug: string) => {
     const [row] = await ctx.dataSource.query(
-      `SELECT id, name, service, kind, period_months AS "periodMonths", period_days AS "periodDays", sessions_included AS "sessionsIncluded" FROM plans WHERE slug = $1`, [slug]);
+      `SELECT id, name, service, kind, period_months AS "periodMonths", period_days AS "periodDays", sessions_included AS "sessionsIncluded" FROM plans WHERE slug = $1 AND deleted_at IS NULL`, [slug]);
     return row;
   };
   const purchase = async (userId: string, planId: string) => {

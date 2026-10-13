@@ -435,6 +435,7 @@ describe('Mercado Pago webhook (e2e)', () => {
 
       // The lost webhook arrives after all: nothing changes and nothing is emailed again.
       await notify('810').expect(200);
+      expect(fake.getPayment).toHaveBeenCalledWith('810');
       expect(await purchaseOf(booking.ref)).toEqual({ status: 'approved', needs_attention: true });
       expect(await count(`payments WHERE mp_payment_id = '810'`)).toBe(1);
       expect(await count(`email_logs WHERE template = 'purchase-approved'`)).toBe(1);
@@ -499,6 +500,7 @@ describe('Mercado Pago webhook (e2e)', () => {
 
       // The webhook of the already reconciled payment changes nothing and emails nothing again.
       await notify('808').expect(200);
+      expect(fake.getPayment).toHaveBeenCalledWith('808');
       expect(await purchaseOf(booking.ref)).toEqual({ status: 'approved', needs_attention: false });
       expect(await count(`email_logs WHERE template = 'purchase-approved'`)).toBe(2);
       expect(await count(`email_logs WHERE idempotency_key = $1`, [`booking-confirmed:${booking.bookingId}`])).toBe(1);

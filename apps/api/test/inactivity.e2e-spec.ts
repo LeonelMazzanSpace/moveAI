@@ -103,10 +103,14 @@ describe('inactivity reasons (e2e)', () => {
         staff.agent.post(startPath(client.userId)).send({ reason: 'vacation' }),
       ]);
       await waitForLockWaiters(2);
-    } finally {
+    } catch (error) {
       await holder.rollbackTransaction();
       await holder.release();
+      await Promise.allSettled([pending]);
+      throw error;
     }
+    await holder.rollbackTransaction();
+    await holder.release();
     const results = (await pending) ?? [];
     expect(results.map((r) => r.status).sort((a, b) => a - b)).toEqual([201, 409]);
     expect(results.find((r) => r.status === 409)?.body.code).toBe('PAUSE_ALREADY_ACTIVE');

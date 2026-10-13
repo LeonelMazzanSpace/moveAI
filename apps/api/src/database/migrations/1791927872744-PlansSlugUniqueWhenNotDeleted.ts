@@ -9,6 +9,7 @@ export class PlansSlugUniqueWhenNotDeleted1791927872744 implements MigrationInte
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        // Fails if a slug is reused by a live and a deleted plan: rename or delete the duplicated deleted rows before reverting.
         await queryRunner.query(`DROP INDEX "public"."UQ_plans_slug_not_deleted"`);
         await queryRunner.query(`ALTER TABLE "plans" ADD CONSTRAINT "UQ_e7b71bb444e74ee067df057397e" UNIQUE ("slug")`);
     }

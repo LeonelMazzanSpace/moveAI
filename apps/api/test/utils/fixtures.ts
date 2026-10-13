@@ -23,7 +23,7 @@ export async function createProfessional(ds: DataSource, name = 'Fisio Test'): P
 }
 
 export async function planIdBySlug(ds: DataSource, slug: string): Promise<string> {
-  const [row] = await ds.query(`SELECT id FROM plans WHERE slug = $1`, [slug]);
+  const [row] = await ds.query(`SELECT id FROM plans WHERE slug = $1 AND deleted_at IS NULL`, [slug]);
   if (!row) throw new Error(`plan ${slug} not seeded`);
   return row.id as string;
 }
