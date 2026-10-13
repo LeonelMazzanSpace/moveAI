@@ -55,8 +55,13 @@ describe('user:create-staff (e2e)', () => {
     const email = `nuevo-${randomUUID()}@test.move`;
     const result = await runCli(['--email', email, '--name', 'Staff Nuevo', '--password', NEW_PASSWORD]);
     expect(result.code).toBe(0);
-    const [row] = await ctx.dataSource.query(`SELECT id, role FROM users WHERE email = $1`, [email]);
+    const [row] = await ctx.dataSource.query(
+      `SELECT id, role, email_verified, updated_at > created_at AS moved FROM users WHERE email = $1`, [email],
+    );
     expect(row.role).toBe('staff');
+    expect(row.email_verified).toBe(false);
+    // The role change goes through UsersService, which moves updated_at (raw SQL did not).
+    expect(row.moved).toBe(true);
     expect(result.stdout.trim()).toBe(`staff ${row.id}`);
     expectNoPassword(result, NEW_PASSWORD);
     const { agent, status } = await signIn(email, NEW_PASSWORD);

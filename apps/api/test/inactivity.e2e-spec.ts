@@ -4,7 +4,7 @@ import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
 import { AlertsService } from '../src/modules/followup/services/alerts.service.js';
 import { createTestApp, type TestApp } from './utils/app.js';
 import { signUpClient, signUpStaff, type TestAgent } from './utils/auth.js';
-import { resetDb } from './utils/db.js';
+import { resetDb, waitForLockWaiters } from './utils/db.js';
 import { givePerformancePlan } from './utils/fixtures.js';
 
 describe('inactivity reasons (e2e)', () => {
@@ -32,18 +32,6 @@ describe('inactivity reasons (e2e)', () => {
   }
   const statusOf = async (alertId: string): Promise<string> =>
     (await ctx.dataSource.query(`SELECT status FROM followup_alerts WHERE id = $1`, [alertId]))[0].status as string;
-
-  async function waitForLockWaiters(expected: number): Promise<void> {
-    const deadline = Date.now() + 10_000;
-    while (Date.now() < deadline) {
-      const [{ waiting }] = await ctx.dataSource.query(
-        `SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
-      );
-      if (waiting >= expected) return;
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
-    throw new Error(`expected ${expected} backends waiting on a lock`);
-  }
 
   it('opens a pause and handles the open inactivity, frequency and expiry alerts of the client', async () => {
     const client = await signUpClient(ctx.app);
@@ -102,11 +90,15 @@ describe('inactivity reasons (e2e)', () => {
         staff.agent.post(startPath(client.userId)).send({ reason: 'injury' }),
         staff.agent.post(startPath(client.userId)).send({ reason: 'vacation' }),
       ]);
-      await waitForLockWaiters(2);
-    } finally {
+      await waitForLockWaiters(ctx.dataSource, 2);
+    } catch (error) {
       await holder.rollbackTransaction();
       await holder.release();
+      await Promise.allSettled([pending]);
+      throw error;
     }
+    await holder.rollbackTransaction();
+    await holder.release();
     const results = (await pending) ?? [];
     expect(results.map((r) => r.status).sort((a, b) => a - b)).toEqual([201, 409]);
     expect(results.find((r) => r.status === 409)?.body.code).toBe('PAUSE_ALREADY_ACTIVE');

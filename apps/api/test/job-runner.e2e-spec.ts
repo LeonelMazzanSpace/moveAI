@@ -20,15 +20,6 @@ describe('JobRunner (e2e)', () => {
     }
   }
 
-  async function waitForLockHeld(job: string): Promise<void> {
-    const deadline = Date.now() + 10_000;
-    while (Date.now() < deadline) {
-      if (!(await isLockFree(job))) return;
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
-    throw new Error(`job ${job} never took its lock`);
-  }
-
   it('skips when the scheduler is disabled unless forced', async () => {
     expect(await runner.run('test-disabled', async () => ({ n: 1 }))).toEqual({ ran: false, result: {} });
     expect(await runner.run('test-disabled', async () => ({ n: 1 }), { force: true })).toEqual({ ran: true, result: { n: 1 } });
@@ -38,9 +29,12 @@ describe('JobRunner (e2e)', () => {
   it('never runs the same job twice at the same time', async () => {
     let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => { release = resolve; });
-    const first = runner.run('test-lock', async () => { await gate; return { n: 1 }; }, { force: true });
+    let markStarted: () => void = () => undefined;
+    const started = new Promise<void>((resolve) => { markStarted = resolve; });
+    const first = runner.run('test-lock', async () => { markStarted(); await gate; return { n: 1 }; }, { force: true });
     try {
-      await waitForLockHeld('test-lock');
+      // The job body only runs once the runner holds the lock, so the probe below can never win it first.
+      await Promise.race([started, first]);
       expect(await isLockFree('test-lock')).toBe(false);
       const second = await runner.run('test-lock', async () => ({ n: 2 }), { force: true });
       expect(second.ran).toBe(false);

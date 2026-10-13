@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -38,6 +38,8 @@ export interface PasswordEmailData {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @Inject(BETTER_AUTH) private readonly auth: BetterAuthInstance,
     @Inject(appConfig.KEY) private readonly app: ConfigType<typeof appConfig>,
@@ -78,7 +80,7 @@ export class AuthService {
   async sendPasswordEmail({ user, url, token }: PasswordEmailData): Promise<void> {
     const hasPassword = await this.accounts.existsBy({ userId: user.id, providerId: 'credential' });
     const template = hasPassword ? 'password-reset' : 'account-invitation';
-    if (!hasPassword) await this.extendInvitationLink(token);
+    if (!hasPassword) await this.tryExtendInvitationLink(user.id, token);
     await this.notifications.send({
       template,
       to: { email: user.email, name: user.name },
@@ -86,6 +88,15 @@ export class AuthService {
       idempotencyKey: `${template}:${tokenDigest(token)}`,
       params: { name: user.name, url },
     });
+  }
+
+  // A failed extension must not fail the caller (the user already exists): the email goes out with the 1-hour link.
+  private async tryExtendInvitationLink(userId: string, token: string): Promise<void> {
+    try {
+      await this.extendInvitationLink(token);
+    } catch {
+      this.logger.warn(`invitation link not extended user=${userId}`);
+    }
   }
 
   // Better Auth creates the `reset-password:<token>` verification before calling `sendResetPassword`.

@@ -39,7 +39,7 @@ if (!email || !name || !password) {
 
 async function createStaff(app: INestApplicationContext, input: { email: string; name: string; password: string }) {
   const { user } = await app.get<BetterAuthInstance>(BETTER_AUTH).api.signUpEmail({ body: input });
-  await app.get(DataSource).query(`UPDATE users SET role = 'staff' WHERE id = $1`, [user.id]);
+  await app.get(DataSource).transaction((manager) => app.get(UsersService).setStaffRole(manager, user.id));
   console.log(`staff ${user.id}`);
 }
 

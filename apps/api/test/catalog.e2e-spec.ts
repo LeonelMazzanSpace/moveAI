@@ -2,7 +2,7 @@ import request from 'supertest';
 import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
 import { createTestApp, type TestApp } from './utils/app.js';
 import { signUpClient, signUpStaff, type TestAgent } from './utils/auth.js';
-import { resetDb } from './utils/db.js';
+import { resetDb, waitForLockWaiters } from './utils/db.js';
 
 const validPlan = { service: 'performance', kind: 'period_plan', slug: 'performance-anual', name: 'Plan Anual', price: 36000, periodMonths: 12 };
 
@@ -104,6 +104,35 @@ describe('catalog (e2e)', () => {
       await staff.post('/api/staff/plans').send({ ...validPlan, active: false }).expect(201);
       await staff.post('/api/staff/plans').send(validPlan).expect(409).expect(expectCode('SLUG_TAKEN'));
       await staff.post('/api/staff/plans').send({ ...validPlan, slug: 'performance-mensual' }).expect(409).expect(expectCode('SLUG_TAKEN'));
+    });
+
+    // Barrier: an open transaction holds the slug in the unique index, so both POSTs pass the existence check and are
+    // seen waiting on it before it rolls back; the one that loses the race hits the index and must answer 409, not 500.
+    it('answers SLUG_TAKEN, never 500, to the loser of two concurrent creates with the same slug', async () => {
+      const holder = ctx.dataSource.createQueryRunner();
+      await holder.connect();
+      await holder.startTransaction();
+      let pending: Promise<request.Response[]> | undefined;
+      try {
+        await holder.query(
+          `INSERT INTO plans (service, kind, slug, name, price, period_months) VALUES ('performance', 'period_plan', $1, 'Holder', 1, 12)`,
+          [validPlan.slug],
+        );
+        pending = Promise.all([staff.post('/api/staff/plans').send(validPlan), staff.post('/api/staff/plans').send(validPlan)]);
+        await waitForLockWaiters(ctx.dataSource, 2);
+      } catch (error) {
+        await holder.rollbackTransaction();
+        await holder.release();
+        await Promise.allSettled([pending]);
+        throw error;
+      }
+      await holder.rollbackTransaction();
+      await holder.release();
+      const results = (await pending) ?? [];
+      expect(results.map((r) => r.status).sort((a, b) => a - b)).toEqual([201, 409]);
+      expect(results.find((r) => r.status === 409)?.body.code).toBe('SLUG_TAKEN');
+      expect(await ctx.dataSource.query(`SELECT count(*)::int AS n FROM plans WHERE slug = $1 AND deleted_at IS NULL`, [validPlan.slug]))
+        .toEqual([{ n: 1 }]);
     });
 
     it('lets a PATCH take the slug of a deleted plan but not the one of a live plan', async () => {
