@@ -16,6 +16,8 @@ import { signUp, signUpStaff, TEST_ORIGIN } from './utils/auth.js';
 import { resetDb } from './utils/db.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const HOUR_MS = 3_600_000;
+const MINUTE_MS = 60_000;
 
 describe('auth (e2e)', () => {
   let ctx: TestApp;
@@ -23,6 +25,14 @@ describe('auth (e2e)', () => {
   afterAll(async () => { await ctx.app.close(); });
   beforeEach(async () => { await resetDb(ctx.dataSource); });
   const http = () => request(ctx.app.getHttpServer());
+  const expectResetLinkLasts = async (hours: number) => {
+    const [row] = await ctx.dataSource.query(
+      `SELECT expires_at FROM verifications WHERE identifier LIKE 'reset-password:%' ORDER BY created_at DESC LIMIT 1`,
+    );
+    const remaining = new Date(row.expires_at).getTime() - Date.now();
+    expect(remaining).toBeGreaterThan(hours * HOUR_MS - MINUTE_MS);
+    expect(remaining).toBeLessThanOrEqual(hours * HOUR_MS + MINUTE_MS);
+  };
 
   it('signs up as client and reads /me', async () => {
     const { agent, email } = await signUp(ctx.app, { name: 'Martina Suárez' });
@@ -235,6 +245,34 @@ describe('auth (e2e)', () => {
     expect((await login.get('/api/me').expect(200)).body.id).toBe(userId);
   });
 
+  it('gives invitation links 72 hours and password reset links 1 hour (D71)', async () => {
+    await ctx.app.get(AuthService).createInvitedUser({ name: 'Lucía Pereira', email: 'lu72@test.move' });
+    await expectResetLinkLasts(72);
+    const { email } = await signUp(ctx.app);
+    await http().post('/api/auth/request-password-reset').set('Origin', TEST_ORIGIN)
+      .send({ email, redirectTo: `${TEST_ORIGIN}/restablecer` }).expect(200);
+    await expectResetLinkLasts(1);
+  });
+
+  it('sends the 72-hour invitation again when an invited user asks for a password reset', async () => {
+    await ctx.app.get(AuthService).createInvitedUser({ name: 'Lucía Pereira', email: 'lu-again@test.move' });
+    await ctx.dataSource.query('DELETE FROM verifications');
+    await http().post('/api/auth/request-password-reset').set('Origin', TEST_ORIGIN)
+      .send({ email: 'lu-again@test.move', redirectTo: `${TEST_ORIGIN}/restablecer` }).expect(200);
+    const templates = await ctx.dataSource.query(`SELECT template FROM email_logs ORDER BY created_at`);
+    expect(templates).toEqual([{ template: 'account-invitation' }, { template: 'account-invitation' }]);
+    await expectResetLinkLasts(72);
+  });
+
+  it('caps the stored User-Agent at 512 characters', async () => {
+    const res = await http().post('/api/auth/sign-up/email').set('Origin', TEST_ORIGIN).set('User-Agent', 'a'.repeat(2000))
+      .send({ name: 'Ana Pérez', email: 'ua@test.move', password: 'Secreto123!' }).expect(200);
+    const [session] = await ctx.dataSource.query(
+      `SELECT length(user_agent)::int AS length FROM sessions WHERE user_id = $1`, [res.body.user.id],
+    );
+    expect(session.length).toBe(512);
+  });
+
   it('creates invited users as password-less clients', async () => {
     const { userId } = await ctx.app.get(AuthService).createInvitedUser({ name: 'Lucía', email: 'Lu2@Test.move', phone: '099111222' });
     const [user] = await ctx.dataSource.query(`SELECT email, role, phone FROM users WHERE id = $1`, [userId]);
@@ -325,6 +363,24 @@ describe('UsersService (e2e)', () => {
     expect((await users.findById(userId))?.rehabFollowupEnabled).toBe(false);
     await expect(users.setRehabFollowupEnabled('00000000-0000-4000-8000-000000000000', true))
       .rejects.toMatchObject({ code: 'USER_NOT_FOUND' });
+  });
+
+  it('promotes a user to staff with a verified email inside the given transaction', async () => {
+    const { userId } = await signUp(ctx.app);
+    const other = await signUp(ctx.app);
+    await ctx.dataSource.transaction((manager) => users.promoteToStaff(manager, userId));
+    const rows = await ctx.dataSource.query(
+      `SELECT id, role, email_verified FROM users WHERE id IN ($1, $2)`, [userId, other.userId],
+    );
+    expect(rows).toEqual(expect.arrayContaining([
+      { id: userId, role: 'staff', email_verified: true },
+      { id: other.userId, role: 'client', email_verified: false },
+    ]));
+    await expect(ctx.dataSource.transaction(async (manager) => {
+      await users.promoteToStaff(manager, other.userId);
+      throw new Error('rollback');
+    })).rejects.toThrow('rollback');
+    expect((await users.findById(other.userId))?.role).toBe('client');
   });
 });
 

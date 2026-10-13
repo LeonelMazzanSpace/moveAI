@@ -24,6 +24,8 @@ const runCli = (args: string[], env: Record<string, string> = {}): Promise<CliRe
 const OLD_PASSWORD = 'Secreto123!';
 const NEW_PASSWORD = 'NuevaClave456!';
 const EXISTING_MESSAGE = 'Ya existe una cuenta con ese email; usá --promote-existing para convertirla en staff.';
+const DELETED_MESSAGE = 'Ese email pertenece a una cuenta dada de baja; no se puede convertir en staff.';
+const LONG_PASSWORD = `${'Clave1!'.repeat(18)}abc`;
 
 describe('user:create-staff (e2e)', () => {
   let ctx: TestApp;
@@ -122,6 +124,45 @@ describe('user:create-staff (e2e)', () => {
     const fresh = await signIn(email, NEW_PASSWORD);
     expect(fresh.status).toBe(200);
     expect((await fresh.agent.get('/api/me').expect(200)).body.role).toBe('staff');
+  });
+
+  it('refuses a soft-deleted account (D72), also with --promote-existing, and changes nothing', async () => {
+    const { userId, email } = await signUp(ctx.app, { password: OLD_PASSWORD });
+    await ctx.dataSource.query(`UPDATE users SET deleted_at = now() WHERE id = $1`, [userId]);
+    const snapshot = async () => ({
+      users: await ctx.dataSource.query(`SELECT id, role, email_verified, deleted_at, updated_at FROM users ORDER BY id`),
+      accounts: await ctx.dataSource.query(`SELECT id, password, updated_at FROM accounts ORDER BY id`),
+      sessions: await sessionCount(userId),
+    });
+    const before = await snapshot();
+
+    for (const extra of [[], ['--promote-existing']]) {
+      const result = await runCli(['--email', email.toUpperCase(), '--name', 'Staff', '--password', NEW_PASSWORD, ...extra]);
+      expect(result.code, extra.join(' ')).toBe(1);
+      expect(result.stderr.trim()).toBe(DELETED_MESSAGE);
+      expect(result.stdout).toBe('');
+      expectNoPassword(result, NEW_PASSWORD);
+    }
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it('rejects a 129-character password without printing it, for new and existing accounts', async () => {
+    expect(LONG_PASSWORD).toHaveLength(129);
+    const email = `largo-${randomUUID()}@test.move`;
+    const created = await runCli(['--email', email, '--name', 'Staff Largo', '--password', LONG_PASSWORD]);
+    expect(created.code).toBe(1);
+    expectNoPassword(created, LONG_PASSWORD);
+    const [{ count }] = await ctx.dataSource.query(`SELECT count(*)::int AS count FROM users WHERE email = $1`, [email]);
+    expect(count).toBe(0);
+
+    const { userId, email: existing } = await signUp(ctx.app, { password: OLD_PASSWORD });
+    const promoted = await runCli(
+      ['--email', existing, '--name', 'Staff', '--promote-existing'], { CREATE_STAFF_PASSWORD: LONG_PASSWORD },
+    );
+    expect(promoted.code).toBe(1);
+    expectNoPassword(promoted, LONG_PASSWORD);
+    expect(await userRow(userId)).toEqual({ role: 'client', email_verified: false });
+    expect((await signIn(existing, OLD_PASSWORD)).status).toBe(200);
   });
 
   it('rejects a too-short password on promotion without changing anything', async () => {

@@ -1,11 +1,13 @@
+import { Logger } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { getRepositoryToken, TypeOrmModule } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { appConfig } from '../src/config/app.config.js';
 import { brevoConfig } from '../src/config/brevo.config.js';
 import { databaseConfig, type DatabaseConfig } from '../src/config/database.config.js';
 import { buildDataSourceOptions } from '../src/database/typeorm.options.js';
+import { EmailLog } from '../src/modules/notifications/entities/email-log.entity.js';
 import { NotificationsModule } from '../src/modules/notifications/notifications.module.js';
 import { NotificationsService } from '../src/modules/notifications/services/notifications.service.js';
 
@@ -61,6 +63,7 @@ describe('NotificationsService (e2e, dry-run)', () => {
 describe('NotificationsService (e2e, Brevo enabled, mocked fetch)', () => {
   let service: NotificationsService;
   let ds: DataSource;
+  let emailLogs: Repository<EmailLog>;
   let close: () => Promise<void>;
 
   beforeAll(async () => {
@@ -81,6 +84,7 @@ describe('NotificationsService (e2e, Brevo enabled, mocked fetch)', () => {
     await app.init();
     service = app.get(NotificationsService);
     ds = app.get(DataSource);
+    emailLogs = app.get(getRepositoryToken(EmailLog));
     close = () => app.close();
   });
   afterAll(async () => { await close(); });
@@ -122,6 +126,22 @@ describe('NotificationsService (e2e, Brevo enabled, mocked fetch)', () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('fetch failed'));
     expect(await service.send(input)).toBe('failed');
     expect(await readRow()).toMatchObject({ status: 'failed', error_code: 'network' });
+  });
+
+  it('returns sent and never marks the row failed when Brevo accepted but the sent update fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ messageId: '<m3>' }), { status: 201 }));
+    const update = emailLogs.update.bind(emailLogs);
+    const updateSpy = vi.spyOn(emailLogs, 'update').mockImplementation((criteria, partial) =>
+      partial.status === 'sent' ? Promise.reject(new Error('connection lost')) : update(criteria, partial));
+    const errorLog = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+
+    expect(await service.send(input)).toBe('sent');
+
+    expect(updateSpy).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ status: 'sent' }));
+    expect(updateSpy).not.toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ status: 'failed' }));
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    expect(String(errorLog.mock.calls[0][0])).not.toContain('ana@test.move');
+    expect((await readRow()).status).not.toBe('failed');
   });
 
   it('calls Brevo once and returns duplicate for the same key', async () => {

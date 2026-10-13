@@ -38,6 +38,21 @@ export class UsersService {
     return user ? toModel(user) : null;
   }
 
+  // Includes soft-deleted accounts, whose email stays taken: `deleted` tells them apart.
+  async findByEmailWithDeleted(email: string): Promise<{ user: UserModel; deleted: boolean } | null> {
+    const user = await this.users
+      .createQueryBuilder('user')
+      .withDeleted()
+      .where('LOWER(user.email) = LOWER(:email)', { email })
+      .getOne();
+    return user ? { user: toModel(user), deleted: user.deletedAt !== null } : null;
+  }
+
+  // D54: staff role plus a verified email, inside the caller's transaction.
+  async promoteToStaff(manager: EntityManager, userId: string): Promise<void> {
+    await manager.getRepository(User).update({ id: userId }, { role: 'staff', emailVerified: true });
+  }
+
   async listClients(): Promise<UserModel[]> {
     const users = await this.users.find({ where: { role: 'client' }, order: { name: 'ASC' } });
     return users.map(toModel);
