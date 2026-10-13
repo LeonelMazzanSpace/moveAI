@@ -137,7 +137,7 @@ Web y API van bajo el mismo dominio raíz para que la cookie de sesión sea firs
 
 ### Mercado Pago
 
-1. Primero probar de punta a punta con las **credenciales de prueba** (usuarios y tarjetas de prueba) en el ambiente de **desarrollo**; recién después cambiar a las credenciales de producción. Los pagos con credenciales de prueba pueden no generar avisos: en desarrollo la firma se prueba con **Webhooks → Simular** del panel, y el pago entra por la conciliación (compras pendientes con más de `reconcileAfterMinutes`, cada 10 minutos).
+1. Primero probar de punta a punta con las **credenciales de prueba** (usuarios y tarjetas de prueba) en el ambiente de **desarrollo**; recién después cambiar a las credenciales de producción. Los pagos con credenciales de prueba pueden no generar avisos: en desarrollo la firma se prueba con **Webhooks → Simular** del panel, y el pago entra por la conciliación (compras pendientes con más de `reconcileAfterMinutes`, cada 10 minutos), así que el plan puede tardar hasta unos 20 minutos en activarse. Si en producción un pago tarda eso, revisar `API_PUBLIC_URL` (arma la `notification_url` de cada preferencia, que tiene prioridad sobre la URL del panel) y el historial de notificaciones de la aplicación.
 2. Cargar `MP_ACCESS_TOKEN` con el access token de la aplicación.
 3. En *Tus integraciones → Webhooks*, configurar la URL `https://<api>/api/payments/webhook/mercadopago` con el evento de pagos y copiar la clave secreta a `MP_WEBHOOK_SECRET`.
 4. La API verifica la firma de cada notificación con formato Webhooks (firma inválida: 401 sin efectos) y es idempotente: repetir una notificación, o recibirla además por la conciliación, no duplica la suscripción ni extiende la vigencia dos veces.
