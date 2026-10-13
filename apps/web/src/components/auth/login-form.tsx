@@ -17,11 +17,19 @@ const FIELD_CLASS = 'mt-2 h-auto rounded border-border bg-soft px-3.5 py-2.5 tex
 const BAD_CREDENTIALS_STATUSES = [400, 401, 403, 422];
 const BAD_CREDENTIALS_MESSAGE = 'Email o contraseña incorrectos.';
 const GENERIC_MESSAGE = 'No pudimos ingresar. Probá de nuevo en unos minutos.';
+const ACCOUNT_NOT_LINKED_MESSAGE = 'Ya tenés una cuenta con ese email. Ingresá con tu contraseña.';
+const GOOGLE_ERROR_MESSAGE = 'No pudimos ingresar con Google. Probá de nuevo.';
+
+function urlErrorMessage(error: string | null): string | null {
+  if (!error) return null;
+  return error === 'account_not_linked' ? ACCOUNT_NOT_LINKED_MESSAGE : GOOGLE_ERROR_MESSAGE;
+}
 
 export function LoginForm() {
   const router = useRouter();
-  const next = useSearchParams().get('next');
-  const [formError, setFormError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const next = searchParams.get('next');
+  const [formError, setFormError] = useState<string | null>(() => urlErrorMessage(searchParams.get('error')));
   const {
     register,
     handleSubmit,

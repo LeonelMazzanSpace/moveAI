@@ -9,7 +9,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
 import { ApiError } from '@/lib/api/errors';
-import type { PurchaseStatusDto } from '@/lib/api/types';
+import type { PlanDto, PurchaseStatusDto } from '@/lib/api/types';
 import { formatDateLong, formatTime, formatUYU } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -20,6 +20,10 @@ const SECONDARY_CTA_CLASS = cn(buttonVariants({ variant: 'outline' }), 'h-auto p
 
 function retryHref({ kind, service }: PurchaseStatusDto): string {
   return kind === 'booking' ? `/${service}#reservar` : `/planes?service=${service}`;
+}
+
+export function findPlanSlug(plans: Pick<PlanDto, 'name' | 'slug'>[] | undefined, itemName: string): string | null {
+  return plans?.find((plan) => plan.name === itemName)?.slug ?? null;
 }
 
 function ResultCard({ title, children }: { title: string; children?: React.ReactNode }) {
@@ -55,9 +59,21 @@ function ApprovedDetail({ status }: { status: PurchaseStatusDto }) {
 interface PaymentResultViewProps {
   status: PurchaseStatusDto;
   timedOut: boolean;
+  planSlug?: string | null;
 }
 
-export function PaymentResultView({ status, timedOut }: PaymentResultViewProps) {
+function PlanRetry({ status, planSlug }: { status: PurchaseStatusDto; planSlug: string | null }) {
+  return (
+    <>
+      <p className="mt-3 text-sm text-muted-foreground">Si tu pago fue rechazado, podés intentarlo de nuevo.</p>
+      <Link href={planSlug ? `/checkout/plan/${planSlug}` : retryHref(status)} className={cn(SECONDARY_CTA_CLASS, 'mt-6')}>
+        Intentar de nuevo
+      </Link>
+    </>
+  );
+}
+
+export function PaymentResultView({ status, timedOut, planSlug = null }: PaymentResultViewProps) {
   if (status.needsAttention) {
     return (
       <ResultCard title="Revisamos tu pago">
@@ -90,6 +106,7 @@ export function PaymentResultView({ status, timedOut }: PaymentResultViewProps) 
             ? 'Tu pago está en proceso. Te avisamos por email cuando se acredite.'
             : 'Estamos esperando la confirmación de Mercado Pago. No cierres esta página.'}
         </p>
+        {timedOut && status.kind === 'plan' ? <PlanRetry status={status} planSlug={planSlug} /> : null}
       </ResultCard>
     );
   }
@@ -120,6 +137,12 @@ function usePurchaseStatus(reference: string) {
 
 function PurchaseStatus({ reference }: { reference: string }) {
   const { query: purchase, attempts } = usePurchaseStatus(reference);
+  const needsPlanSlug = purchase.data?.kind === 'plan' && purchase.data.status === 'pending' && attempts >= MAX_ATTEMPTS;
+  const plans = useQuery({
+    queryKey: ['catalog', 'plans', purchase.data?.service],
+    queryFn: () => apiFetch<PlanDto[]>('/catalog/plans', { query: { service: purchase.data?.service } }),
+    enabled: needsPlanSlug,
+  });
 
   if (purchase.isPending) return <Skeleton className="h-48 rounded" />;
   if (purchase.error instanceof ApiError && purchase.error.code === 'PURCHASE_NOT_FOUND') {
@@ -127,7 +150,7 @@ function PurchaseStatus({ reference }: { reference: string }) {
   }
   if (purchase.isError) return <ErrorState error={purchase.error} onRetry={() => void purchase.refetch()} />;
 
-  return <PaymentResultView status={purchase.data} timedOut={attempts >= MAX_ATTEMPTS} />;
+  return <PaymentResultView status={purchase.data} timedOut={attempts >= MAX_ATTEMPTS} planSlug={findPlanSlug(plans.data, purchase.data.itemName)} />;
 }
 
 export function PaymentResult() {

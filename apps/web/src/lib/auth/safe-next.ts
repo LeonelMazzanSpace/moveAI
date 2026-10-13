@@ -12,8 +12,26 @@ function isInternal(next: string): boolean {
   return next.startsWith('/') && !next.startsWith('//') && !UNSAFE_CHARS.test(next);
 }
 
-export function safeNextPath(next: string | null | undefined, role: Role): string | null {
-  if (!next || !isInternal(next)) return null;
+function normalizePathname(pathname: string): string {
+  const segments: string[] = [];
+  for (const segment of pathname.split('/').slice(1)) {
+    const dots = segment.toLowerCase().replaceAll('%2e', '.');
+    if (dots === '..') segments.pop();
+    else if (dots !== '.') segments.push(segment);
+  }
+  return `/${segments.join('/')}`;
+}
+
+function normalize(next: string): string {
+  const rawPathname = next.split(/[?#]/)[0];
+  return `${normalizePathname(rawPathname)}${next.slice(rawPathname.length)}`;
+}
+
+export function safeNextPath(rawNext: string | null | undefined, role: Role): string | null {
+  if (!rawNext || !isInternal(rawNext)) return null;
+
+  const next = normalize(rawNext);
+  if (!isInternal(next)) return null;
 
   const pathname = next.split(/[?#]/)[0];
   const isStaffRoute = matchesRoute(pathname, '/staff');

@@ -44,6 +44,22 @@ describe('UpcomingBookings', () => {
     expect(apiFetch).toHaveBeenCalledWith('/me/bookings', { query: { scope: 'upcoming' } });
   });
 
+  it('flags unpaid held bookings instead of pointing to MOVE for cancellation', async () => {
+    apiFetch.mockResolvedValue([
+      booking({ id: 'b3', service: 'recovery', source: 'payment', status: 'pending_payment', canCancel: false, label: 'Sesión Recovery' }),
+    ]);
+    renderList(<UpcomingBookings />);
+    expect(await screen.findByText('Pago pendiente')).toBeInTheDocument();
+    expect(screen.queryByText('Cancelación con MOVE')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Cancelar' })).toBeNull();
+  });
+
+  it('does not flag confirmed bookings as unpaid', async () => {
+    renderList(<UpcomingBookings />);
+    await screen.findByText('Performance — 18:00');
+    expect(screen.queryByText('Pago pendiente')).toBeNull();
+  });
+
   it('confirms before cancelling and posts to the contract endpoint', async () => {
     const user = userEvent.setup();
     renderList(<UpcomingBookings />);
