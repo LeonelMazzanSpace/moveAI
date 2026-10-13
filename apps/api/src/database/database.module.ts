@@ -7,7 +7,7 @@ import { buildDataSourceOptions } from './typeorm.options.js';
   imports: [
     TypeOrmModule.forRootAsync({
       inject: [databaseConfig.KEY],
-      useFactory: (config: DatabaseConfig) => buildDataSourceOptions(config),
+      useFactory: (config: DatabaseConfig) => ({ ...buildDataSourceOptions(config), autoLoadEntities: true }),
     }),
   ],
 })
