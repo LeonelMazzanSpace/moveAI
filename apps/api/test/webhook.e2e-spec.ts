@@ -126,17 +126,15 @@ describe('Mercado Pago webhook (e2e)', () => {
     expect(fake.getPayment).toHaveBeenCalledWith('222');
   });
 
-  it('activates exactly once when the same payment is notified concurrently', async () => {
-    const { ref } = await buyQuarterly();
-    providerPayments.set('225', approved('225', ref, 10500));
-    // Barrier: a separate connection holds the purchase row, so both notifications are in flight before either applies.
+  // Barrier: a separate connection holds the purchase row, so both notifications are in flight before either applies.
+  const notifyBehindPurchaseLock = async (ref: string, paymentIds: [string, string]): Promise<request.Response[]> => {
     const gate = ds.createQueryRunner();
     await gate.connect();
     await gate.startTransaction();
     let pending: Promise<request.Response[]> | undefined;
     try {
       await gate.query(`SELECT id FROM purchases WHERE external_reference = $1 FOR UPDATE`, [ref]);
-      pending = Promise.all([notify('225'), notify('225')]);
+      pending = Promise.all(paymentIds.map((id) => notify(id)));
       const deadline = Date.now() + 10_000;
       while ((await count(`pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`)) < 2) {
         if (Date.now() > deadline) throw new Error('expected 2 backends waiting on the purchase lock');
@@ -146,11 +144,31 @@ describe('Mercado Pago webhook (e2e)', () => {
       await gate.commitTransaction();
       await gate.release();
     }
-    const results = await pending;
+    if (!pending) throw new Error('notifications were not sent');
+    return pending;
+  };
+
+  it('activates exactly once when the same payment is notified concurrently', async () => {
+    const { ref } = await buyQuarterly();
+    providerPayments.set('225', approved('225', ref, 10500));
+    const results = await notifyBehindPurchaseLock(ref, ['225', '225']);
     expect(results.map((r) => r.status)).toEqual([200, 200]);
     expect(await count('subscriptions')).toBe(1);
     expect(await count(`payments WHERE mp_payment_id = '225'`)).toBe(1);
     expect(await count(`email_logs WHERE template = 'purchase-approved'`)).toBe(1);
+    expect(await purchaseOf(ref)).toEqual({ status: 'approved', needs_attention: false });
+  });
+
+  it('activates once and flags the purchase when two different approved payments arrive concurrently', async () => {
+    const { ref } = await buyQuarterly();
+    providerPayments.set('228', approved('228', ref, 10500));
+    providerPayments.set('229', approved('229', ref, 10500));
+    const results = await notifyBehindPurchaseLock(ref, ['228', '229']);
+    expect(results.map((r) => r.status)).toEqual([200, 200]);
+    expect(await count('subscriptions')).toBe(1);
+    expect(await count(`payments WHERE applied_at IS NOT NULL`)).toBe(1);
+    expect(await count(`email_logs WHERE template = 'purchase-approved'`)).toBe(1);
+    expect(await purchaseOf(ref)).toEqual({ status: 'approved', needs_attention: true });
   });
 
   it('does not extend the validity twice for a second approved payment of the same purchase', async () => {
@@ -224,7 +242,7 @@ describe('Mercado Pago webhook (e2e)', () => {
     expect(await count(`email_logs WHERE template = 'booking-confirmed'`)).toBe(0);
   });
 
-  it('releases the hold when the payment is rejected', async () => {
+  it('releases the hold when a booking payment is rejected and flags a later approved retry (R16, D44)', async () => {
     const { agent } = await signUpClient(app);
     const { ref, bookingId } = await rehabCheckout(agent);
     providerPayments.set('661', { id: '661', status: 'rejected', statusDetail: 'cc_rejected_other_reason', externalReference: ref, transactionAmount: 1800 });
@@ -237,6 +255,27 @@ describe('Mercado Pago webhook (e2e)', () => {
     providerPayments.set('662', approved('662', ref, 1800));
     await notify('662').expect(200);
     expect(await purchaseOf(ref)).toEqual({ status: 'rejected', needs_attention: true });
+  });
+
+  it('keeps a plan purchase pending after a declined payment so an approved retry activates it (D44)', async () => {
+    const { agent, ref } = await buyQuarterly();
+    providerPayments.set('663', { id: '663', status: 'rejected', statusDetail: 'cc_rejected_other_reason', externalReference: ref, transactionAmount: 10500 });
+    await notify('663').expect(200);
+    expect(await purchaseOf(ref)).toEqual({ status: 'pending', needs_attention: false });
+    const [declined] = await ds.query(`SELECT status, applied_at FROM payments WHERE mp_payment_id = '663'`);
+    expect(declined).toEqual({ status: 'rejected', applied_at: null });
+    providerPayments.set('664', { id: '664', status: 'cancelled', statusDetail: 'expired', externalReference: ref, transactionAmount: 10500 });
+    await notify('664').expect(200);
+    expect(await purchaseOf(ref)).toEqual({ status: 'pending', needs_attention: false });
+    expect(await count('subscriptions')).toBe(0);
+
+    // The buyer retries with another card on the same preference.
+    providerPayments.set('665', approved('665', ref, 10500));
+    await notify('665').expect(200);
+    expect(await purchaseOf(ref)).toEqual({ status: 'approved', needs_attention: false });
+    const subs = await agent.get('/api/me/subscriptions').expect(200);
+    expect(subs.body.performance).toMatchObject({ planName: 'Plan Trimestral', startsOn: businessToday() });
+    expect(await count(`email_logs WHERE template = 'purchase-approved'`)).toBe(1);
   });
 
   it('cancels the purchase and frees the hold when Mercado Pago fails', async () => {
@@ -307,6 +346,37 @@ describe('Mercado Pago webhook (e2e)', () => {
       providerPayments.set('804', approved('804', plan.ref, 10500));
       await notify('804').expect(200);
       expect((await purchaseOf(plan.ref)).status).toBe('approved');
+    });
+
+    it('rechecks expired plan purchases from the last 7 days and applies a late approval (D45)', async () => {
+      const { agent, ref } = await buyQuarterly();
+      await backdate(ref, '25 hours');
+      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 1 });
+      expect((await purchaseOf(ref)).status).toBe('expired');
+
+      const old = await buyQuarterly();
+      await backdate(old.ref, '8 days');
+      await ds.query(`UPDATE purchases SET status = 'expired' WHERE external_reference = $1`, [old.ref]);
+      const booking = await rehabCheckout((await signUpClient(app)).agent);
+      await backdate(booking.ref, '1 hour');
+      await ds.query(`UPDATE purchases SET status = 'expired' WHERE external_reference = $1`, [booking.ref]);
+      providerPayments.set('806', approved('806', ref, 10500));
+      providerPayments.set('807', approved('807', old.ref, 10500));
+      providerPayments.set('808', approved('808', booking.ref, 1800));
+      fake.searchByExternalReference.mockClear();
+
+      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 1, expired: 0 });
+      expect(fake.searchByExternalReference.mock.calls).toEqual([[ref]]);
+      expect(await purchaseOf(ref)).toEqual({ status: 'approved', needs_attention: false });
+      const subs = await agent.get('/api/me/subscriptions').expect(200);
+      expect(subs.body.performance).toMatchObject({ planName: 'Plan Trimestral' });
+      expect((await purchaseOf(old.ref)).status).toBe('expired');
+      expect((await purchaseOf(booking.ref)).status).toBe('expired');
+
+      // Idempotent: a further run finds nothing left to apply.
+      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 0 });
+      expect(await count('subscriptions')).toBe(1);
+      expect(await count(`email_logs WHERE template = 'purchase-approved'`)).toBe(1);
     });
 
     it('keeps going when Mercado Pago fails for one purchase', async () => {

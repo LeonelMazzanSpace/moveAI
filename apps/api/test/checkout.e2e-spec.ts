@@ -144,6 +144,18 @@ describe('checkout (e2e)', () => {
       expect(users).toHaveLength(0);
     });
 
+    it('forbids staff sessions from booking (D25)', async () => {
+      const staff = await signUpStaff(ctx.app, ctx.dataSource);
+      const slotId = await rehabSlot();
+      const planId = await planIdBySlug(ctx.dataSource, 'rehab-evaluacion');
+      const data = guest();
+      await staff.agent.post('/api/checkout/booking').send({ planId, timeSlotId: slotId, guest: data }).expect(403).expect(expectCode('FORBIDDEN'));
+      const [{ bookings }] = await ctx.dataSource.query(`SELECT count(*)::int AS bookings FROM bookings`);
+      const [{ purchases }] = await ctx.dataSource.query(`SELECT count(*)::int AS purchases FROM purchases`);
+      const [{ users }] = await ctx.dataSource.query(`SELECT count(*)::int AS users FROM users`);
+      expect({ bookings, purchases, users }).toEqual({ bookings: 0, purchases: 0, users: 1 });
+    });
+
     it('books a single Recovery session', async () => {
       const { agent } = await signUpClient(ctx.app);
       const slotId = await createSlot(ctx.dataSource, { service: 'recovery', startsAt: tomorrowAt('09:00'), capacity: 2 });

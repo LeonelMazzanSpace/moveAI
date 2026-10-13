@@ -143,15 +143,17 @@ export class PaymentsService {
     await this.apply(payment);
   }
 
-  // Pending Mercado Pago purchases older than `reconcileAfterMinutes` (up to 7 days) take their real state from
-  // Mercado Pago; then stale purchases expire: bookings whose hold expired and plans pending for more than 24 h.
+  // Mercado Pago purchases from the last 7 days take their real state from Mercado Pago: pending ones older than
+  // `reconcileAfterMinutes`, and expired plan purchases, whose preference can still be paid late (D45). Then stale
+  // purchases expire: bookings whose hold expired and plans pending for more than 24 h.
   async reconcilePending(now: Date): Promise<{ applied: number; expired: number }> {
     let applied = 0;
     if (!this.config.simulatorEnabled) {
       const minutes = await this.settings.get('reconcileAfterMinutes');
       const pending: { externalReference: string }[] = await this.dataSource.query(
         `SELECT external_reference AS "externalReference" FROM purchases
-         WHERE status = 'pending' AND method = 'mercadopago' AND deleted_at IS NULL AND created_at < $1 AND created_at > $2
+         WHERE method = 'mercadopago' AND deleted_at IS NULL AND created_at > $2
+           AND ((status = 'pending' AND created_at < $1) OR (status = 'expired' AND kind = 'plan'))
          ORDER BY created_at`,
         [new Date(now.getTime() - minutes * MINUTE_MS), new Date(now.getTime() - RECONCILE_LOOKBACK_MS)],
       );
@@ -275,7 +277,10 @@ export class PaymentsService {
       }
       const stored = await this.upsertPayment(manager, purchase.id, payment);
       if (payment.status === 'approved') return this.applyApproved(manager, purchase, payment, stored);
-      if ((payment.status === 'rejected' || payment.status === 'cancelled') && purchase.status === 'pending') {
+      // D44: a declined plan payment leaves the purchase pending, so an approved retry on the same preference
+      // activates it; the 24 h expiry closes abandoned ones.
+      const declined = payment.status === 'rejected' || payment.status === 'cancelled';
+      if (declined && purchase.kind === 'booking' && purchase.status === 'pending') {
         await this.reject(manager, purchase);
       }
       return null;
@@ -339,7 +344,7 @@ export class PaymentsService {
     }
   }
 
-  // R16 step 5.
+  // R16 step 5, for booking purchases (D44).
   private async reject(manager: EntityManager, purchase: LockedPurchase): Promise<void> {
     await manager.query(`UPDATE purchases SET status = 'rejected', updated_at = now() WHERE id = $1 AND status = 'pending'`, [
       purchase.id,

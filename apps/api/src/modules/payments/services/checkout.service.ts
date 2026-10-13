@@ -53,8 +53,11 @@ export class CheckoutService {
 
   // R8 + R17: the spot is held and the purchase created in one transaction; Mercado Pago is called after the commit.
   async checkoutBooking(viewer: AuthUser | undefined, dto: CheckoutBookingDto): Promise<CheckoutResponseDto> {
+    // D25: only clients book; staff do not book on behalf of clients.
+    if (viewer?.role === 'staff') throw new AppError('FORBIDDEN');
     const plan = await this.loadPlan(dto.planId, BOOKING_PURCHASE_KINDS);
     const service = plan.service;
+    // Never true (the plan CHECKs bind evaluation/single_session to rehab/recovery); it narrows the type for holdForPayment.
     if (service === 'performance') throw new AppError('PLAN_KIND_INVALID');
     const slot = await this.schedule.getSlot(dto.timeSlotId);
     if (slot.service !== service) throw new AppError('SERVICE_MISMATCH');

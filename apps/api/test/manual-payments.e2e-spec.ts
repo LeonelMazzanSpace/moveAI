@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { businessToday } from '../src/common/time/business-time.js';
 import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
+import { SubscriptionsService } from '../src/modules/subscriptions/services/subscriptions.service.js';
 import { createTestApp, type TestApp } from './utils/app.js';
 import { signUpClient, signUpStaff } from './utils/auth.js';
 import { resetDb } from './utils/db.js';
@@ -40,6 +41,25 @@ describe('manual payments (e2e)', () => {
       `SELECT count(*)::int AS count FROM email_logs WHERE idempotency_key = $1`, [`purchase-approved:${res.body.purchaseId}`],
     );
     expect(count).toBe(1);
+  });
+
+  it('writes nothing when the activation fails (same transaction)', async () => {
+    const staff = await signUpStaff(ctx.app, ctx.dataSource);
+    const client = await signUpClient(ctx.app);
+    const planId = await planIdBySlug(ctx.dataSource, 'performance-trimestral');
+    const activate = vi.spyOn(ctx.app.get(SubscriptionsService), 'activateFromPurchase').mockRejectedValueOnce(new Error('boom'));
+    try {
+      await staff.agent.post('/api/staff/payments/manual').send({ userId: client.userId, planId, method: 'cash', amount: 10500 })
+        .expect(500).expect(expectCode('INTERNAL_ERROR'));
+    } finally {
+      activate.mockRestore();
+    }
+    const [counts] = await ctx.dataSource.query(
+      `SELECT (SELECT count(*)::int FROM purchases) AS purchases, (SELECT count(*)::int FROM payments) AS payments,
+         (SELECT count(*)::int FROM subscriptions) AS subscriptions,
+         (SELECT count(*)::int FROM email_logs WHERE template = 'purchase-approved') AS emails`,
+    );
+    expect(counts).toEqual({ purchases: 0, payments: 0, subscriptions: 0, emails: 0 });
   });
 
   it('renews from the current end date and activates Recovery packs', async () => {
