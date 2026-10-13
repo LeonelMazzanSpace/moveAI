@@ -14,6 +14,7 @@ import { AgendaModule } from './modules/schedule/agenda.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { BookingsModule } from './modules/bookings/bookings.module.js';
 import { CatalogModule } from './modules/catalog/catalog.module.js';
+import { ClientsModule } from './modules/clients/clients.module.js';
 import { FollowupModule } from './modules/followup/followup.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
@@ -43,6 +44,7 @@ import { UsersModule } from './modules/users/users.module.js';
     BookingsModule,
     PaymentsModule,
     FollowupModule,
+    ClientsModule,
   ],
 })
 export class AppModule {}
