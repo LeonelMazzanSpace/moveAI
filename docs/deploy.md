@@ -1,0 +1,182 @@
+# Runbook de deploy — MOVE
+
+Guía para publicar MOVE cuando existan los accesos a Neon, AWS (Elastic Beanstalk), Vercel y los proveedores. Hasta entonces nada de esto se ejecutó: el desarrollo corre con Postgres en Docker, el simulador de pagos y el email en modo dry-run (ver [development.md](development.md)).
+
+Arquitectura de producción:
+
+| Pieza | Plataforma | Notas |
+|---|---|---|
+| Web (`apps/web`) | Vercel | Preview por rama, producción desde el repositorio |
+| API (`apps/api`) | AWS Elastic Beanstalk (Node 24) | Zip generado por `scripts/package-api-eb.sh` |
+| Base de datos | Neon (PostgreSQL 17) | Base nueva; no se migra el esquema anterior. Sin RDS en el MVP |
+| Pagos | Mercado Pago | Credenciales de producción y webhook firmado |
+| Email | Brevo | Remitente verificado |
+
+Los ambientes de desarrollo y producción están separados: bases, credenciales y URLs distintas. Los previews de Vercel apuntan a la API de desarrollo, nunca a la de producción (ver [Vercel](#4-web-en-vercel)).
+
+El CI (`bitbucket-pipelines.yml`) solo valida (lint, tests, e2e de la API y build). No hay pasos de deploy: se hace a mano siguiendo este runbook hasta que se automatice.
+
+## Variables de entorno de la API
+
+Se definen y validan en `apps/api/src/config/env.validation.ts`; si falta una obligatoria, la API no arranca. En Elastic Beanstalk se cargan en *Configuration → Updates, monitoring and logging → Environment properties* (o con `eb setenv`). Los valores sensibles no van al repositorio.
+
+| Variable | Producción | Propósito |
+|---|---|---|
+| `NODE_ENV` | Obligatoria (`production`) | Con `production` se exigen las credenciales de proveedores, se usan cookies `Secure` y se deshabilita el simulador de pagos |
+| `PORT` | Obligatoria | Puerto donde escucha la API. Poner el que reenvía el proxy de Elastic Beanstalk (8080 por defecto) |
+| `WEB_URL` | Obligatoria | Origen exacto de la web, sin barra final (`https://move.uy`). Se usa para CORS, orígenes de confianza de Better Auth y links de los emails |
+| `API_PUBLIC_URL` | Obligatoria | URL pública de la API sin `/api` (`https://api.move.uy`). Base de Better Auth, callback de Google y `notification_url` del webhook de Mercado Pago |
+| `DB_HOST` | Obligatoria | Host de Neon. Usar el host **directo** (sin `-pooler`): los jobs usan locks de sesión de Postgres, que un pooler en modo transacción rompe |
+| `DB_PORT` | Obligatoria | `5432` |
+| `DB_USER` | Obligatoria | Usuario de la base en Neon |
+| `DB_PASSWORD` | Obligatoria | Contraseña de la base en Neon |
+| `DB_NAME` | Obligatoria | Nombre de la base nueva de MOVE en Neon |
+| `DB_SSL` | Obligatoria en la práctica (`true`) | Neon exige SSL. El default local es `false`; si falta en producción la conexión falla |
+| `BETTER_AUTH_SECRET` | Obligatoria | Secreto de Better Auth, 32+ caracteres aleatorios (por ejemplo `openssl rand -base64 48`). Cambiarlo invalida las sesiones |
+| `COOKIE_DOMAIN` | Obligatoria en la práctica (`.move.uy`) | Dominio raíz de la cookie de sesión, para que web y API compartan la sesión. Vacío deja la cookie atada al host de la API |
+| `GOOGLE_CLIENT_ID` | Opcional | Cliente OAuth de Google. Va junto con `GOOGLE_CLIENT_SECRET`: se definen las dos o ninguna |
+| `GOOGLE_CLIENT_SECRET` | Opcional | Secreto del cliente OAuth de Google |
+| `MP_ACCESS_TOKEN` | Obligatoria | Access token de Mercado Pago. Sin él (fuera de producción) se usa el simulador |
+| `MP_WEBHOOK_SECRET` | Obligatoria | Secreto de firma de los webhooks de Mercado Pago; sin firma válida el webhook responde 401 |
+| `BREVO_API_KEY` | Obligatoria | API key de Brevo. Sin ella (fuera de producción) los emails se registran en el log y no se envían |
+| `BREVO_SENDER_EMAIL` | Obligatoria | Remitente verificado en Brevo (debe ser un email válido) |
+| `BREVO_SENDER_NAME` | Opcional | Nombre del remitente (default `MOVE`) |
+| `SCHEDULER_ENABLED` | Opcional | Solo `true` o `false`; cualquier otro valor impide el arranque. Default `true`. Ver [Scheduler](#scheduler-una-sola-instancia) |
+
+Variables que **no** van a producción: `E2E_DATABASE_NAME` (solo tests) y `CREATE_STAFF_PASSWORD` (solo se pasa al comando `user:create-staff`, ver [paso 7](#7-crear-el-primer-staff)).
+
+### Variables de la web (Vercel)
+
+| Variable | Producción | Propósito |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | Obligatoria | URL de la API con `/api` (`https://api.move.uy/api`). Se incrusta en el build: cambiarla requiere un nuevo deploy |
+| `NEXT_PUBLIC_GOOGLE_ENABLED` | Opcional | `true` muestra el botón de Google; solo activar si la API tiene `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` |
+
+## 1. Base de datos en Neon
+
+1. En el proyecto Neon existente de MOVE, crear una **base nueva** (por ejemplo `move`) en Postgres 17. No reutilizar ni migrar el esquema anterior.
+2. Copiar host directo, usuario, contraseña y nombre a las variables `DB_*` y definir `DB_SSL=true`.
+3. Las migraciones se corren **antes** de cambiar el tráfico a la versión nueva, desde el mismo bundle que se va a desplegar (el bundle no incluye el CLI de Nest, por eso se llama a TypeORM directo):
+
+   ```bash
+   unzip artifacts/move-api-<sha>.zip -d /tmp/move-api && cd /tmp/move-api
+   DB_HOST=… DB_PORT=5432 DB_USER=… DB_PASSWORD=… DB_NAME=… DB_SSL=true \
+     node_modules/.bin/typeorm migration:run -d dist/database/data-source.js
+   ```
+
+   Pasar las variables en el comando (o exportarlas en la sesión) en lugar de crear un `.env`. El esquema solo cambia por migraciones: nunca `synchronize`.
+4. Cargar los datos iniciales (planes, plantillas de horarios y configuración, valores provisorios hasta que MOVE los confirme). Es idempotente:
+
+   ```bash
+   DB_HOST=… DB_PORT=5432 DB_USER=… DB_PASSWORD=… DB_NAME=… DB_SSL=true node dist/database/seed.js
+   ```
+
+## 2. API en Elastic Beanstalk
+
+1. Generar el paquete desde la raíz del repo (necesita `pnpm`, `zip` y el commit a desplegar en `HEAD`):
+
+   ```bash
+   bash scripts/package-api-eb.sh      # genera artifacts/move-api-<sha>.zip
+   ```
+
+   El zip contiene `Procfile` (`web: node dist/main.js`), `package.json`, `dist/` y los `node_modules` de producción. No lleva `.env` ni código fuente. Como incluye `node_modules`, conviene generarlo en Linux (CI o Docker `node:24`) si en algún momento se suman dependencias con binarios nativos; hoy las dependencias de runtime son JavaScript puro.
+2. Crear el entorno con la plataforma **Node.js 24** (Amazon Linux 2023), tipo *Web server environment*.
+3. Cargar todas las variables de la [tabla](#variables-de-entorno-de-la-api) como propiedades del entorno.
+4. Subir el zip como nueva versión de la aplicación y desplegarla. Beanstalk usa el `Procfile` para arrancar y, al venir `node_modules` en el zip, no instala dependencias.
+5. Configurar el health check del balanceador/entorno en `GET /api/health` (responde `{"status":"ok"}`).
+6. **Proxy y límite de body de auth.** `/api/auth/*` rechaza con 413 cualquier request con más de 64 KB o con `Transfer-Encoding` sin `content-length`. El proxy (Nginx de Beanstalk o ALB) tiene que reenviar `content-length`: dejar `proxy_request_buffering on` (el default de Nginx) y no agregar configuración que lo desactive. Los `fetch` del navegador con body JSON siempre envían `content-length`.
+7. Subir con HTTPS (certificado en ACM asociado al balanceador) y dominio `api.move.uy`.
+
+### Scheduler: una sola instancia
+
+La API corre jobs con cron dentro del proceso (`@nestjs/schedule`): vencimiento de reservas retenidas (cada minuto), conciliación de pagos (cada 10 minutos), generación de turnos (03:00), detección de seguimiento (07:00), recordatorios de vencimiento (09:00) y check-ins mensuales (10:00, actúan el primer lunes del mes); las horas son de `America/Montevideo`. Cada job toma un lock de Postgres, así que dos instancias no corren el mismo job a la vez, pero igual:
+
+- Dejar el entorno con **una sola instancia**, o
+- Si se escala a varias, poner `SCHEDULER_ENABLED=true` en **una** y `SCHEDULER_ENABLED=false` en todas las demás (solo se aceptan esos dos valores).
+
+`SCHEDULER_ENABLED=false` solo apaga los crons; los endpoints y la corrida manual (`POST /api/staff/automations/run/:job`) siguen funcionando.
+
+## 3. Dominios
+
+Web y API van bajo el mismo dominio raíz para que la cookie de sesión sea first-party:
+
+| Servicio | Dominio de ejemplo |
+|---|---|
+| Web (Vercel) | `move.uy` |
+| API (Elastic Beanstalk) | `api.move.uy` |
+
+- `COOKIE_DOMAIN=.move.uy` (con el punto inicial), `WEB_URL=https://move.uy`, `API_PUBLIC_URL=https://api.move.uy`, `NEXT_PUBLIC_API_URL=https://api.move.uy/api`.
+- `api.move.uy`: registro CNAME hacia el entorno de Beanstalk (o alias al balanceador) con certificado HTTPS.
+- `move.uy`: los registros que indique Vercel al agregar el dominio al proyecto.
+
+## 4. Web en Vercel
+
+1. Importar el repositorio en el proyecto existente de MOVE en Vercel con **Root Directory** `apps/web` (framework Next.js; Vercel detecta pnpm por `packageManager`) y Node 24.
+2. Definir `NEXT_PUBLIC_API_URL` y, si corresponde, `NEXT_PUBLIC_GOOGLE_ENABLED` en el ambiente *Production*.
+3. Producción se publica desde la rama `main`; las demás ramas generan previews.
+4. En el ambiente *Preview* definir `NEXT_PUBLIC_API_URL` apuntando a la API de **desarrollo**. La API de producción solo acepta el origen de `WEB_URL`, así que un preview no podría usarla (y no debe).
+5. Agregar el dominio `move.uy` al proyecto.
+
+## 5. Servicios externos
+
+### Google OAuth (opcional)
+
+1. En Google Cloud Console crear un cliente OAuth tipo *Web application*.
+2. Orígenes autorizados: `https://move.uy`. URI de redirección autorizada: `https://<api>/api/auth/callback/google` (por ejemplo `https://api.move.uy/api/auth/callback/google`).
+3. Cargar `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` en la API y `NEXT_PUBLIC_GOOGLE_ENABLED=true` en Vercel. Una cuenta por email: Google se vincula a la cuenta que ya exista con ese email.
+
+### Mercado Pago
+
+1. Primero probar de punta a punta con las **credenciales de prueba** (usuarios y tarjetas de prueba) en un entorno de staging; recién después cambiar a las credenciales de producción.
+2. Cargar `MP_ACCESS_TOKEN` con el access token de la aplicación.
+3. En *Tus integraciones → Webhooks*, configurar la URL `https://<api>/api/payments/webhook/mercadopago` con el evento de pagos y copiar la clave secreta a `MP_WEBHOOK_SECRET`.
+4. La API verifica la firma de cada notificación (firma inválida: 401 sin efectos) y es idempotente: repetir una notificación, o recibirla además por la conciliación, no duplica la suscripción ni extiende la vigencia dos veces.
+5. Comportamiento a conocer: los pagos de plan rechazados quedan en `pending` (el cliente puede reintentar); la conciliación periódica también revisa las compras de plan vencidas (`expired`) de los últimos 7 días, porque su preferencia todavía puede pagarse tarde. Si un pago se aprueba cuando la reserva ya venció y el turno no tiene cupo, la compra queda aprobada y marcada para atención del staff (sin reembolso automático).
+
+### Brevo
+
+1. Verificar el dominio o el remitente en Brevo y crear una API key.
+2. Cargar `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` (el remitente verificado) y, si se quiere, `BREVO_SENDER_NAME`.
+3. Sin `BREVO_API_KEY` la API no envía nada: registra el envío en el log (dry-run). En producción la variable es obligatoria.
+
+## 6. Autenticación detrás de proxy
+
+- Better Auth revoca todas las sesiones de una cuenta cuando se restablece su contraseña, y marca el email como verificado al completar un restablecimiento o una invitación (alta de cliente por el staff). No se exige email verificado para ingresar.
+- Las cookies de sesión son `Secure` en producción: probar siempre sobre HTTPS.
+
+## 7. Crear el primer staff
+
+Con las variables `DB_*` del entorno de producción y la contraseña por variable (no por argumento, para que no quede en el historial del shell):
+
+```bash
+cd /tmp/move-api   # el bundle descomprimido del paso 1
+read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD
+DB_HOST=… DB_PORT=5432 DB_USER=… DB_PASSWORD=… DB_NAME=… DB_SSL=true \
+BETTER_AUTH_SECRET=… NODE_ENV=production PORT=8080 \
+WEB_URL=https://move.uy API_PUBLIC_URL=https://api.move.uy \
+MP_ACCESS_TOKEN=… MP_WEBHOOK_SECRET=… BREVO_API_KEY=… BREVO_SENDER_EMAIL=… SCHEDULER_ENABLED=false \
+  node dist/cli/create-staff.js --email <email> --name "<Nombre Apellido>"
+unset CREATE_STAFF_PASSWORD
+```
+
+El comando arranca el contexto de la aplicación, por eso necesita el mismo conjunto de variables que la API (con `SCHEDULER_ENABLED=false` para que no corran jobs). Imprime solo el id (`staff <id>`). Si el email ya existe, esa cuenta pasa a ser staff. Después, entrar a la web con ese usuario y cambiar la contraseña si se usó una temporal.
+
+## 8. Checklist de verificación posterior al deploy
+
+- [ ] `GET https://<api>/api/health` responde `200` y `{"status":"ok"}`.
+- [ ] La web carga en `https://move.uy` y la lista de planes viene de la API (sin errores de CORS en la consola).
+- [ ] Registro de un cliente nuevo y login: la cookie de sesión queda con `Secure` y dominio `.move.uy`; recargar mantiene la sesión.
+- [ ] `POST /api/auth/sign-in/email` con un body JSON normal no responde 413 (el proxy reenvía `content-length`).
+- [ ] `GET /api/staff/dashboard` responde 401 sin sesión y 403 con la sesión de un cliente.
+- [ ] Ingreso del staff y apertura de Dashboard, Clientes y Configuración.
+- [ ] Pago de prueba: compra de un plan con credenciales de prueba de Mercado Pago hasta ver la suscripción activa.
+- [ ] Webhook recibido: en el log de la API aparece `webhook payment=<id>` y la compra pasa a aprobada; reenviar la notificación desde el panel de Mercado Pago no duplica nada.
+- [ ] Email recibido: restablecer la contraseña de una cuenta de prueba y recibir el correo de Brevo (o ver el envío en el panel de Brevo).
+- [ ] Cron ejecutado en los logs: aparecen líneas `job expire-holds …` y `job reconcile-payments …` (corren solas) y, tras `POST /api/staff/automations/run/followup-detect`, la línea `job followup-detect …`. Con varias instancias, comprobar que solo una registra los jobs.
+- [ ] Neon: las tablas existen en la base nueva y la conexión usa SSL.
+- [ ] Reemplazar los valores provisorios de Configuración (aviso "Valores provisorios — confirmar con MOVE") con los que defina MOVE.
+
+## 9. Rollback
+
+- API: volver a desplegar la versión anterior del zip desde Beanstalk. Las migraciones no se revierten automáticamente; si una migración nueva no es compatible hacia atrás, revertirla con `node_modules/.bin/typeorm migration:revert -d dist/database/data-source.js` (del bundle nuevo) **antes** de volver a la versión anterior.
+- Web: *Instant Rollback* sobre un deploy anterior en Vercel.

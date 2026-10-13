@@ -20,9 +20,26 @@ Monorepo (pnpm workspaces) de la plataforma MOVE — Performance, Rehab & Recove
 pnpm install
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
-pnpm db:up          # levanta Postgres en Docker
-pnpm dev            # web + api en paralelo
+pnpm db:up                                   # levanta Postgres en Docker
+pnpm --filter @move/api migration:run        # crea el esquema
+pnpm --filter @move/api seed                 # planes, horarios y configuración provisorios
+pnpm dev                                     # web + api en paralelo
 ```
+
+El `.env.example` de la API trae valores de desarrollo. Sin credenciales de proveedores todo funciona en local: Mercado Pago usa un simulador de pagos, Brevo registra los emails en el log (dry-run) y el botón de Google queda oculto. Variables, proveedores y detalles en [docs/development.md](docs/development.md).
+
+### Variables de entorno
+
+| App | Variable | Propósito |
+|---|---|---|
+| API | `NODE_ENV`, `PORT`, `WEB_URL`, `API_PUBLIC_URL` | Entorno, puerto y URLs públicas de la web y de la API |
+| API | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL` | Conexión a PostgreSQL (`DB_SSL=true` en Neon) |
+| API | `BETTER_AUTH_SECRET`, `COOKIE_DOMAIN` | Secreto de sesiones y dominio de la cookie (`.move.uy` en producción) |
+| API | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth (opcional; las dos o ninguna) |
+| API | `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` | Mercado Pago (vacíos = simulador en desarrollo; obligatorios en producción) |
+| API | `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME` | Brevo (vacíos = dry-run en desarrollo; obligatorios en producción) |
+| API | `SCHEDULER_ENABLED` | `true` o `false`; activo en una sola instancia |
+| Web | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_GOOGLE_ENABLED` | URL de la API (con `/api`) y botón de Google |
 
 ## Scripts raíz
 
@@ -31,7 +48,17 @@ pnpm dev            # web + api en paralelo
 | `pnpm dev` | Web y API en modo watch |
 | `pnpm dev:web` / `pnpm dev:api` | Una sola app |
 | `pnpm build` / `pnpm lint` / `pnpm test` | Corre el script en todas las apps |
+| `pnpm test:e2e` | E2E de la API contra Postgres (requiere `E2E_DATABASE_NAME`, ver [docs/development.md](docs/development.md#tests)) |
 | `pnpm db:up` / `pnpm db:down` / `pnpm db:logs` | Postgres local |
+
+Scripts de la API (`pnpm --filter @move/api <script>`):
+
+| Script | Qué hace |
+|---|---|
+| `seed` | Carga planes, horarios y configuración provisorios (idempotente) |
+| `user:create-staff -- --email <e> --name <n>` | Crea un usuario staff; la contraseña va en `CREATE_STAFF_PASSWORD` (preferible a `--password`) |
+| `test:e2e` | E2E de la API |
+| `migration:generate` / `migration:run` / `migration:revert` / `migration:show` | Migraciones |
 
 ## Migraciones (API)
 
@@ -45,3 +72,13 @@ pnpm --filter @move/api migration:show
 ```
 
 Las tablas y columnas se nombran en snake_case automáticamente (`SnakeNamingStrategy`).
+
+## Documentación
+
+- [docs/development.md](docs/development.md): setup local, seed, staff, simulador de pagos, tests, jobs manuales y módulos de la API.
+- [docs/deploy.md](docs/deploy.md): runbook de deploy (Neon, Elastic Beanstalk, Vercel, dominios, proveedores y checklist).
+- [apps/api/CLAUDE.md](apps/api/CLAUDE.md) y [apps/web/CLAUDE.md](apps/web/CLAUDE.md): convenciones del proyecto.
+
+## CI y paquete de la API
+
+`bitbucket-pipelines.yml` corre lint, tests, e2e de la API y build en cada PR y en `main` y `feature/*` (variable segura `CI_BETTER_AUTH_SECRET`). `bash scripts/package-api-eb.sh` genera `artifacts/move-api-<sha>.zip` para Elastic Beanstalk.
