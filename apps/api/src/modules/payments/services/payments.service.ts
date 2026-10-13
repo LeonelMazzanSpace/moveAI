@@ -144,8 +144,9 @@ export class PaymentsService {
   }
 
   // Mercado Pago purchases from the last 7 days take their real state from Mercado Pago: pending ones older than
-  // `reconcileAfterMinutes`, and expired plan purchases, whose preference can still be paid late (D45). Then stale
-  // purchases expire: bookings whose hold expired and plans pending for more than 24 h.
+  // `reconcileAfterMinutes`, and expired ones of any kind, whose preference can still be paid late (D45, D60; a
+  // late booking payment whose hold is gone ends approved and flagged, D23). Then stale purchases expire: bookings
+  // whose hold expired or was cancelled, and plans pending for more than 24 h.
   async reconcilePending(now: Date): Promise<{ applied: number; expired: number }> {
     let applied = 0;
     if (!this.config.simulatorEnabled) {
@@ -153,7 +154,7 @@ export class PaymentsService {
       const pending: { externalReference: string }[] = await this.dataSource.query(
         `SELECT external_reference AS "externalReference" FROM purchases
          WHERE method = 'mercadopago' AND deleted_at IS NULL AND created_at > $2
-           AND ((status = 'pending' AND created_at < $1) OR (status = 'expired' AND kind = 'plan'))
+           AND ((status = 'pending' AND created_at < $1) OR status = 'expired')
          ORDER BY created_at`,
         [new Date(now.getTime() - minutes * MINUTE_MS), new Date(now.getTime() - RECONCILE_LOOKBACK_MS)],
       );
@@ -313,7 +314,10 @@ export class PaymentsService {
        ) SELECT id FROM moved`,
       [purchase.id],
     );
-    if (moved.length === 0) return null;
+    if (moved.length === 0) {
+      await this.flag(manager, purchase.id);
+      return null;
+    }
 
     const approval: Approval = {
       purchaseId: purchase.id,
