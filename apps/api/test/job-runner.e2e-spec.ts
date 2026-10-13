@@ -21,5 +21,12 @@ describe('JobRunner (e2e)', () => {
     release();
     expect(second.ran).toBe(false);
     expect((await first).ran).toBe(true);
+    expect(await runner.run('test-lock', async () => ({ n: 3 }), { force: true })).toEqual({ ran: true, result: { n: 3 } });
+  });
+
+  it('releases the lock when the job fails', async () => {
+    const failing = runner.run('test-fail', async () => { throw new Error('boom'); }, { force: true });
+    await expect(failing).rejects.toThrow('boom');
+    expect(await runner.run('test-fail', async () => ({ n: 1 }), { force: true })).toEqual({ ran: true, result: { n: 1 } });
   });
 });
