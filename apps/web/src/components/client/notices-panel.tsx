@@ -8,11 +8,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
 import type { NoticeDto, NoticeKind } from '@/lib/api/types';
 
-const ACTION_LABEL: Record<NoticeKind, string> = {
+const ACTION_LABEL: Partial<Record<NoticeKind, string>> = {
   plan_expiring: 'Renovar plan',
   plan_expired: 'Renovar plan',
   checkin_pending: 'Responder check-in',
-  checkin_answered: 'Ver más',
   pack_low: 'Ver paquetes',
 };
 
@@ -33,7 +32,7 @@ function NoticesBody() {
         <li key={notice.id} className="rounded border border-border bg-soft p-4">
           <p className="font-medium">{notice.title}</p>
           {notice.body ? <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{notice.body}</p> : null}
-          {notice.actionUrl ? (
+          {notice.actionUrl && ACTION_LABEL[notice.kind] ? (
             <div className="mt-3">
               <CtaLink href={notice.actionUrl} variant="outline">
                 {ACTION_LABEL[notice.kind]}

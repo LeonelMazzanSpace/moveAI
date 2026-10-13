@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api/errors';
-import type { PlanDto, PublicSettingsDto, TimeSlotDto } from '@/lib/api/types';
+import type { MeDto, PlanDto, PublicSettingsDto, TimeSlotDto } from '@/lib/api/types';
 import { businessTodayWeb } from '@/lib/format';
 
 const apiFetch = vi.fn();
@@ -29,9 +29,13 @@ const slot: TimeSlotDto = {
 };
 const guest = { name: 'Ana Pérez', email: 'ana@mail.com', phone: '099123456' };
 
-function mockApi(checkout: () => unknown) {
+const client: MeDto = { id: 'u1', name: 'Ana Pérez', email: 'ana@mail.com', role: 'client', phone: null, rehabFollowupEnabled: false };
+
+function mockApi(checkout: () => unknown, me: () => unknown = () => {
+  throw new ApiError(401, 'UNAUTHENTICATED', 'x');
+}) {
   apiFetch.mockImplementation(async (path: string, init?: { method?: string }) => {
-    if (path === '/me') throw new ApiError(401, 'UNAUTHENTICATED', 'x');
+    if (path === '/me') return me();
     if (path === '/settings/public') return settings;
     if (path === '/schedule/availability') return [{ date: today, available: 1 }];
     if (path === '/schedule/time-slots') return [slot];
@@ -47,11 +51,16 @@ function renderFlow() {
       <RehabBookingFlow plan={plan} />
     </QueryClientProvider>,
   );
+  return queryClient;
+}
+
+async function pickSlot() {
+  await userEvent.click(await screen.findByRole('button', { name: String(Number(today.slice(8))) }));
+  await userEvent.click(await screen.findByRole('button', { name: '11:00' }));
 }
 
 async function fillGuestAndPay() {
-  await userEvent.click(await screen.findByRole('button', { name: String(Number(today.slice(8))) }));
-  await userEvent.click(await screen.findByRole('button', { name: '11:00' }));
+  await pickSlot();
   await userEvent.click(screen.getByRole('button', { name: 'Continuar al pago' }));
   await userEvent.type(await screen.findByLabelText('Nombre'), guest.name);
   await userEvent.type(screen.getByLabelText('Email'), guest.email);
@@ -101,5 +110,98 @@ describe('RehabBookingFlow', () => {
     expect(await screen.findByText('El turno está completo.')).toBeInTheDocument();
     const slotCalls = () => apiFetch.mock.calls.filter(([path]) => path === '/schedule/time-slots').length;
     await vi.waitFor(() => expect(slotCalls()).toBeGreaterThan(1));
+  });
+
+  it('books with the session and without guest data when the client is signed in', async () => {
+    mockApi(() => ({ purchaseId: 'p', externalReference: 'ref', initPoint: 'https://mp.test/pay', bookingId: 'b', holdExpiresAt: null }), () => client);
+    renderFlow();
+
+    await pickSlot();
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeEnabled());
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar al pago' }));
+
+    await vi.waitFor(() => expect(assign).toHaveBeenCalledWith('https://mp.test/pay'));
+    const post = apiFetch.mock.calls.find(([path]) => path === '/checkout/booking');
+    expect(post?.[1]).toEqual({ method: 'POST', body: { planId: 'plan-eval', timeSlotId: 'slot-1' } });
+    expect(post?.[1].body).not.toHaveProperty('guest');
+    expect(screen.queryByLabelText('Nombre')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeDisabled();
+  });
+
+  it('shows the error with retry instead of the guest form when /me fails for a reason other than 401', async () => {
+    let failing = true;
+    mockApi(() => ({ purchaseId: 'p', externalReference: 'ref', initPoint: 'https://mp.test/pay', bookingId: 'b', holdExpiresAt: null }), () => {
+      if (failing) throw new ApiError(500, 'INTERNAL_ERROR', 'x');
+      return client;
+    });
+    renderFlow();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ocurrió un error inesperado.');
+    expect(screen.queryByLabelText('Nombre')).toBeNull();
+
+    failing = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(await screen.findByRole('button', { name: 'Continuar al pago' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('keeps the flow visible when a background refresh of /me fails for a signed-in client', async () => {
+    let failing = false;
+    mockApi(() => ({ purchaseId: 'p', externalReference: 'ref', initPoint: 'https://mp.test/pay', bookingId: 'b', holdExpiresAt: null }), () => {
+      if (failing) throw new ApiError(500, 'INTERNAL_ERROR', 'x');
+      return client;
+    });
+    const queryClient = renderFlow();
+
+    await pickSlot();
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeEnabled());
+
+    failing = true;
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: ['me'] });
+      // TanStack Query avisa a React con un `setTimeout(0)`: sin este turno el DOM todavía no refleja el error.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(queryClient.getQueryState(['me'])?.status).toBe('error');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: '11:00' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeEnabled();
+  });
+
+  it('keeps the guest data after the slot turned out to be full', async () => {
+    mockApi(() => {
+      throw new ApiError(409, 'SLOT_FULL', 'El turno está completo.');
+    });
+    renderFlow();
+
+    await fillGuestAndPay();
+
+    expect(await screen.findByText('El turno está completo.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Nombre')).toHaveValue(guest.name);
+    expect(screen.getByLabelText('Email')).toHaveValue(guest.email);
+    expect(screen.getByLabelText('Teléfono')).toHaveValue(guest.phone);
+    expect(screen.getByRole('button', { name: 'Ir a pagar' })).toBeDisabled();
+  });
+
+  it('lets the guest pay again after choosing another slot without retyping the data', async () => {
+    let attempts = 0;
+    mockApi(() => {
+      attempts += 1;
+      if (attempts === 1) throw new ApiError(409, 'SLOT_FULL', 'El turno está completo.');
+      return { purchaseId: 'p', externalReference: 'ref', initPoint: 'https://mp.test/pay', bookingId: 'b', holdExpiresAt: null };
+    });
+    renderFlow();
+
+    await fillGuestAndPay();
+    await screen.findByText('El turno está completo.');
+    await userEvent.click(await screen.findByRole('button', { name: '11:00' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Ir a pagar' }));
+
+    await vi.waitFor(() => expect(assign).toHaveBeenCalledWith('https://mp.test/pay'));
+    expect(apiFetch).toHaveBeenCalledWith('/checkout/booking', {
+      method: 'POST',
+      body: { planId: 'plan-eval', timeSlotId: 'slot-1', guest },
+    });
   });
 });

@@ -42,7 +42,10 @@ function PlanSummary({ plan, startsOn }: { plan: PlanDto; startsOn: string | nul
   return (
     <div className="rounded border border-border bg-card p-7">
       <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">{plan.name}</p>
-      <p className="mt-3 font-display text-4xl font-black">{formatUYU(plan.price)}</p>
+      <p className="mt-3 font-display text-4xl font-black">
+        <span>{formatUYU(plan.price)}</span>
+        {plan.kind === 'session_pack' ? <span className="text-sm font-semibold text-muted-foreground"> /paquete</span> : null}
+      </p>
       <dl className="mt-5 space-y-3 text-sm">
         {summaryRows(plan).map(([label, value]) => (
           <div key={label} className="flex justify-between gap-4">

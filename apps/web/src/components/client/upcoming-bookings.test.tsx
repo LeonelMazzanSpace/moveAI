@@ -27,8 +27,11 @@ const bookings = [
 
 function renderList(children: ReactNode) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>);
+  const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+  return { invalidate, ...render(<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>) };
 }
+
+const CANCEL_PERFORMANCE = 'Cancelar reserva del 12/10/2026 a las 18:00';
 
 describe('UpcomingBookings', () => {
   beforeEach(() => {
@@ -39,7 +42,7 @@ describe('UpcomingBookings', () => {
   it('offers cancel only for cancellable bookings', async () => {
     renderList(<UpcomingBookings />);
     expect(await screen.findByText('Performance — 18:00')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Cancelar' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Cancelar reserva/ })).toHaveLength(1);
     expect(screen.getByText('Cancelación con MOVE')).toBeInTheDocument();
     expect(apiFetch).toHaveBeenCalledWith('/me/bookings', { query: { scope: 'upcoming' } });
   });
@@ -51,7 +54,7 @@ describe('UpcomingBookings', () => {
     renderList(<UpcomingBookings />);
     expect(await screen.findByText('Pago pendiente')).toBeInTheDocument();
     expect(screen.queryByText('Cancelación con MOVE')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Cancelar' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Cancelar reserva/ })).toBeNull();
   });
 
   it('does not flag confirmed bookings as unpaid', async () => {
@@ -63,11 +66,52 @@ describe('UpcomingBookings', () => {
   it('confirms before cancelling and posts to the contract endpoint', async () => {
     const user = userEvent.setup();
     renderList(<UpcomingBookings />);
-    await user.click(await screen.findByRole('button', { name: 'Cancelar' }));
+    await user.click(await screen.findByRole('button', { name: CANCEL_PERFORMANCE }));
     expect(await screen.findByText('¿Cancelar la reserva del 12/10/2026 a las 18:00?')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Sí, cancelar' }));
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith('/bookings/b1/cancel', { method: 'POST' }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Reserva cancelada'));
+  });
+
+  it('gives every Cancelar button its own accessible name', async () => {
+    apiFetch.mockResolvedValue([
+      booking({}),
+      booking({ id: 'b4', startsAt: '2026-10-13T10:00:00.000Z' }),
+    ]);
+    renderList(<UpcomingBookings />);
+
+    expect(await screen.findByRole('button', { name: 'Cancelar reserva del 12/10/2026 a las 18:00' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancelar reserva del 13/10/2026 a las 07:00' })).toBeInTheDocument();
+  });
+
+  it('links to the full history', async () => {
+    renderList(<UpcomingBookings />);
+    expect(await screen.findByRole('link', { name: 'Ver todas' })).toHaveAttribute('href', '/historial');
+  });
+
+  it('refreshes bookings, activity and subscriptions after cancelling', async () => {
+    const user = userEvent.setup();
+    const { invalidate } = renderList(<UpcomingBookings />);
+    await user.click(await screen.findByRole('button', { name: CANCEL_PERFORMANCE }));
+    await user.click(await screen.findByRole('button', { name: 'Sí, cancelar' }));
+
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['me', 'subscriptions'] }));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['me', 'bookings'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['me', 'activity'] });
+  });
+
+  it('refreshes the bookings when the cancellation is refused', async () => {
+    const user = userEvent.setup();
+    apiFetch.mockImplementation((path: string) =>
+      path === '/me/bookings'
+        ? Promise.resolve(bookings)
+        : Promise.reject(new ApiError(409, 'CANCEL_WINDOW_CLOSED', 'x')),
+    );
+    const { invalidate } = renderList(<UpcomingBookings />);
+    await user.click(await screen.findByRole('button', { name: CANCEL_PERFORMANCE }));
+    await user.click(await screen.findByRole('button', { name: 'Sí, cancelar' }));
+
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['me', 'bookings'] }));
   });
 
   it('shows the contract message when the cancel window is closed', async () => {
@@ -78,7 +122,7 @@ describe('UpcomingBookings', () => {
         : Promise.reject(new ApiError(409, 'CANCEL_WINDOW_CLOSED', 'x')),
     );
     renderList(<UpcomingBookings />);
-    await user.click(await screen.findByRole('button', { name: 'Cancelar' }));
+    await user.click(await screen.findByRole('button', { name: CANCEL_PERFORMANCE }));
     await user.click(await screen.findByRole('button', { name: 'Sí, cancelar' }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Ya pasó el plazo para cancelar este turno.'));
   });

@@ -21,7 +21,8 @@ describe('RecoveryModalities', () => {
     expect(screen.getByText('$ 900')).toBeInTheDocument();
     expect(screen.getByText('/sesión')).toBeInTheDocument();
     expect(screen.getByText('$ 3.200')).toBeInTheDocument();
-    expect(screen.getAllByText('/mes')).toHaveLength(2);
+    expect(screen.getAllByText('/paquete')).toHaveLength(2);
+    expect(screen.queryByText('/mes')).toBeNull();
     expect(screen.getAllByText('Recomendado')).toHaveLength(1);
   });
 

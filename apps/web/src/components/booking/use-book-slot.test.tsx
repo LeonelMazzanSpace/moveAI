@@ -35,8 +35,45 @@ describe('useBookSlot', () => {
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Reserva confirmada'));
     expect(apiFetch).toHaveBeenCalledWith('/bookings', { method: 'POST', body: { timeSlotId: 'slot-1' } });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['time-slots'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['availability'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['me', 'bookings'] });
     expect(result.current.planRequired).toBe(false);
+  });
+
+  it('runs the per-call onSuccess only when the booking is confirmed', async () => {
+    apiFetch.mockResolvedValue({ id: 'b1' });
+    const onSuccess = vi.fn();
+    const { result } = setup();
+
+    act(() => result.current.book('slot-1', { onSuccess }));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not run the per-call onSuccess when the booking fails', async () => {
+    apiFetch.mockRejectedValue(new ApiError(409, 'SLOT_FULL', 'El turno está completo.'));
+    const onSuccess = vi.fn();
+    const { result } = setup();
+
+    act(() => result.current.book('slot-1', { onSuccess }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['SLOT_FULL', 'El turno está completo.'],
+    ['ALREADY_BOOKED', 'Ya tenés una reserva en este turno.'],
+  ] as const)('refreshes slots, availability and bookings when the request fails with %s', async (code, message) => {
+    apiFetch.mockRejectedValue(new ApiError(409, code, message));
+    const { result, invalidate } = setup();
+
+    act(() => result.current.book('slot-1'));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['me', 'bookings'] }));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['time-slots'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['availability'] });
   });
 
   it('flags planRequired without a toast when the plan is not valid', async () => {

@@ -49,6 +49,7 @@ export function ClientPlanCard({ subscription, upcoming }: ClientPlanCardProps) 
 
   const badge = STATUS_BADGE[main.status];
   const next = subscription && upcoming ? upcoming : null;
+  const scheduled = main.status === 'scheduled';
 
   return (
     <div className="rounded border border-border bg-card p-7">
@@ -59,7 +60,7 @@ export function ClientPlanCard({ subscription, upcoming }: ClientPlanCardProps) 
             <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
-            Vigente desde el {formatDate(main.startsOn)} · vence el{' '}
+            {scheduled ? 'Comienza' : 'Vigente desde'} el {formatDate(main.startsOn)} · vence el{' '}
             <span className="font-semibold text-foreground">{formatDate(main.endsOn)}</span>
           </p>
           {next ? (
@@ -70,22 +71,24 @@ export function ClientPlanCard({ subscription, upcoming }: ClientPlanCardProps) 
         </div>
         <CtaLink href={RENEW_HREF}>Renovar plan</CtaLink>
       </div>
-      <div className="mt-6">
-        <div className="flex justify-between text-[11px] text-muted-foreground">
-          <span>Progreso del período</span>
-          <span>{daysLeftLabel(main.daysLeft)}</span>
+      {scheduled ? null : (
+        <div className="mt-6">
+          <div className="flex justify-between text-[11px] text-muted-foreground">
+            <span>Progreso del período</span>
+            <span>{daysLeftLabel(main.daysLeft)}</span>
+          </div>
+          <div
+            role="progressbar"
+            aria-label="Progreso del período"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={main.progressPct}
+            className="mt-2 h-1.5 overflow-hidden rounded-full bg-soft"
+          >
+            <div className="h-full rounded-full bg-foreground" style={{ width: `${main.progressPct}%` }} />
+          </div>
         </div>
-        <div
-          role="progressbar"
-          aria-label="Progreso del período"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={main.progressPct}
-          className="mt-2 h-1.5 overflow-hidden rounded-full bg-soft"
-        >
-          <div className="h-full rounded-full bg-foreground" style={{ width: `${main.progressPct}%` }} />
-        </div>
-      </div>
+      )}
     </div>
   );
 }

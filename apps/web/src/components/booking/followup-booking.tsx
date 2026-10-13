@@ -89,8 +89,7 @@ function FollowupPicker({ today, bookingWindowDays }: { today: string; bookingWi
       <Button
         disabled={slotId === null || pendingSlotId !== null}
         onClick={() => {
-          if (slotId) book(slotId);
-          setSlotId(null);
+          if (slotId) book(slotId, { onSuccess: () => setSlotId(null) });
         }}
         className="text-[10px] font-semibold uppercase tracking-[0.2em]"
       >
@@ -118,7 +117,7 @@ export function FollowupBooking() {
 
 export function FollowupCard() {
   const me = useQuery({ queryKey: ['me'], queryFn: () => apiFetch<MeDto>('/me'), retry: false });
-  if (!me.data?.rehabFollowupEnabled) return null;
+  if (me.data?.role !== 'client' || !me.data.rehabFollowupEnabled) return null;
 
   return (
     <Link href="/reservar/fisioterapia" className="rounded border border-border bg-card p-7 hover:bg-soft">

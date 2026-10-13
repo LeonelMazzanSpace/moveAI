@@ -23,6 +23,18 @@ describe('PlansSection', () => {
     expect(screen.getByText('Más elegido')).toBeInTheDocument();
   });
 
+  it('prices session packs per package, not per month', () => {
+    render(
+      <PlansSection
+        plans={[plan({ slug: 'recovery-paquete-4', name: 'Paquete 4 sesiones', kind: 'session_pack', service: 'recovery', periodMonths: null, periodDays: 30, sessionsIncluded: 4 })]}
+        ctaLabel="Contratar"
+        hrefFor={(p) => `/checkout/plan/${p.slug}`}
+      />,
+    );
+    expect(screen.getByText('/paquete')).toBeInTheDocument();
+    expect(screen.queryByText('/mes')).not.toBeInTheDocument();
+  });
+
   it('shows an empty state without plans', () => {
     render(<PlansSection plans={[]} ctaLabel="Contratar" hrefFor={() => '#'} />);
     expect(screen.getByText('Planes no disponibles por el momento')).toBeInTheDocument();
