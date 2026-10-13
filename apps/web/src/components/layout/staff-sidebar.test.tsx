@@ -2,7 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/staff/turnos' }));
+let pathname = '/staff/turnos';
+vi.mock('next/navigation', () => ({ usePathname: () => pathname }));
 const apiFetch = vi.fn();
 vi.mock('@/lib/api/client', () => ({ apiFetch }));
 
@@ -19,6 +20,7 @@ function renderSidebar() {
 
 describe('StaffSidebar', () => {
   beforeEach(() => {
+    pathname = '/staff/turnos';
     apiFetch.mockReset();
     apiFetch.mockResolvedValue({ total: 23 });
   });
@@ -44,6 +46,20 @@ describe('StaffSidebar', () => {
     expect(screen.getByRole('link', { name: 'Turnos y asistencia' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute('aria-current');
     expect(screen.getByRole('link', { name: 'Clientes' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('marks only Check-in, never Seguimiento too, on /staff/seguimiento/check-in', () => {
+    pathname = '/staff/seguimiento/check-in';
+    renderSidebar();
+    expect(screen.getByRole('link', { name: 'Check-in' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: /^Seguimiento/ })).not.toHaveAttribute('aria-current');
+  });
+
+  it('marks Seguimiento on /staff/seguimiento', () => {
+    pathname = '/staff/seguimiento';
+    renderSidebar();
+    expect(screen.getByRole('link', { name: /^Seguimiento/ })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Check-in' })).not.toHaveAttribute('aria-current');
   });
 
   it('shows the open alerts total as a badge', async () => {
