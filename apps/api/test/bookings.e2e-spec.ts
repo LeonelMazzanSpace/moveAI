@@ -15,6 +15,18 @@ describe('bookings (e2e)', () => {
 
   const tomorrow = () => addDays(businessToday(), 1);
 
+  async function waitForLockWaiters(expected: number): Promise<void> {
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline) {
+      const [{ waiting }] = await ctx.dataSource.query(
+        `SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+      );
+      if (waiting >= expected) return;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    throw new Error(`expected ${expected} backends waiting on a lock`);
+  }
+
   it('requires a plan covering the slot date for Performance', async () => {
     const { agent, userId } = await signUpClient(ctx.app);
     const slotId = await createSlot(ctx.dataSource, { service: 'performance', startsAt: businessDateTime(tomorrow(), '19:00'), capacity: 14 });
@@ -46,11 +58,25 @@ describe('bookings (e2e)', () => {
     const a = await signUpClient(ctx.app);
     const b = await signUpClient(ctx.app);
     for (const u of [a, b]) await givePerformancePlan(ctx.dataSource, u.userId, { startsOn: businessToday(), endsOn: tomorrow() });
-    const results = await Promise.all([
-      a.agent.post('/api/bookings').send({ timeSlotId: slotId }),
-      b.agent.post('/api/bookings').send({ timeSlotId: slotId }),
-    ]);
-    expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
+
+    // Barrier: a separate connection holds the slot row lock, so both bookings are in flight before either runs.
+    const gate = ctx.dataSource.createQueryRunner();
+    await gate.connect();
+    await gate.startTransaction();
+    let pending: Promise<request.Response[]> | undefined;
+    try {
+      await gate.query(`SELECT id FROM time_slots WHERE id = $1 FOR UPDATE`, [slotId]);
+      pending = Promise.all([
+        a.agent.post('/api/bookings').send({ timeSlotId: slotId }),
+        b.agent.post('/api/bookings').send({ timeSlotId: slotId }),
+      ]);
+      await waitForLockWaiters(2);
+    } finally {
+      await gate.commitTransaction();
+      await gate.release();
+    }
+    const results = await pending;
+    expect(results.map((r) => r.status).sort((x, y) => x - y)).toEqual([201, 409]);
     expect(results.find((r) => r.status === 409)?.body.code).toBe('SLOT_FULL');
     const [{ count }] = await ctx.dataSource.query(`SELECT count(*)::int AS count FROM bookings WHERE time_slot_id = $1 AND status = 'confirmed'`, [slotId]);
     expect(count).toBe(14);
@@ -229,6 +255,37 @@ describe('bookings (e2e)', () => {
       await expect(ctx.dataSource.transaction((m) =>
         service.holdForPayment(m, { userId: b.userId, timeSlotId: slotId, expectedService: 'recovery', holdMinutes: 15 })))
         .rejects.toMatchObject({ code: 'SLOT_FULL' });
+    });
+
+    it('answers SLOT_FULL for an expired hold when the client already holds that slot again (D43)', async () => {
+      const service = ctx.app.get(BookingsService);
+      const { userId } = await signUpClient(ctx.app);
+      const slotId = await createSlot(ctx.dataSource, { service: 'recovery', startsAt: businessDateTime(tomorrow(), '17:00'), capacity: 2 });
+      const hold = (minutes: number) => ctx.dataSource.transaction((m) =>
+        service.holdForPayment(m, { userId, timeSlotId: slotId, expectedService: 'recovery', holdMinutes: minutes }));
+      const first = await hold(15);
+      expect(await service.expireHolds(new Date(Date.now() + 16 * 60_000))).toBe(1);
+      const retry = await hold(15);
+
+      await expect(ctx.dataSource.transaction((m) => service.confirmPaid(m, first.id))).rejects.toMatchObject({ code: 'SLOT_FULL' });
+      const rows: { id: string; status: string }[] = await ctx.dataSource.query(
+        `SELECT id, status FROM bookings WHERE id = ANY($1::uuid[])`, [[first.id, retry.id]]);
+      expect(Object.fromEntries(rows.map((r) => [r.id, r.status]))).toEqual({ [first.id]: 'expired', [retry.id]: 'pending_payment' });
+    });
+
+    it('answers SLOT_FULL for an expired hold whose slot already started (D43)', async () => {
+      const service = ctx.app.get(BookingsService);
+      const { userId } = await signUpClient(ctx.app);
+      const slotId = await createSlot(ctx.dataSource, { service: 'recovery', startsAt: businessDateTime(tomorrow(), '17:00'), capacity: 2 });
+      const hold = await ctx.dataSource.transaction((m) =>
+        service.holdForPayment(m, { userId, timeSlotId: slotId, expectedService: 'recovery', holdMinutes: 15 }));
+      expect(await service.expireHolds(new Date(Date.now() + 16 * 60_000))).toBe(1);
+      await ctx.dataSource.query(
+        `UPDATE time_slots SET starts_at = now() - interval '10 minutes', ends_at = now() + interval '35 minutes' WHERE id = $1`, [slotId]);
+
+      await expect(ctx.dataSource.transaction((m) => service.confirmPaid(m, hold.id))).rejects.toMatchObject({ code: 'SLOT_FULL' });
+      const [row] = await ctx.dataSource.query(`SELECT status FROM bookings WHERE id = $1`, [hold.id]);
+      expect(row.status).toBe('expired');
     });
 
     it('re-confirms an expired hold when there is room and releases holds on demand', async () => {

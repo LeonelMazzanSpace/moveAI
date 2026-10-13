@@ -125,17 +125,14 @@ export class BookingsService {
     });
   }
 
-  // R8. A hold cancelled by staff or by a rejected payment is not revived: it answers SLOT_FULL so payments
-  // flags the purchase for staff (D23).
+  // R8. Whenever a paid booking cannot be placed it answers SLOT_FULL, so payments flags the purchase for staff
+  // (D23): a hold cancelled by staff or by a rejected payment is not revived, and an expired hold is only
+  // re-confirmed on a live, not yet started slot where the client has no other active booking (D43).
   async confirmPaid(manager: EntityManager, bookingId: string): Promise<BookingModel> {
     const booking = await this.lockBooking(manager, bookingId);
     if (booking.status === 'confirmed') return booking;
     if (booking.status === 'cancelled') throw new AppError('SLOT_FULL');
-    if (booking.status === 'expired') {
-      const slot = await this.schedule.lockSlot(manager, booking.timeSlotId);
-      if (slot.cancelledAt) throw new AppError('SLOT_FULL');
-      await this.assertRoom(manager, booking.userId, slot);
-    }
+    if (booking.status === 'expired') await this.assertRoomForExpiredHold(manager, booking);
     await manager.query(
       `UPDATE bookings SET status = 'confirmed', confirmed_at = now(), cancelled_at = NULL, cancelled_by = NULL, updated_at = now()
        WHERE id = $1`,
@@ -280,6 +277,17 @@ export class BookingsService {
   private assertBookable(slot: TimeSlotModel, windowDays: number): void {
     const now = new Date();
     if (!isBookable(slot, now, businessToday(now), windowDays)) throw new AppError('SLOT_NOT_BOOKABLE');
+  }
+
+  private async assertRoomForExpiredHold(manager: EntityManager, booking: BookingModel): Promise<void> {
+    const slot = await this.schedule.lockSlot(manager, booking.timeSlotId);
+    if (slot.cancelledAt || slot.startsAt.getTime() <= Date.now()) throw new AppError('SLOT_FULL');
+    try {
+      await this.assertRoom(manager, booking.userId, slot);
+    } catch (error) {
+      if (error instanceof AppError && error.code === 'ALREADY_BOOKED') throw new AppError('SLOT_FULL');
+      throw error;
+    }
   }
 
   // R6 steps 3–4; the slot must already be locked.

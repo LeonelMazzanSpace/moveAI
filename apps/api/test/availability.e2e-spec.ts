@@ -2,7 +2,7 @@ import request from 'supertest';
 import { addDays, businessDateTime, businessToday } from '../src/common/time/business-time.js';
 import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
 import { createTestApp, type TestApp } from './utils/app.js';
-import { signUpClient } from './utils/auth.js';
+import { signUpClient, signUpStaff } from './utils/auth.js';
 import { resetDb } from './utils/db.js';
 import { createProfessional, createSlot } from './utils/fixtures.js';
 
@@ -49,6 +49,24 @@ describe('availability (e2e)', () => {
     const res = await request(ctx.app.getHttpServer()).get(`/api/schedule/availability?service=recovery&from=${day(14)}`).expect(200);
     expect(res.body).toHaveLength(7);
     expect(res.body.slice(0, 2)).toEqual([{ date: day(14), available: 2 }, { date: day(15), available: 0 }]);
+  });
+
+  it('lists a 23:30 local slot under its local date, not the next UTC day', async () => {
+    const startsAt = businessDateTime(day(1), '23:30');
+    expect(startsAt.toISOString()).toBe(`${day(2)}T02:30:00.000Z`);
+    const slotId = await createSlot(ctx.dataSource, { service: 'performance', startsAt, capacity: 14 });
+    const anon = request(ctx.app.getHttpServer());
+    const ids = (body: { id: string }[]) => body.map((s) => s.id);
+
+    expect(ids((await anon.get(`/api/schedule/time-slots?service=performance&date=${day(1)}`).expect(200)).body)).toEqual([slotId]);
+    expect(ids((await anon.get(`/api/schedule/time-slots?service=performance&date=${day(2)}`).expect(200)).body)).toEqual([]);
+
+    const { agent: staff } = await signUpStaff(ctx.app, ctx.dataSource);
+    expect(ids((await staff.get(`/api/staff/time-slots?date=${day(1)}`).expect(200)).body)).toEqual([slotId]);
+    expect(ids((await staff.get(`/api/staff/time-slots?date=${day(2)}`).expect(200)).body)).toEqual([]);
+
+    const availability = await anon.get(`/api/schedule/availability?service=performance&from=${day(1)}&days=2`).expect(200);
+    expect(availability.body).toEqual([{ date: day(1), available: 14 }, { date: day(2), available: 0 }]);
   });
 
   it.each([
