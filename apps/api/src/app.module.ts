@@ -10,6 +10,7 @@ import { schedulerConfig } from './config/scheduler.config.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
+import { SettingsModule } from './modules/settings/settings.module.js';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     DatabaseModule,
     CommonModule,
     HealthModule,
+    SettingsModule,
     NotificationsModule,
   ],
 })
