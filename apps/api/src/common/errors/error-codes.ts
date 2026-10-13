@@ -34,7 +34,7 @@ export const ERROR_CODES = {
     status: 409,
     message: 'Ya tenés reservas pendientes de pago. Completá el pago o esperá a que venzan.',
   },
-  RATE_LIMITED: { status: 429, message: 'Hiciste demasiados intentos. Esperá un minuto y probá de nuevo.' },
+  RATE_LIMITED: { status: 429, message: 'Hiciste demasiados intentos. Esperá un rato y probá de nuevo.' },
   GUEST_DATA_REQUIRED: { status: 400, message: 'Completá tus datos para continuar.' },
   EMAIL_ALREADY_REGISTERED: { status: 409, message: 'Ya existe una cuenta con ese email.' },
   USER_NOT_FOUND: { status: 404, message: 'El usuario no existe.' },

@@ -143,7 +143,7 @@ describe('payment holds and checkout throttling (e2e)', () => {
       expect(res.body).toEqual({
         statusCode: 429,
         code: 'RATE_LIMITED',
-        message: 'Hiciste demasiados intentos. Esperá un minuto y probá de nuevo.',
+        message: 'Hiciste demasiados intentos. Esperá un rato y probá de nuevo.',
       });
       expect(res.headers['retry-after']).toEqual(expect.any(String));
       expect(await counts()).toEqual(before);
@@ -196,7 +196,7 @@ describe('payment holds and checkout throttling (e2e)', () => {
         expect(res.body).toEqual({
           statusCode: 429,
           code: 'RATE_LIMITED',
-          message: 'Hiciste demasiados intentos. Esperá un minuto y probá de nuevo.',
+          message: 'Hiciste demasiados intentos. Esperá un rato y probá de nuevo.',
         });
         expect(res.headers['retry-after']).toEqual(expect.any(String));
         expect(await counts()).toEqual(before);
