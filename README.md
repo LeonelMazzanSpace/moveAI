@@ -50,6 +50,9 @@ El `.env.example` de la API trae valores de desarrollo. Sin credenciales de prov
 | `pnpm build` / `pnpm lint` / `pnpm test` | Corre el script en todas las apps |
 | `pnpm test:e2e` | E2E de la API contra Postgres (requiere `E2E_DATABASE_NAME`, ver [docs/development.md](docs/development.md#tests)) |
 | `pnpm db:up` / `pnpm db:down` / `pnpm db:logs` | Postgres local |
+| `pnpm manual:demo-data` | Carga datos de demostración inventados por HTTP contra la API local (ver [Manual de usuario](#manual-de-usuario)) |
+| `pnpm manual:screenshots` | Captura una imagen de cada pantalla de la web en `docs/manual/img/` |
+| `pnpm manual:pdf` | Genera `docs/manual/manual-de-usuario.pdf` desde el Markdown |
 
 Scripts de la API (`pnpm --filter @move/api <script>`):
 
@@ -73,8 +76,13 @@ pnpm --filter @move/api migration:show
 
 Las tablas y columnas se nombran en snake_case automáticamente (`SnakeNamingStrategy`).
 
+## Manual de usuario
+
+[docs/manual/manual-de-usuario.md](docs/manual/manual-de-usuario.md) ([PDF](docs/manual/manual-de-usuario.pdf)) explica el sistema con una captura de cada pantalla, en tres partes: clientes, staff de MOVE y equipo técnico (correr todo en local, qué está simulado y los pasos que faltan para el deploy y las integraciones). Las capturas y el PDF se regeneran con `pnpm manual:demo-data`, `pnpm manual:screenshots` y `pnpm manual:pdf` (pasos y variables `MANUAL_STAFF_PASSWORD` / `MANUAL_CLIENT_PASSWORD` en la parte 3 del manual).
+
 ## Documentación
 
+- [docs/manual/manual-de-usuario.md](docs/manual/manual-de-usuario.md): manual de usuario con capturas de todas las pantallas.
 - [docs/development.md](docs/development.md): setup local, seed, staff, simulador de pagos, tests, jobs manuales y módulos de la API.
 - [docs/deploy.md](docs/deploy.md): runbook de deploy (Neon, Elastic Beanstalk, Vercel, dominios, proveedores y checklist).
 - [apps/api/CLAUDE.md](apps/api/CLAUDE.md) y [apps/web/CLAUDE.md](apps/web/CLAUDE.md): convenciones del proyecto.

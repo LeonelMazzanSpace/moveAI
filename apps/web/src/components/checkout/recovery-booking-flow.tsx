@@ -100,8 +100,19 @@ function activePack(subscriptions: MySubscriptionsDto | undefined): PackDto | un
   return subscriptions?.recoveryPacks.find((pack) => pack.sessionsLeft > 0);
 }
 
+/**
+ * `true` desde la primera vez que `resolved` fue `true`. El flujo de pago vuelve a consultar `/me`
+ * al montarse y, si la consulta había fallado (visitante), la deja en `pending` otra vez.
+ */
+function useSettled(resolved: boolean): boolean {
+  const [settled, setSettled] = useState(resolved);
+  if (resolved && !settled) setSettled(true);
+  return settled || resolved;
+}
+
 export function RecoveryBookingFlow({ plans }: { plans: PlanDto[] }) {
   const { me, isPending: mePending } = useMe();
+  const meSettled = useSettled(!mePending);
   const subscriptions = useQuery({
     queryKey: ['me', 'subscriptions'],
     queryFn: () => apiFetch<MySubscriptionsDto>('/me/subscriptions'),
@@ -109,7 +120,7 @@ export function RecoveryBookingFlow({ plans }: { plans: PlanDto[] }) {
   });
 
   const pack = activePack(subscriptions.data);
-  const loading = mePending || (me !== null && subscriptions.isPending);
+  const loading = !meSettled || (me !== null && subscriptions.isPending);
 
   return (
     <div>

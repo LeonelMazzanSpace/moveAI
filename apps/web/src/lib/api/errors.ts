@@ -45,6 +45,8 @@ const ERROR_MESSAGES: Record<ErrorCode, string> = {
   CANCEL_WINDOW_CLOSED: 'Ya pasó el plazo para cancelar este turno.',
   ATTENDANCE_NOT_ALLOWED: 'Todavía no se puede registrar la asistencia de este turno.',
   LOGIN_REQUIRED: 'Ya tenés una cuenta con ese email: ingresá para continuar.',
+  HOLD_LIMIT_REACHED: 'Ya tenés reservas pendientes de pago. Completá el pago o esperá a que venzan.',
+  RATE_LIMITED: 'Hiciste demasiados intentos. Esperá un minuto y probá de nuevo.',
   GUEST_DATA_REQUIRED: 'Completá tus datos para continuar.',
   EMAIL_ALREADY_REGISTERED: 'Ya existe una cuenta con ese email.',
   USER_NOT_FOUND: 'El usuario no existe.',

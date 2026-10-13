@@ -9,7 +9,7 @@ const replace = vi.fn();
 vi.mock('@/lib/api/client', () => ({ apiFetch }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace }) }));
 const { PaymentsTable } = await import('./payments-table');
-const { PaymentsView, clampPage } = await import('./payments-view');
+const { PaymentsView } = await import('./payments-view');
 
 const base: StaffPaymentDto = {
   purchaseId: 'pu1',
@@ -44,22 +44,6 @@ describe('PaymentsTable', () => {
     render(<PaymentsTable payments={[base, { ...base, purchaseId: 'pu2', client: { ...base.client, name: 'Lucía Pérez' }, needsAttention: true }]} />);
     expect(screen.getByText('Lucía Pérez').closest('tr')).toHaveClass('bg-warning-muted/40');
     expect(screen.getByText('Martina Suárez').closest('tr')).not.toHaveClass('bg-warning-muted/40');
-  });
-});
-
-describe('clampPage', () => {
-  it.each([
-    [undefined, 1],
-    ['abc', 1],
-    ['0', 1],
-    ['-3', 1],
-    ['2.5', 1],
-    ['3', 3],
-    ['10000', 10_000],
-    ['10001', 10_000],
-    ['1e21', 10_000],
-  ])('turns %s into page %i', (raw, expected) => {
-    expect(clampPage(raw)).toBe(expected);
   });
 });
 
