@@ -31,6 +31,7 @@ export const PLAN_PURCHASE_KINDS: PlanKind[] = ['period_plan', 'session_pack'];
 const MINUTE_MS = 60_000;
 const PLAN_PENDING_LIMIT_MS = 24 * 60 * MINUTE_MS;
 const RECONCILE_LOOKBACK_MS = 7 * 24 * 60 * MINUTE_MS;
+const BOOKING_RECONCILE_LOOKBACK_MS = 72 * 60 * MINUTE_MS;
 
 interface LockedPurchase {
   id: string;
@@ -144,8 +145,9 @@ export class PaymentsService {
   }
 
   // Mercado Pago purchases from the last 7 days take their real state from Mercado Pago: pending ones older than
-  // `reconcileAfterMinutes`, and expired ones of any kind, whose preference can still be paid late (D45, D60; a
-  // late booking payment whose hold is gone ends approved and flagged, D23). Then stale purchases expire: bookings
+  // `reconcileAfterMinutes`, and expired ones whose preference can still be paid late: plans for 7 days (D45) and
+  // bookings for 72 h (D60, D70). A late booking payment is flagged for staff only when the booking can no longer
+  // be placed (D23/D43). Rejected booking purchases are never rechecked. Then stale purchases expire: bookings
   // whose hold expired or was cancelled, and plans pending for more than 24 h.
   async reconcilePending(now: Date): Promise<{ applied: number; expired: number }> {
     let applied = 0;
@@ -154,9 +156,13 @@ export class PaymentsService {
       const pending: { externalReference: string }[] = await this.dataSource.query(
         `SELECT external_reference AS "externalReference" FROM purchases
          WHERE method = 'mercadopago' AND deleted_at IS NULL AND created_at > $2
-           AND ((status = 'pending' AND created_at < $1) OR status = 'expired')
+           AND ((status = 'pending' AND created_at < $1) OR (status = 'expired' AND (kind = 'plan' OR created_at > $3)))
          ORDER BY created_at`,
-        [new Date(now.getTime() - minutes * MINUTE_MS), new Date(now.getTime() - RECONCILE_LOOKBACK_MS)],
+        [
+          new Date(now.getTime() - minutes * MINUTE_MS),
+          new Date(now.getTime() - RECONCILE_LOOKBACK_MS),
+          new Date(now.getTime() - BOOKING_RECONCILE_LOOKBACK_MS),
+        ],
       );
       for (const { externalReference } of pending) {
         if (await this.reconcileOne(externalReference)) applied += 1;
@@ -198,7 +204,8 @@ export class PaymentsService {
     if (!isUUID(externalReference)) throw new AppError('PURCHASE_NOT_FOUND');
     const [row]: (Omit<PurchaseStatusDto, 'startsAt'>)[] = await this.dataSource.query(
       `SELECT pu.external_reference AS "externalReference", pu.status, pu.kind, pl.name AS "itemName", pl.service,
-         pu.amount, pu.booking_id AS "bookingId", pu.needs_attention AS "needsAttention"
+         pu.amount, pu.booking_id AS "bookingId", pu.needs_attention AS "needsAttention",
+         CASE WHEN pu.kind = 'plan' THEN pl.slug END AS "planSlug"
        FROM purchases pu JOIN plans pl ON pl.id = pu.plan_id
        WHERE pu.external_reference = $1 AND pu.deleted_at IS NULL`,
       [externalReference],

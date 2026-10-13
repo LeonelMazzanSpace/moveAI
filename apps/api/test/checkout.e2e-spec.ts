@@ -35,7 +35,7 @@ describe('checkout (e2e)', () => {
       const status = await simulate(res.body.externalReference, 'approved');
       expect(status.body).toEqual({
         externalReference: res.body.externalReference, status: 'approved', kind: 'plan', itemName: 'Plan Mensual',
-        service: 'performance', amount: 3900, bookingId: null, startsAt: null, needsAttention: false,
+        service: 'performance', amount: 3900, bookingId: null, startsAt: null, needsAttention: false, planSlug: 'performance-mensual',
       });
       const subs = await agent.get('/api/me/subscriptions').expect(200);
       expect(subs.body.performance).toMatchObject({ planName: 'Plan Mensual', startsOn: businessToday() });
@@ -48,6 +48,22 @@ describe('checkout (e2e)', () => {
       await simulate(res.body.externalReference, 'approved');
       const [{ subscriptions }] = await ctx.dataSource.query(`SELECT count(*)::int AS subscriptions FROM subscriptions`);
       expect(subscriptions).toBe(1);
+    });
+
+    it('keeps a plan pending after a rejected payment and approves a retry (D44)', async () => {
+      const { agent } = await signUpClient(ctx.app);
+      const planId = await planIdBySlug(ctx.dataSource, 'performance-trimestral');
+      const res = await agent.post('/api/checkout/plan').send({ planId }).expect(201);
+
+      const rejected = await simulate(res.body.externalReference, 'rejected');
+      expect(rejected.body).toMatchObject({ status: 'pending', kind: 'plan', planSlug: 'performance-trimestral', needsAttention: false });
+      const before = await agent.get('/api/me/subscriptions').expect(200);
+      expect(before.body.performance).toBeNull();
+
+      const approved = await simulate(res.body.externalReference, 'approved');
+      expect(approved.body).toMatchObject({ status: 'approved', needsAttention: false });
+      const after = await agent.get('/api/me/subscriptions').expect(200);
+      expect(after.body.performance).toMatchObject({ planName: 'Plan Trimestral', startsOn: businessToday(), status: 'active' });
     });
 
     it('buys a Recovery pack', async () => {
@@ -100,7 +116,7 @@ describe('checkout (e2e)', () => {
       const status = await simulate(res.body.externalReference, 'approved');
       expect(status.body).toMatchObject({
         status: 'approved', kind: 'booking', itemName: 'Evaluación y Diagnóstico', service: 'rehab', amount: 1800,
-        bookingId: res.body.bookingId, startsAt: tomorrowAt('10:00').toISOString(), needsAttention: false,
+        bookingId: res.body.bookingId, startsAt: tomorrowAt('10:00').toISOString(), needsAttention: false, planSlug: null,
       });
       const [confirmed] = await ctx.dataSource.query(`SELECT status FROM bookings WHERE id = $1`, [res.body.bookingId]);
       expect(confirmed.status).toBe('confirmed');
@@ -235,8 +251,15 @@ describe('checkout (e2e)', () => {
       const status = await http().get(`/api/checkout/purchases/${res.body.externalReference}`).expect(200);
       expect(status.body).toEqual({
         externalReference: res.body.externalReference, status: 'pending', kind: 'plan', itemName: 'Plan Trimestral',
-        service: 'performance', amount: 10500, bookingId: null, startsAt: null, needsAttention: false,
+        service: 'performance', amount: 10500, bookingId: null, startsAt: null, needsAttention: false, planSlug: 'performance-trimestral',
       });
+
+      const slotId = await rehabSlot();
+      const evaluation = await planIdBySlug(ctx.dataSource, 'rehab-evaluacion');
+      const booking = await agent.post('/api/checkout/booking').send({ planId: evaluation, timeSlotId: slotId }).expect(201);
+      const bookingStatus = await http().get(`/api/checkout/purchases/${booking.body.externalReference}`).expect(200);
+      expect(bookingStatus.body).toMatchObject({ kind: 'booking', bookingId: booking.body.bookingId, planSlug: null });
+
       await http().get(`/api/checkout/purchases/${randomUUID()}`).expect(404).expect(expectCode('PURCHASE_NOT_FOUND'));
       await http().get('/api/checkout/purchases/not-a-uuid').expect(404).expect(expectCode('PURCHASE_NOT_FOUND'));
     });
