@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { StaffPageHeader } from '@/components/move/staff-page-header';
-import { clampPage, PaymentsView, type PaymentFilters, type PaymentStatusFilter } from '@/components/staff/pagos/payments-view';
+import { PaymentsView, type PaymentFilters, type PaymentStatusFilter } from '@/components/staff/pagos/payments-view';
 import type { PaymentMethod } from '@/lib/api/types';
+import { clampPage } from '@/lib/pagination';
 
 export const metadata: Metadata = { title: 'Pagos' };
 
