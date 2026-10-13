@@ -33,6 +33,8 @@ const BOOKING_SELECT = `
 
 const PAST_LIMIT = 50;
 const MINUTE_MS = 60_000;
+// D53: unpaid holds a user may keep at once, so nobody can block every paid slot.
+const MAX_ACTIVE_HOLDS = 2;
 
 const ATTENDANCE_LABEL: Record<AttendanceStatus, string> = {
   present: 'Asistencia',
@@ -115,6 +117,7 @@ export class BookingsService {
     if (slot.service !== input.expectedService) throw new AppError('SERVICE_MISMATCH');
     this.assertBookable(slot, windowDays);
     await this.assertRoom(manager, input.userId, slot);
+    await this.assertHoldAllowed(manager, input.userId);
     return this.insert(manager, {
       userId: input.userId,
       slot,
@@ -288,6 +291,17 @@ export class BookingsService {
       if (error instanceof AppError && error.code === 'ALREADY_BOOKED') throw new AppError('SLOT_FULL');
       throw error;
     }
+  }
+
+  // D53. Holds of one user may target different slots, so a per-user lock serializes the count with the insert.
+  private async assertHoldAllowed(manager: EntityManager, userId: string): Promise<void> {
+    await manager.query(`SELECT pg_advisory_xact_lock(hashtext('holds:' || $1))`, [userId]);
+    const [{ holds }]: { holds: number }[] = await manager.query(
+      `SELECT count(*)::int AS holds FROM bookings
+       WHERE user_id = $1 AND status = 'pending_payment' AND hold_expires_at > $2 AND deleted_at IS NULL`,
+      [userId, new Date()],
+    );
+    if (holds >= MAX_ACTIVE_HOLDS) throw new AppError('HOLD_LIMIT_REACHED');
   }
 
   // R6 steps 3–4; the slot must already be locked.

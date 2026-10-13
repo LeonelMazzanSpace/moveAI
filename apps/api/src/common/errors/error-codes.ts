@@ -30,6 +30,11 @@ export const ERROR_CODES = {
   CANCEL_WINDOW_CLOSED: { status: 409, message: 'Ya pasó el plazo para cancelar este turno.' },
   ATTENDANCE_NOT_ALLOWED: { status: 409, message: 'Todavía no se puede registrar la asistencia de este turno.' },
   LOGIN_REQUIRED: { status: 409, message: 'Ya tenés una cuenta con ese email: ingresá para continuar.' },
+  HOLD_LIMIT_REACHED: {
+    status: 409,
+    message: 'Ya tenés reservas pendientes de pago. Completá el pago o esperá a que venzan.',
+  },
+  RATE_LIMITED: { status: 429, message: 'Hiciste demasiados intentos. Esperá un minuto y probá de nuevo.' },
   GUEST_DATA_REQUIRED: { status: 400, message: 'Completá tus datos para continuar.' },
   EMAIL_ALREADY_REGISTERED: { status: 409, message: 'Ya existe una cuenta con ese email.' },
   USER_NOT_FOUND: { status: 404, message: 'El usuario no existe.' },
