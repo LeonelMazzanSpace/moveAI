@@ -1,6 +1,6 @@
 # Runbook de deploy — MOVE
 
-Guía para publicar MOVE cuando existan los accesos a Neon, AWS (Elastic Beanstalk), Vercel y los proveedores. Hasta entonces nada de esto se ejecutó: el desarrollo corre con Postgres en Docker, el simulador de pagos y el email en modo dry-run (ver [development.md](development.md)).
+Guía para publicar MOVE cuando existan los accesos a Neon, AWS (Elastic Beanstalk), Vercel y los proveedores. Hasta entonces nada de esto se ejecutó: el desarrollo corre con Postgres en Docker, el simulador de pagos y el email en modo dry-run (ver [development.md](development.md)). La guía paso a paso de cada consola (Neon, AWS, Vercel, DNS, Mercado Pago, Google, Brevo y Bitbucket), con los links a la documentación oficial, está en la parte 4 del [manual de usuario](manual/manual-de-usuario.md#parte-4-proveedores-uno-por-uno); este runbook tiene los comandos.
 
 Arquitectura de producción:
 
@@ -12,18 +12,18 @@ Arquitectura de producción:
 | Pagos | Mercado Pago | Credenciales de producción y webhook firmado |
 | Email | Brevo | Remitente verificado |
 
-Los ambientes de desarrollo y producción están separados: bases, credenciales y URLs distintas. Los previews de Vercel apuntan a la API de desarrollo, nunca a la de producción (ver [Vercel](#4-web-en-vercel)).
+Los ambientes de desarrollo y producción están separados: bases, credenciales y URLs distintas (en el manual: [manual de usuario](manual/manual-de-usuario.md#ambientes-separados-de-desarrollo-y-producción)). Los previews de Vercel apuntan a la API de desarrollo, nunca a la de producción (ver [Vercel](#4-web-en-vercel)). Los dominios de este runbook (`move.uy`) son ejemplos: el dominio final no está decidido (el sitio actual de MOVE está en `moveperformance.uy`).
 
 El CI (`bitbucket-pipelines.yml`) solo valida (lint, tests, e2e de la API y build). No hay pasos de deploy: se hace a mano siguiendo este runbook hasta que se automatice.
 
 ## Variables de entorno de la API
 
-Se definen y validan en `apps/api/src/config/env.validation.ts`; si falta una obligatoria, la API no arranca. En Elastic Beanstalk se cargan en *Configuration → Updates, monitoring and logging → Environment properties* (o con `eb setenv`). Los valores sensibles no van al repositorio.
+Se definen y validan en `apps/api/src/config/env.validation.ts`; si falta una obligatoria, la API no arranca. En Elastic Beanstalk se cargan en *Configuration → Updates, monitoring, and logging → Runtime environment variables* (o con `eb setenv`); los secretos pueden venir de Secrets Manager o SSM Parameter Store. Los valores sensibles no van al repositorio.
 
 | Variable | Producción | Propósito |
 |---|---|---|
 | `NODE_ENV` | Obligatoria (`production`) | Con `production` se exigen las credenciales de proveedores, se usan cookies `Secure` y se deshabilita el simulador de pagos |
-| `PORT` | Obligatoria | Puerto donde escucha la API. Poner el que reenvía el proxy de Elastic Beanstalk (8080 por defecto) |
+| `PORT` | Obligatoria | Puerto donde escucha la API. Definirlo siempre como propiedad del entorno (por ejemplo `8080`): Beanstalk configura Nginx para reenviar a ese puerto; sin la propiedad, Nginx reenvía al 5000. Solo dígitos |
 | `WEB_URL` | Obligatoria | Origen exacto de la web, sin barra final (`https://move.uy`). Se usa para CORS, orígenes de confianza de Better Auth y links de los emails |
 | `API_PUBLIC_URL` | Obligatoria | URL pública de la API sin `/api` (`https://api.move.uy`). Base de Better Auth, callback de Google y `notification_url` del webhook de Mercado Pago |
 | `DB_HOST` | Obligatoria | Host de Neon. Usar el host **directo** (sin `-pooler`): los jobs usan locks de sesión de Postgres, que un pooler en modo transacción rompe |
@@ -31,7 +31,7 @@ Se definen y validan en `apps/api/src/config/env.validation.ts`; si falta una ob
 | `DB_USER` | Obligatoria | Usuario de la base en Neon |
 | `DB_PASSWORD` | Obligatoria | Contraseña de la base en Neon |
 | `DB_NAME` | Obligatoria | Nombre de la base nueva de MOVE en Neon |
-| `DB_SSL` | Obligatoria en la práctica (`true`) | Neon exige SSL. El default local es `false`; si falta en producción la conexión falla |
+| `DB_SSL` | Obligatoria en la práctica (`true`) | Neon exige SSL. El default local es `false`; si falta en producción la conexión falla. Escribir exactamente `true`: `1` pasa la validación pero no activa SSL |
 | `BETTER_AUTH_SECRET` | Obligatoria | Secreto de Better Auth, 32+ caracteres aleatorios (por ejemplo `openssl rand -base64 48`). Cambiarlo invalida las sesiones |
 | `COOKIE_DOMAIN` | Obligatoria en la práctica (`.move.uy`) | Dominio raíz de la cookie de sesión, para que web y API compartan la sesión. Vacío deja la cookie atada al host de la API |
 | `GOOGLE_CLIENT_ID` | Opcional | Cliente OAuth de Google. Va junto con `GOOGLE_CLIENT_SECRET`: se definen las dos o ninguna |
@@ -55,8 +55,8 @@ Variables que **no** van a producción: `E2E_DATABASE_NAME` (solo tests) y `CREA
 
 ## 1. Base de datos en Neon
 
-1. En el proyecto Neon existente de MOVE, crear una **base nueva** (por ejemplo `move`) en Postgres 17. No reutilizar ni migrar el esquema anterior.
-2. Copiar host directo, usuario, contraseña y nombre a las variables `DB_*` y definir `DB_SSL=true`.
+1. En el proyecto Neon existente de MOVE (o uno nuevo con Postgres 17), crear una **base nueva** (por ejemplo `move`) con un rol propio como dueño. No reutilizar ni migrar el esquema anterior. Desarrollo va en otro branch (`development`, sin borrado automático) con **otro rol y otra base**: un branch hereda los roles y contraseñas del padre.
+2. Copiar host directo (en **Connect**, con *Connection pooling* apagado), usuario, contraseña y nombre a las variables `DB_*` y definir `DB_SSL=true`.
 3. Las migraciones se corren **antes** de cambiar el tráfico a la versión nueva, desde el mismo bundle que se va a desplegar (el bundle no incluye el CLI de Nest, por eso se llama a TypeORM directo):
 
    ```bash
@@ -81,10 +81,10 @@ Variables que **no** van a producción: `E2E_DATABASE_NAME` (solo tests) y `CREA
    ```
 
    El zip contiene `Procfile` (`web: node dist/main.js`), `package.json`, `dist/` y los `node_modules` de producción. No lleva `.env` ni código fuente. Como incluye `node_modules`, conviene generarlo en Linux (CI o Docker `node:24`) si en algún momento se suman dependencias con binarios nativos; hoy las dependencias de runtime son JavaScript puro.
-2. Crear el entorno con la plataforma **Node.js 24** (Amazon Linux 2023), tipo *Web server environment*.
+2. Crear el entorno con la plataforma **Node.js 24** (Amazon Linux 2023), tipo *Web server environment*, con **Application Load Balancer** (el tipo de balanceador no se puede cambiar después) y capacidad de 1 instancia. Roles de IAM, etiquetas `Project`/`Environment`/`Owner` y logs en CloudWatch con retención: ver la sección AWS del manual.
 3. Cargar todas las variables de la [tabla](#variables-de-entorno-de-la-api) como propiedades del entorno.
 4. Subir el zip como nueva versión de la aplicación y desplegarla. Beanstalk usa el `Procfile` para arrancar y, al venir `node_modules` en el zip, no instala dependencias.
-5. Configurar el health check del balanceador/entorno en `GET /api/health` (responde `{"status":"ok"}`).
+5. Configurar el health check del balanceador en `GET /api/health` (*Load balancer → Processes → default → Health check path*, u opción `HealthCheckPath` de `aws:elasticbeanstalk:environment:process:default`). Responde `{"status":"ok"}`.
 6. **Proxy y límite de body de auth.** `/api/auth/*` rechaza con 413 cualquier request con más de 64 KB o con `Transfer-Encoding` sin `content-length`. El proxy (Nginx de Beanstalk o ALB) tiene que reenviar `content-length`: dejar `proxy_request_buffering on` (el default de Nginx) y no agregar configuración que lo desactive. Los `fetch` del navegador con body JSON siempre envían `content-length`.
 7. Subir con HTTPS (certificado en ACM asociado al balanceador) y dominio `api.move.uy`.
 
@@ -123,7 +123,7 @@ Web y API van bajo el mismo dominio raíz para que la cookie de sesión sea firs
 1. Importar el repositorio en el proyecto existente de MOVE en Vercel con **Root Directory** `apps/web` (framework Next.js; Vercel detecta pnpm por `packageManager`) y Node 24.
 2. Definir `NEXT_PUBLIC_API_URL` y, si corresponde, `NEXT_PUBLIC_GOOGLE_ENABLED` en el ambiente *Production*.
 3. Producción se publica desde la rama `main`; las demás ramas generan previews.
-4. En el ambiente *Preview* definir `NEXT_PUBLIC_API_URL` apuntando a la API de **desarrollo**. La API de producción solo acepta el origen de `WEB_URL`, así que un preview no podría usarla (y no debe).
+4. En el ambiente *Preview* definir `NEXT_PUBLIC_API_URL` apuntando a la API de **desarrollo**. Cada API solo acepta (CORS y cookies) el origen de su `WEB_URL`: los previews con URL automática (`*.vercel.app`) sirven para mirar páginas, y los flujos completos de desarrollo se prueban en un dominio fijo asignado a la rama de desarrollo (por ejemplo `dev.move.uy`, con la API de desarrollo en `api.dev.move.uy` y `COOKIE_DOMAIN=.dev.move.uy`).
 5. Agregar el dominio `move.uy` al proyecto.
 
 ## 5. Servicios externos
@@ -147,6 +147,7 @@ Web y API van bajo el mismo dominio raíz para que la cookie de sesión sea firs
 1. Verificar el dominio o el remitente en Brevo y crear una API key.
 2. Cargar `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` (el remitente verificado) y, si se quiere, `BREVO_SENDER_NAME`.
 3. Sin `BREVO_API_KEY` la API no envía nada: registra el envío en el log (dry-run). En producción la variable es obligatoria.
+4. Brevo puede activar solo el bloqueo de IPs desconocidas para las API keys; como la IP de salida de una instancia de Beanstalk cambia al reemplazarla, desactivar ese bloqueo para la API o darle a la API una IP de salida fija (detalle en la sección Brevo del manual).
 
 ## 6. Autenticación detrás de proxy
 

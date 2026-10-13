@@ -79,11 +79,19 @@ Las tablas y columnas se nombran en snake_case automáticamente (`SnakeNamingStr
 
 ## Manual de usuario
 
-[docs/manual/manual-de-usuario.md](docs/manual/manual-de-usuario.md) ([PDF](docs/manual/manual-de-usuario.pdf)) explica el sistema con una captura de cada pantalla, en tres partes: clientes, staff de MOVE y equipo técnico (correr todo en local, qué está simulado y los pasos que faltan para el deploy y las integraciones). Las capturas y el PDF se regeneran con `pnpm manual:demo-data`, `pnpm manual:screenshots` y `pnpm manual:pdf` (pasos y variables `MANUAL_STAFF_PASSWORD` / `MANUAL_CLIENT_PASSWORD` en la parte 3 del manual).
+[docs/manual/manual-de-usuario.md](docs/manual/manual-de-usuario.md) ([PDF](docs/manual/manual-de-usuario.pdf)) es la guía única para clientes, staff de MOVE y equipo técnico, con una captura de cada pantalla y el diagrama de arquitectura:
+
+- [Estado actual frente a MOVE.pdf](docs/manual/manual-de-usuario.md#estado-actual-frente-a-movepdf): hecho, simulado en local y pendiente, sección por sección.
+- [Parte 1: Clientes](docs/manual/manual-de-usuario.md#parte-1-clientes) y [Parte 2: Staff de MOVE](docs/manual/manual-de-usuario.md#parte-2-staff-de-move).
+- [Parte 3: Cómo levantar todo](docs/manual/manual-de-usuario.md#parte-3-cómo-levantar-todo): local paso a paso y producción en orden.
+- [Parte 4: Proveedores, uno por uno](docs/manual/manual-de-usuario.md#parte-4-proveedores-uno-por-uno): Neon, AWS Elastic Beanstalk, Vercel, dominio y cookies, Mercado Pago, Google OAuth, Brevo y Bitbucket Pipelines, con ambientes separados y la tabla de variables.
+- [Parte 5: Puesta en marcha y mantenimiento](docs/manual/manual-de-usuario.md#parte-5-puesta-en-marcha-y-mantenimiento): primer staff, checklist posterior al deploy, rollback y cómo regenerar el manual.
+
+Las capturas y el PDF se regeneran con `pnpm manual:demo-data`, `pnpm manual:screenshots` y `pnpm manual:pdf`; el diagrama, con `node scripts/manual/render-diagram.mjs` (pasos y variables `MANUAL_STAFF_PASSWORD` / `MANUAL_CLIENT_PASSWORD` en [Regenerar este manual](docs/manual/manual-de-usuario.md#regenerar-este-manual)).
 
 ## Documentación
 
-- [docs/manual/manual-de-usuario.md](docs/manual/manual-de-usuario.md): manual de usuario con capturas de todas las pantallas.
+- [docs/manual/manual-de-usuario.md](docs/manual/manual-de-usuario.md): manual de usuario con capturas de todas las pantallas, estado actual, cómo levantar todo y la guía de cada proveedor.
 - [docs/development.md](docs/development.md): setup local, seed, staff, simulador de pagos, tests, jobs manuales y módulos de la API.
 - [docs/deploy.md](docs/deploy.md): runbook de deploy (Neon, Elastic Beanstalk, Vercel, dominios, proveedores y checklist).
 - [apps/api/CLAUDE.md](apps/api/CLAUDE.md) y [apps/web/CLAUDE.md](apps/web/CLAUDE.md): convenciones del proyecto.
