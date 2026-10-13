@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { CommonModule } from './common/common.module.js';
 import { appConfig } from './config/app.config.js';
 import { authConfig } from './config/auth.config.js';
@@ -32,6 +33,8 @@ import { UsersModule } from './modules/users/users.module.js';
       load: [appConfig, databaseConfig, authConfig, mercadoPagoConfig, schedulerConfig],
     }),
     ScheduleModule.forRoot(),
+    // D53: only the checkout controller applies it (no global guard).
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 10 }]),
     DatabaseModule,
     CommonModule,
     HealthModule,

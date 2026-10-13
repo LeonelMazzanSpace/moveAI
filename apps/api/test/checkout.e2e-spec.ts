@@ -10,7 +10,7 @@ import { createProfessional, createSlot, planIdBySlug } from './utils/fixtures.j
 // Development simulator active: no MP_ACCESS_TOKEN in the e2e environment.
 describe('checkout (e2e)', () => {
   let ctx: TestApp;
-  beforeAll(async () => { ctx = await createTestApp(); });
+  beforeAll(async () => { ctx = await createTestApp({ raiseCheckoutLimit: true }); });
   afterAll(async () => { await ctx.app.close(); });
   beforeEach(async () => { await resetDb(ctx.dataSource); await seedCatalogAndSchedule(ctx.dataSource); });
 

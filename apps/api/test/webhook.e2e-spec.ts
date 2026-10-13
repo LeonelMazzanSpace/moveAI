@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
+import { getOptionsToken } from '@nestjs/throttler';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module.js';
@@ -11,6 +12,7 @@ import type { ProviderPayment } from '../src/modules/payments/models/provider-pa
 import { MercadoPagoService } from '../src/modules/payments/services/mercado-pago.service.js';
 import { PaymentsService } from '../src/modules/payments/services/payments.service.js';
 import { SubscriptionsService } from '../src/modules/subscriptions/services/subscriptions.service.js';
+import { raisedCheckoutLimit } from './utils/app.js';
 import { signUpClient } from './utils/auth.js';
 import { resetDb } from './utils/db.js';
 import { createProfessional, createSlot, planIdBySlug } from './utils/fixtures.js';
@@ -28,7 +30,10 @@ describe('Mercado Pago webhook (e2e)', () => {
   beforeAll(async () => {
     process.env.MP_ACCESS_TOKEN = 'TEST-token';
     process.env.MP_WEBHOOK_SECRET = 'test-secret';
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).overrideProvider(MercadoPagoService).useValue(fake).compile();
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(MercadoPagoService).useValue(fake)
+      .overrideProvider(getOptionsToken()).useValue(raisedCheckoutLimit)
+      .compile();
     app = moduleRef.createNestApplication<NestExpressApplication>({ bodyParser: false });
     configureApp(app);
     await app.init();
