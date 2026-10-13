@@ -2,6 +2,7 @@
 // The password can come from CREATE_STAFF_PASSWORD instead, so it stays out of shell history and pnpm's echo.
 // Creates the staff user and prints only its id. An existing account with that email is refused unless
 // --promote-existing is given (D54): then it gets the given password, loses every session and becomes staff.
+// A soft-deleted account is always refused (D72).
 import { parseArgs } from 'node:util';
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -44,11 +45,16 @@ async function createStaff(app: INestApplicationContext, input: { email: string;
 
 // Returns the process exit code.
 async function run(app: INestApplicationContext, input: { email: string; name: string; password: string }) {
-  const existing = await app.get(UsersService).findByEmail(input.email);
-  if (!existing) {
+  const found = await app.get(UsersService).findByEmailWithDeleted(input.email);
+  if (!found) {
     await createStaff(app, input);
     return 0;
   }
+  if (found.deleted) {
+    console.error('Ese email pertenece a una cuenta dada de baja; no se puede convertir en staff.');
+    return 1;
+  }
+  const existing = found.user;
   if (!promoteExisting) {
     console.error('Ya existe una cuenta con ese email; usá --promote-existing para convertirla en staff.');
     return 1;
