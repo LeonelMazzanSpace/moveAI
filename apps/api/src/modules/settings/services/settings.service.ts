@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { Repository } from 'typeorm';
+import { DataSource, type Repository } from 'typeorm';
 import { Setting, type SettingValue } from '../entities/setting.entity.js';
 import type { SettingsValues } from '../models/settings.model.js';
 import { SETTING_DB_KEYS, SETTINGS_DEFAULTS } from '../settings.defaults.js';
@@ -19,18 +19,29 @@ const FIELD_BY_DB_KEY = new Map(
   (Object.keys(SETTING_DB_KEYS) as SettingsField[]).map((field) => [SETTING_DB_KEYS[field], field]),
 );
 
+function toValues(rows: Pick<Setting, 'key' | 'value'>[]): SettingsValues {
+  const values: Record<SettingsField, SettingValue> = { ...SETTINGS_DEFAULTS };
+  for (const row of rows) {
+    const field = FIELD_BY_DB_KEY.get(row.key);
+    if (field) values[field] = row.value;
+  }
+  return values as SettingsValues;
+}
+
+// A key present with `undefined` (e.g. an optional DTO field) means "not patched", never "clear it".
+function definedEntries(patch: Partial<SettingsValues>): Partial<SettingsValues> {
+  return Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
+}
+
 @Injectable()
 export class SettingsService {
-  constructor(@InjectRepository(Setting) private readonly settings: Repository<Setting>) {}
+  constructor(
+    @InjectRepository(Setting) private readonly settings: Repository<Setting>,
+    private readonly dataSource: DataSource,
+  ) {}
 
   async getAll(): Promise<SettingsValues> {
-    const rows = await this.settings.find({ select: { key: true, value: true } });
-    const values: Record<SettingsField, SettingValue> = { ...SETTINGS_DEFAULTS };
-    for (const row of rows) {
-      const field = FIELD_BY_DB_KEY.get(row.key);
-      if (field) values[field] = row.value;
-    }
-    return values as SettingsValues;
+    return toValues(await this.settings.find({ select: { key: true, value: true } }));
   }
 
   async get<K extends SettingsField>(key: K): Promise<SettingsValues[K]> {
@@ -40,13 +51,21 @@ export class SettingsService {
   }
 
   async update(patch: Partial<SettingsValues>, updatedBy: string): Promise<SettingsValues> {
-    const next = { ...(await this.getAll()), ...patch };
-    if (next.prolongedInactivityDays <= next.noAttendanceDays) throw new InvalidSettingsError();
+    const changes = definedEntries(patch);
+    return this.dataSource.transaction(async (manager) => {
+      const repository = manager.getRepository(Setting);
+      // Locks every settings row so concurrent updates run the cross-field check one after another.
+      const rows = await repository.find({ select: { key: true, value: true }, lock: { mode: 'pessimistic_write' } });
+      const next = { ...toValues(rows), ...changes };
+      if (next.prolongedInactivityDays <= next.noAttendanceDays) throw new InvalidSettingsError();
 
-    const rows = (Object.keys(patch) as SettingsField[])
-      .filter((field) => patch[field] !== undefined)
-      .map((field) => ({ key: SETTING_DB_KEYS[field], value: next[field], updatedBy }));
-    if (rows.length > 0) await this.settings.upsert(rows, ['key']);
-    return next;
+      const upserts = (Object.keys(changes) as SettingsField[]).map((field) => ({
+        key: SETTING_DB_KEYS[field],
+        value: next[field],
+        updatedBy,
+      }));
+      if (upserts.length > 0) await repository.upsert(upserts, ['key']);
+      return next;
+    });
   }
 }
