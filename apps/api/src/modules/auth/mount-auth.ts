@@ -8,8 +8,13 @@ import type { BetterAuthInstance } from './better-auth.factory.js';
 // Auth bodies are small JSON objects; Nest's body-parser limit does not apply to this raw handler.
 const MAX_AUTH_BODY_BYTES = 64 * 1024;
 
+// Better Auth streams chunked bodies (no content-length) without any limit, so those are refused too.
+// Browsers' fetch with a JSON string body always sends content-length.
+const hasUnsizedBody = (req: Request): boolean =>
+  req.method !== 'GET' && req.method !== 'HEAD' && req.headers['transfer-encoding'] !== undefined;
+
 const rejectLargeBodies = (req: Request, res: Response, next: NextFunction): void => {
-  if (Number(req.headers['content-length'] ?? 0) <= MAX_AUTH_BODY_BYTES) return next();
+  if (!hasUnsizedBody(req) && Number(req.headers['content-length'] ?? 0) <= MAX_AUTH_BODY_BYTES) return next();
   res.status(413).json({ statusCode: 413, code: 'VALIDATION_FAILED', message: ERROR_CODES.VALIDATION_FAILED.message });
 };
 

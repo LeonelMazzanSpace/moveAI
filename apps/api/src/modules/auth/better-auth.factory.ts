@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { betterAuth } from 'better-auth';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
 import type { Pool } from 'pg';
-import { cleanText, NAME_LENGTH, PHONE_LENGTH } from '../users/dto/update-me.dto.js';
+import { cleanText, EMAIL_LENGTH, NAME_LENGTH, PHONE_LENGTH } from '../users/dto/update-me.dto.js';
 
 export interface BetterAuthDeps {
   pool: Pool;
@@ -18,16 +18,19 @@ export interface BetterAuthDeps {
 const logger = new Logger('BetterAuth');
 
 // Better Auth stores sign-up fields as sent: apply the PATCH /me rules (trim, bounds, no NUL) before it writes the user.
+// `image` is never accepted here: the web does not send it and Google's image arrives through the OAuth callback.
 const validateSignUp = createAuthMiddleware(async (ctx) => {
   if (ctx.path !== '/sign-up/email') return;
   const body = (ctx.body ?? {}) as Record<string, unknown>;
   const name = cleanText(body.name, NAME_LENGTH);
+  const email = cleanText(body.email, EMAIL_LENGTH);
   const hasPhone = body.phone !== undefined && body.phone !== null;
   const phone = hasPhone ? cleanText(body.phone, PHONE_LENGTH) : null;
-  if (name === null || (hasPhone && phone === null)) {
+  const hasImage = body.image !== undefined && body.image !== null;
+  if (name === null || email === null || (hasPhone && phone === null) || hasImage) {
     throw new APIError('BAD_REQUEST', { code: 'VALIDATION_FAILED', message: 'Los datos enviados no son válidos.' });
   }
-  return { context: { body: { ...body, name, ...(phone === null ? {} : { phone }) } } };
+  return { context: { body: { ...body, name, email, ...(phone === null ? {} : { phone }) } } };
 });
 
 // The only Better Auth instance of the app. Tables and columns follow the Data contract mapping.

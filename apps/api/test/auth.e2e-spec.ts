@@ -1,4 +1,6 @@
-import { Controller, Get } from '@nestjs/common';
+import { createServer, request as httpRequest } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { Controller, Get, Logger } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -128,9 +130,32 @@ describe('auth (e2e)', () => {
       const res = await http().post('/api/auth/sign-up/email').set('Origin', TEST_ORIGIN)
         .send({ name: 'Ana Pérez', email, password: 'Secreto123!', ...override });
       expect(res.status, JSON.stringify(override)).toBe(400);
+      expect(res.body.code, JSON.stringify(override)).toBe('VALIDATION_FAILED');
       const [{ count }] = await ctx.dataSource.query(`SELECT count(*)::int AS count FROM users WHERE email = $1`, [email]);
       expect(count).toBe(0);
     }
+  });
+
+  it('rejects sign-up images and out-of-bounds emails without creating the user', async () => {
+    const invalid = [
+      { image: 'https://example.com/a.png' }, { image: 'javascript:alert(1)' }, { image: 'x'.repeat(60_000) }, { image: '' },
+      { email: `${'a'.repeat(245)}@test.move` }, { email: 'a\u0000b@test.move' }, { email: 12345 }, { email: '   ' },
+    ];
+    for (const override of invalid) {
+      const res = await http().post('/api/auth/sign-up/email').set('Origin', TEST_ORIGIN)
+        .send({ name: 'Ana Pérez', email: 'image@test.move', password: 'Secreto123!', ...override });
+      expect(res.status, JSON.stringify(override).slice(0, 80)).toBe(400);
+      expect(res.body.code, JSON.stringify(override).slice(0, 80)).toBe('VALIDATION_FAILED');
+    }
+    const [{ count }] = await ctx.dataSource.query(`SELECT count(*)::int AS count FROM users`);
+    expect(count).toBe(0);
+  });
+
+  it('trims the sign-up email and stores it lowercased', async () => {
+    const res = await http().post('/api/auth/sign-up/email').set('Origin', TEST_ORIGIN)
+      .send({ name: 'Ana Pérez', email: '  Trim@Test.move  ', password: 'Secreto123!' }).expect(200);
+    const [user] = await ctx.dataSource.query(`SELECT email, image FROM users WHERE id = $1`, [res.body.user.id]);
+    expect(user).toEqual({ email: 'trim@test.move', image: null });
   });
 
   it('does not expose Better Auth update-user (PATCH /me is the profile path)', async () => {
@@ -146,6 +171,37 @@ describe('auth (e2e)', () => {
       .send(body).expect(413);
     const [{ count }] = await ctx.dataSource.query(`SELECT count(*)::int AS count FROM users`);
     expect(count).toBe(0);
+  });
+
+  it('rejects chunked auth request bodies with 413 without logging an error', async () => {
+    const errorLog = vi.spyOn(Logger.prototype, 'error');
+    const server = createServer(ctx.app.getHttpAdapter().getInstance());
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address() as AddressInfo;
+    try {
+      const body = JSON.stringify({ name: 'Ana Pérez', email: 'chunked@test.move', password: 'Secreto123!', image: 'x'.repeat(70_000) });
+      const res = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+        const req = httpRequest({
+          host: '127.0.0.1', port, method: 'POST', path: '/api/auth/sign-up/email',
+          headers: { 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked', Origin: TEST_ORIGIN },
+        }, (response) => {
+          let text = '';
+          response.setEncoding('utf8').on('data', (chunk: string) => { text += chunk; })
+            .on('end', () => resolve({ status: response.statusCode ?? 0, body: text }));
+        });
+        req.on('error', reject);
+        for (let offset = 0; offset < body.length; offset += 8_192) req.write(body.slice(offset, offset + 8_192));
+        req.end();
+      });
+      expect(res.status).toBe(413);
+      expect(JSON.parse(res.body)).toEqual({ statusCode: 413, code: 'VALIDATION_FAILED', message: 'Los datos enviados no son válidos.' });
+      const [{ count }] = await ctx.dataSource.query(`SELECT count(*)::int AS count FROM users`);
+      expect(count).toBe(0);
+      expect(errorLog).not.toHaveBeenCalled();
+    } finally {
+      errorLog.mockRestore();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 
   it('rejects untrusted password reset redirects', async () => {

@@ -7,7 +7,7 @@ import { DataSource } from 'typeorm';
 import { AppModule } from '../app.module.js';
 import { BETTER_AUTH } from '../modules/auth/auth.constants.js';
 import type { BetterAuthInstance } from '../modules/auth/better-auth.factory.js';
-import { cleanText, NAME_LENGTH } from '../modules/users/dto/update-me.dto.js';
+import { cleanText, EMAIL_LENGTH, NAME_LENGTH } from '../modules/users/dto/update-me.dto.js';
 import { UsersService } from '../modules/users/services/users.service.js';
 
 const { values } = parseArgs({
@@ -15,7 +15,7 @@ const { values } = parseArgs({
   options: { email: { type: 'string' }, name: { type: 'string' }, password: { type: 'string' } },
 });
 
-const email = cleanText(values.email, { min: 3, max: 254 })?.toLowerCase();
+const email = cleanText(values.email, EMAIL_LENGTH)?.toLowerCase();
 const name = cleanText(values.name, NAME_LENGTH);
 const password = values.password ?? process.env.CREATE_STAFF_PASSWORD;
 

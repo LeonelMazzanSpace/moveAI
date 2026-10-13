@@ -6,13 +6,12 @@ import { Repository } from 'typeorm';
 import { AppError } from '../../../common/errors/app-error.js';
 import { appConfig } from '../../../config/app.config.js';
 import { NotificationsService } from '../../notifications/services/notifications.service.js';
-import { cleanText, NAME_LENGTH, PHONE_LENGTH } from '../../users/dto/update-me.dto.js';
+import { cleanText, EMAIL_LENGTH, NAME_LENGTH, PHONE_LENGTH } from '../../users/dto/update-me.dto.js';
 import { BETTER_AUTH } from '../auth.constants.js';
 import type { BetterAuthInstance } from '../better-auth.factory.js';
 import { AuthAccount } from '../entities/auth-account.entity.js';
 
 const PG_UNIQUE_VIOLATION = '23505';
-const EMAIL_LENGTH = { min: 3, max: 254 } as const;
 
 const isUniqueViolation = (error: unknown): boolean =>
   typeof error === 'object' && error !== null && 'code' in error && error.code === PG_UNIQUE_VIOLATION;

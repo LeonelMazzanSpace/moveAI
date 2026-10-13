@@ -4,6 +4,7 @@ import { IsString, Length, NotContains, ValidateIf } from 'class-validator';
 // Profile field rules shared by PATCH /me, sign-up and invitations.
 export const NAME_LENGTH = { min: 2, max: 80 } as const;
 export const PHONE_LENGTH = { min: 6, max: 20 } as const;
+export const EMAIL_LENGTH = { min: 3, max: 254 } as const;
 // Postgres text cannot store NUL bytes: reject them at the edge instead of failing with a 500.
 const NUL = '\u0000';
 
