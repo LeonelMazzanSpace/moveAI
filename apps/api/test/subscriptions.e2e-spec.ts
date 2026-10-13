@@ -13,6 +13,39 @@ describe('subscriptions (e2e)', () => {
   afterAll(async () => { await ctx.app.close(); });
   beforeEach(async () => { await resetDb(ctx.dataSource); await seedCatalogAndSchedule(ctx.dataSource); });
 
+  async function waitForLockWaiters(expected: number): Promise<void> {
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline) {
+      const [{ waiting }] = await ctx.dataSource.query(
+        `SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+      );
+      if (waiting >= expected) return;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    throw new Error(`expected ${expected} backends waiting on a lock`);
+  }
+
+  // Barrier: a separate connection takes the lock first, `start` fires the competing work without awaiting it, and the
+  // lock is only released once `waiters` backends are blocked on it, so the work really overlaps.
+  async function whileLockHeld<T>(lock: { sql: string; params: unknown[] }, waiters: number, start: () => Promise<T>): Promise<T> {
+    const gate = ctx.dataSource.createQueryRunner();
+    await gate.connect();
+    await gate.startTransaction();
+    let pending: Promise<T> | undefined;
+    try {
+      await gate.query(lock.sql, lock.params);
+      pending = start();
+      await waitForLockWaiters(waiters);
+    } finally {
+      await gate.commitTransaction();
+      await gate.release();
+      await pending?.then(() => undefined, () => undefined);
+    }
+    return pending;
+  }
+  const userLock = (userId: string) => ({ sql: `SELECT pg_advisory_xact_lock(hashtext('subscriptions:' || $1))`, params: [userId] });
+  const subscriptionLock = (id: string) => ({ sql: `SELECT id FROM subscriptions WHERE id = $1 FOR UPDATE`, params: [id] });
+
   const planBySlug = async (slug: string) => {
     const [row] = await ctx.dataSource.query(
       `SELECT id, name, service, kind, period_months AS "periodMonths", period_days AS "periodDays", sessions_included AS "sessionsIncluded" FROM plans WHERE slug = $1`, [slug]);
@@ -45,14 +78,31 @@ describe('subscriptions (e2e)', () => {
     const pack = await ctx.dataSource.transaction((m) => subs.activateFromPurchase(m, { purchaseId, userId, plan, today }));
     await ctx.dataSource.query(`UPDATE subscriptions SET sessions_used = 3 WHERE id = $1`, [pack.id]);
     const date = addDays(today, 1);
-    const results = await Promise.all([
+    const results = await whileLockHeld(subscriptionLock(pack.id), 2, () => Promise.all([
       ctx.dataSource.transaction((m) => subs.consumePackSession(m, userId, date)),
       ctx.dataSource.transaction((m) => subs.consumePackSession(m, userId, date)),
-    ]);
+    ]));
     expect(results.filter(Boolean)).toHaveLength(1);
+    expect(results.find(Boolean)).toMatchObject({ id: pack.id, sessionsUsed: 4 });
     await ctx.dataSource.transaction((m) => subs.releasePackSession(m, pack.id));
     const [row] = await ctx.dataSource.query(`SELECT sessions_used FROM subscriptions WHERE id = $1`, [pack.id]);
     expect(row.sessions_used).toBe(3);
+  });
+
+  it('gives the next pack to a consumer that waited for an exhausted one', async () => {
+    const { userId } = await signUpClient(ctx.app);
+    const today = businessToday();
+    const packA = await activate(userId, 'recovery-paquete-4', addDays(today, -10));
+    const packB = await activate(userId, 'recovery-paquete-8', today);
+    await ctx.dataSource.query(`UPDATE subscriptions SET sessions_used = 3 WHERE id = $1`, [packA.id]);
+    const results = await whileLockHeld(subscriptionLock(packA.id), 2, () => Promise.all([
+      ctx.dataSource.transaction((m) => subs.consumePackSession(m, userId, today)),
+      ctx.dataSource.transaction((m) => subs.consumePackSession(m, userId, today)),
+    ]));
+    expect(results.every(Boolean)).toBe(true);
+    expect(results.map((pack) => pack?.id).sort((x, y) => String(x).localeCompare(String(y)))).toEqual([packA.id, packB.id].sort((x, y) => x.localeCompare(y)));
+    expect(await subs.findById(packA.id)).toMatchObject({ sessionsUsed: 4 });
+    expect(await subs.findById(packB.id)).toMatchObject({ sessionsUsed: 1 });
   });
 
   it('covers the last day of the period', async () => {
@@ -83,10 +133,10 @@ describe('subscriptions (e2e)', () => {
     const plan = await planBySlug('performance-mensual');
     const purchaseId = await purchase(userId, plan.id);
     const today = businessToday();
-    const [a, b] = await Promise.all([
+    const [a, b] = await whileLockHeld(userLock(userId), 2, () => Promise.all([
       ctx.dataSource.transaction((m) => subs.activateFromPurchase(m, { purchaseId, userId, plan, today })),
       ctx.dataSource.transaction((m) => subs.activateFromPurchase(m, { purchaseId, userId, plan, today })),
-    ]);
+    ]));
     expect(b.id).toBe(a.id);
     const [{ count }] = await ctx.dataSource.query(`SELECT count(*)::int AS count FROM subscriptions WHERE purchase_id = $1`, [purchaseId]);
     expect(count).toBe(1);
@@ -103,6 +153,19 @@ describe('subscriptions (e2e)', () => {
     const res = await agent.get('/api/me/subscriptions').expect(200);
     expect(res.body.performance).toMatchObject({ endsOn: currentEnd, status: 'expiring', daysLeft: 5 });
     expect(res.body.upcomingPerformance).toMatchObject({ id: renewal.id, startsOn: addDays(currentEnd, 1), status: 'scheduled', progressPct: 0 });
+  });
+
+  it('marks a plan as expiring only within expiring_soon_days', async () => {
+    const { agent, userId } = await signUpClient(ctx.app);
+    const today = businessToday();
+    const plan = await planBySlug('performance-mensual');
+    await insertPerformance(userId, plan.id, addDays(today, -20), addDays(today, 5));
+    await ctx.dataSource.query(`UPDATE settings SET value = '3'::jsonb WHERE key = 'expiring_soon_days'`);
+    const outside = await agent.get('/api/me/subscriptions').expect(200);
+    expect(outside.body.performance).toMatchObject({ status: 'active', daysLeft: 5 });
+    await ctx.dataSource.query(`UPDATE settings SET value = '5'::jsonb WHERE key = 'expiring_soon_days'`);
+    const boundary = await agent.get('/api/me/subscriptions').expect(200);
+    expect(boundary.body.performance).toMatchObject({ status: 'expiring', daysLeft: 5 });
   });
 
   it('chains consecutive renewals from the latest end', async () => {
@@ -132,8 +195,8 @@ describe('subscriptions (e2e)', () => {
     const plan = await planBySlug('performance-mensual');
     const [p1, p2] = [await purchase(userId, plan.id), await purchase(userId, plan.id)];
     const today = businessToday();
-    const created = await Promise.all([p1, p2].map((purchaseId) =>
-      ctx.dataSource.transaction((m) => subs.activateFromPurchase(m, { purchaseId, userId, plan, today }))));
+    const created = await whileLockHeld(userLock(userId), 2, () => Promise.all([p1, p2].map((purchaseId) =>
+      ctx.dataSource.transaction((m) => subs.activateFromPurchase(m, { purchaseId, userId, plan, today })))));
     const [early, late] = [...created].sort((x, y) => x.startsOn.localeCompare(y.startsOn));
     expect(early.startsOn).toBe(today);
     expect(late.startsOn).toBe(addDays(early.endsOn, 1));

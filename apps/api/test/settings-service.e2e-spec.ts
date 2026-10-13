@@ -34,6 +34,18 @@ describe('SettingsService (e2e)', () => {
   afterAll(async () => { await close(); });
   beforeEach(async () => { await resetDb(ds); });
 
+  async function waitForLockWaiters(expected: number): Promise<void> {
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline) {
+      const [{ waiting }] = await ds.query(
+        `SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+      );
+      if (waiting >= expected) return;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    throw new Error(`expected ${expected} backends waiting on a lock`);
+  }
+
   it('reads defaults', async () => {
     expect(await settings.getAll()).toMatchObject({ cancelLimitHours: 2, bookingWindowDays: 14, valuesProvisional: true });
   });
@@ -65,19 +77,22 @@ describe('SettingsService (e2e)', () => {
     const concurrent = ds.createQueryRunner();
     await concurrent.connect();
     await concurrent.startTransaction();
+    let pending: Promise<unknown> | undefined;
     try {
       await concurrent.query('SELECT key FROM settings FOR UPDATE');
       await concurrent.query(`UPDATE settings SET value = '20'::jsonb WHERE key = 'no_attendance_days'`);
-      const pending = settings.update({ prolongedInactivityDays: 15 }, id).then(
+      pending = settings.update({ prolongedInactivityDays: 15 }, id).then(
         () => 'resolved',
         (error: unknown) => error,
       );
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      // Barrier: the update is blocked on the settings row lock before the concurrent write commits.
+      await waitForLockWaiters(1);
       await concurrent.commitTransaction();
       expect(await pending).toBeInstanceOf(InvalidSettingsError);
     } finally {
       if (concurrent.isTransactionActive) await concurrent.rollbackTransaction();
       await concurrent.release();
+      await pending;
     }
     expect(await settings.getAll()).toMatchObject({ noAttendanceDays: 20, prolongedInactivityDays: 21 });
   });

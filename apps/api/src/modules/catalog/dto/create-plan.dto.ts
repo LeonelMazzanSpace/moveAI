@@ -3,26 +3,14 @@ import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsString, Length, Matches, Max, MaxLength, Min, NotContains, ValidateIf,
 } from 'class-validator';
-import { SLUG_PATTERN } from '../domain/plan-rules.js';
+import { PLAN_LIMITS, SLUG_PATTERN } from '../domain/plan-rules.js';
 import type { PlanKind, Service } from '../entities/plan.entity.js';
 
 export const SERVICES: Service[] = ['performance', 'rehab', 'recovery'];
 export const PLAN_KINDS: PlanKind[] = ['period_plan', 'session_pack', 'single_session', 'evaluation'];
 
-// Ranges shared with the web settings form (D38).
-export const PLAN_LIMITS = {
-  name: { min: 2, max: 80 },
-  slugMax: 80,
-  descriptionMax: 500,
-  featuresMax: 10,
-  featureMax: 120,
-  price: { min: 0, max: 10_000_000 },
-  periodMonths: { min: 1, max: 36 },
-  periodDays: { min: 1, max: 365 },
-  sessionsIncluded: { min: 1, max: 100 },
-  durationMinutes: { min: 15, max: 240 },
-  sortOrder: { min: 0, max: 999 },
-} as const;
+// update-plan.dto.ts reads the limits from here.
+export { PLAN_LIMITS };
 
 // Postgres text cannot store NUL bytes: reject them at the edge instead of failing with a 500.
 const NUL = '\u0000';

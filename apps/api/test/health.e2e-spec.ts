@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -26,6 +27,15 @@ describe('health (e2e)', () => {
       .post('/api/health').set('Content-Type', 'application/json').send(body).expect(400);
     expect(res.body).toEqual({ statusCode: 400, code: 'VALIDATION_FAILED', message: 'Los datos enviados no son válidos.' });
   });
+
+  // Only JSON is parsed: a form-encoded body never reaches a Nest route, so the same fields that work as JSON fail.
+  it('answers 400 VALIDATION_FAILED to a form-encoded POST on a Nest route', async () => {
+    const fields = { externalReference: randomUUID(), outcome: 'approved' };
+    const json = await request(ctx.app.getHttpServer()).post('/api/payments/dev/simulate').send(fields).expect(404);
+    expect(json.body.code).toBe('PURCHASE_NOT_FOUND');
+    const form = await request(ctx.app.getHttpServer()).post('/api/payments/dev/simulate').type('form').send(fields).expect(400);
+    expect(form.body).toMatchObject({ statusCode: 400, code: 'VALIDATION_FAILED' });
+  });
 });
 
 // D4/D59: the simulator route exists only outside production, also when NODE_ENV comes from the .env file
@@ -52,13 +62,16 @@ describe('dev simulator registration (e2e)', () => {
   });
 
   afterEach(async () => {
-    await app?.close();
-    app = undefined;
-    process.chdir(originalCwd);
-    for (const key of Object.keys(process.env)) if (!(key in originalEnv)) delete process.env[key];
-    Object.assign(process.env, originalEnv);
-    rmSync(tempDir, { recursive: true, force: true });
-    vi.resetModules();
+    try {
+      await app?.close();
+    } finally {
+      app = undefined;
+      process.chdir(originalCwd);
+      for (const key of Object.keys(process.env)) if (!(key in originalEnv)) delete process.env[key];
+      Object.assign(process.env, originalEnv);
+      rmSync(tempDir, { recursive: true, force: true });
+      vi.resetModules();
+    }
   });
 
   // Boots the real AppModule with `lines` as the only .env file; the process has no NODE_ENV.

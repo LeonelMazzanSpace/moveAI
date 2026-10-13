@@ -37,6 +37,14 @@ describe('catalog (e2e)', () => {
     });
   });
 
+  it('does not let the public list ask for inactive plans', async () => {
+    const created = await staff.post('/api/staff/plans').send({ ...validPlan, active: false }).expect(201);
+    await publicGet('/api/catalog/plans?includeInactive=true').expect(400).expect(expectCode('VALIDATION_FAILED'));
+    await publicGet('/api/catalog/plans?service=performance&includeInactive=true').expect(400).expect(expectCode('VALIDATION_FAILED'));
+    const list = await publicGet('/api/catalog/plans').expect(200);
+    expect(list.body.some((p: { id: string }) => p.id === created.body.id)).toBe(false);
+  });
+
   it('rejects an unknown service filter', async () => {
     await publicGet('/api/catalog/plans?service=gym').expect(400).expect(expectCode('VALIDATION_FAILED'));
     await publicGet('/api/catalog/plans?service=performance&service=rehab').expect(400);
@@ -46,6 +54,7 @@ describe('catalog (e2e)', () => {
     await publicGet('/api/catalog/plans/performance-mensual').expect(200).expect((r) => expect(r.body).toMatchObject({ slug: 'performance-mensual', price: 3900 }));
     await publicGet('/api/catalog/plans/nope').expect(404).expect(expectCode('PLAN_NOT_FOUND'));
     await publicGet('/api/catalog/plans/%00').expect(404).expect(expectCode('PLAN_NOT_FOUND'));
+    await publicGet(`/api/catalog/plans/${'a'.repeat(81)}`).expect(404).expect(expectCode('PLAN_NOT_FOUND'));
     const created = await staff.post('/api/staff/plans').send(validPlan).expect(201);
     await staff.patch(`/api/staff/plans/${created.body.id}`).send({ active: false }).expect(200);
     await publicGet('/api/catalog/plans/performance-anual').expect(404).expect(expectCode('PLAN_NOT_FOUND'));
@@ -76,7 +85,68 @@ describe('catalog (e2e)', () => {
     expect(list.body.some((p: { id: string }) => p.id === created.body.id)).toBe(false);
     await staff.delete(`/api/staff/plans/${created.body.id}`).expect(404).expect(expectCode('PLAN_NOT_FOUND'));
     await staff.patch(`/api/staff/plans/${created.body.id}`).send({ name: 'Otro nombre' }).expect(404).expect(expectCode('PLAN_NOT_FOUND'));
-    await staff.post('/api/staff/plans').send(validPlan).expect(409).expect(expectCode('SLUG_TAKEN'));
+  });
+
+  describe('slug uniqueness among plans that are not deleted', () => {
+    it('lets staff create, delete and create a plan again with the same slug', async () => {
+      const first = await staff.post('/api/staff/plans').send(validPlan).expect(201);
+      await staff.delete(`/api/staff/plans/${first.body.id}`).expect(204);
+      const second = await staff.post('/api/staff/plans').send(validPlan).expect(201);
+      expect(second.body.id).not.toBe(first.body.id);
+      expect(second.body.slug).toBe('performance-anual');
+      await staff.delete(`/api/staff/plans/${second.body.id}`).expect(204);
+      await staff.post('/api/staff/plans').send(validPlan).expect(201);
+      const [{ count }] = await ctx.dataSource.query(`SELECT count(*)::int AS count FROM plans WHERE slug = 'performance-anual'`);
+      expect(count).toBe(3);
+    });
+
+    it('answers SLUG_TAKEN for two active plans with the same slug, also inactive ones', async () => {
+      await staff.post('/api/staff/plans').send({ ...validPlan, active: false }).expect(201);
+      await staff.post('/api/staff/plans').send(validPlan).expect(409).expect(expectCode('SLUG_TAKEN'));
+      await staff.post('/api/staff/plans').send({ ...validPlan, slug: 'performance-mensual' }).expect(409).expect(expectCode('SLUG_TAKEN'));
+    });
+
+    it('lets a PATCH take the slug of a deleted plan but not the one of a live plan', async () => {
+      const deleted = await staff.post('/api/staff/plans').send(validPlan).expect(201);
+      await staff.delete(`/api/staff/plans/${deleted.body.id}`).expect(204);
+      const [plan] = (await staff.get('/api/staff/plans?service=performance').expect(200)).body;
+      const patched = await staff.patch(`/api/staff/plans/${plan.id}`).send({ slug: 'performance-anual' }).expect(200);
+      expect(patched.body.slug).toBe('performance-anual');
+      await staff.post('/api/staff/plans').send(validPlan).expect(409).expect(expectCode('SLUG_TAKEN'));
+    });
+
+    it('does not bring back a seed plan staff deleted when the seed runs again', async () => {
+      const [plan] = (await staff.get('/api/staff/plans?service=performance').expect(200)).body;
+      await staff.delete(`/api/staff/plans/${plan.id}`).expect(204);
+      const again = await seedCatalogAndSchedule(ctx.dataSource);
+      expect(again.plans).toBe(0);
+      const rows: { id: string; deleted_at: Date | null }[] = await ctx.dataSource.query(
+        `SELECT id, deleted_at FROM plans WHERE slug = $1`, [plan.slug],
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].deleted_at).not.toBeNull();
+      await publicGet(`/api/catalog/plans/${plan.slug}`).expect(404).expect(expectCode('PLAN_NOT_FOUND'));
+    });
+
+    it('seeds again without duplicating live plans', async () => {
+      const again = await seedCatalogAndSchedule(ctx.dataSource);
+      expect(again.plans).toBe(0);
+      const [{ count }] = await ctx.dataSource.query(`SELECT count(*)::int AS count FROM plans`);
+      expect(count).toBe(7);
+    });
+
+    it('is enforced by a partial unique index on live rows only', async () => {
+      const indexes: { indexdef: string }[] = await ctx.dataSource.query(
+        `SELECT indexdef FROM pg_indexes WHERE tablename = 'plans' AND indexdef ILIKE '%(slug)%'`,
+      );
+      expect(indexes).toHaveLength(1);
+      expect(indexes[0].indexdef).toMatch(/UNIQUE INDEX/);
+      expect(indexes[0].indexdef).toMatch(/WHERE \(deleted_at IS NULL\)/);
+      const constraints: { conname: string }[] = await ctx.dataSource.query(
+        `SELECT conname FROM pg_constraint WHERE conrelid = 'plans'::regclass AND contype = 'u'`,
+      );
+      expect(constraints).toEqual([]);
+    });
   });
 
   it('lists plans for staff, with inactive ones only on request', async () => {
