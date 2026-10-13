@@ -1,7 +1,7 @@
 import { AppError } from '../../../common/errors/app-error.js';
 import { MercadoPagoService } from './mercado-pago.service.js';
 
-const app = { port: 3001, webUrl: 'https://move.test', apiPublicUrl: 'https://api.move.test', nodeEnv: 'test' };
+const app = { port: 3001, webUrl: 'https://move.test', apiPublicUrl: 'https://api.move.test', nodeEnv: 'test', trustProxyHops: 0 };
 const mp = { accessToken: 'TEST-token', webhookSecret: 'secret', simulatorEnabled: false };
 
 const jsonResponse = (status: number, body: unknown): Response =>

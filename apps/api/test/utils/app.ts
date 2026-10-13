@@ -7,8 +7,12 @@ import { configureApp } from '../../src/app.setup.js';
 
 export interface TestApp { app: NestExpressApplication; dataSource: DataSource }
 
-// Specs that start more than 10 checkouts a minute (D53) raise the throttler limit instead of disabling it.
-export const raisedCheckoutLimit = [{ ttl: 60_000, limit: 1_000 }];
+// Specs that start more than 10 checkouts a minute or 20 bookings an hour (D53, D58) raise both throttler windows
+// instead of disabling them.
+export const raisedCheckoutLimit = [
+  { name: 'minute', ttl: 60_000, limit: 1_000 },
+  { name: 'hour', ttl: 3_600_000, limit: 1_000 },
+];
 
 export async function createTestApp(opts: { raiseCheckoutLimit?: boolean } = {}): Promise<TestApp> {
   const builder = Test.createTestingModule({ imports: [AppModule] });
