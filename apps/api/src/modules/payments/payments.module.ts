@@ -20,7 +20,11 @@ import { PaymentsService } from './services/payments.service.js';
   imports: [
     SettingsModule, NotificationsModule, UsersModule, AuthModule, CatalogModule, AgendaModule, SubscriptionsModule, BookingsModule,
   ],
-  controllers: [CheckoutController, WebhookController, DevSimulatorController, StaffPaymentsController],
+  controllers: [
+    CheckoutController, WebhookController, StaffPaymentsController,
+    // D4: the simulator route must not exist in production, not just answer NOT_FOUND.
+    ...(process.env.NODE_ENV === 'production' ? [] : [DevSimulatorController]),
+  ],
   providers: [PaymentsService, CheckoutService, MercadoPagoService, ReconcilePaymentsJob],
   exports: [PaymentsService, ReconcilePaymentsJob],
 })
