@@ -109,7 +109,7 @@ pnpm e2e:reset                                               # borra y recrea mo
 pnpm test:e2e:web                                            # las dos suites; --project=desktop o --project=mobile para una
 ```
 
-- Toda entrada (`pnpm e2e:reset`, `pnpm test:e2e:web` y el SQL de las specs) se niega antes de tocar nada si `E2E_DB_NAME` no empieza con `move_e2e`, y el reset y la suite solo aceptan un Postgres local (`DB_HOST` `localhost`, `127.0.0.1` o `::1`).
+- Toda entrada (`pnpm e2e:reset`, `pnpm test:e2e:web` y el SQL de las specs) se niega antes de tocar nada si `E2E_DB_NAME` no empieza con `move_e2e`, y el reset y la suite solo aceptan el Postgres del contenedor local: `DB_HOST` `localhost`, `127.0.0.1` o `::1`, y `DB_PORT` sin definir o igual al puerto que publica `move-postgres` (`docker port`).
 - `pnpm e2e:reset` (`scripts/e2e/reset.mjs`) crea el staff `staff.e2e@example.com` (`E2E_STAFF_EMAIL`) y, por la API, el profesional "Profesional E2E" y los turnos de la ventana de reserva. Usa el contenedor `move-postgres` (`E2E_DB_CONTAINER`).
 - Cada prueba crea sus propios clientes, turnos (en un día y minuto únicos) y compras por la API, así que no depende del orden ni de las otras pruebas, y las fechas se calculan desde hoy en la zona de Uruguay. Lo que la API no permite (un plan vencido, un turno de hoy para marcar asistencia) se ajusta con SQL en `move_e2e`, como `scripts/manual/demo-data.mjs`.
 - La API de E2E corre con `TRUST_PROXY_HOPS=1` y cada prueba manda su propio `X-Forwarded-For`, así el throttling por IP del checkout (D53/D58) no mezcla pruebas que corren en paralelo. No cambia nada de la app.

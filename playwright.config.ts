@@ -1,12 +1,12 @@
 // Pruebas end to end de la web (D73): los mismos flujos en desktop (Chromium 1440×900) y mobile (iPhone 15 con
 // Chromium). Antes de correrlas: `pnpm e2e:reset`. Ver docs/development.md, "Pruebas end to end".
 import { defineConfig, devices } from '@playwright/test';
-import { apiEnv, assertLocalDatabaseHost, E2E_API_URL, E2E_WEB_PORT, E2E_WEB_URL, webEnv } from './scripts/e2e/env.mjs';
+import { apiEnv, assertLocalDatabase, E2E_API_URL, E2E_WEB_PORT, E2E_WEB_URL, webEnv } from './scripts/e2e/env.mjs';
 
 const BUILD_TIMEOUT_MS = 600_000;
 
 // Importar env.mjs ya rechaza una base que no sea move_e2e*; acá además solo el Postgres local.
-assertLocalDatabaseHost();
+assertLocalDatabase();
 
 function workers(): number {
   const value = process.env.E2E_WORKERS;

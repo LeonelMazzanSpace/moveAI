@@ -6,6 +6,7 @@
     "strict": true,
     "noEmit": true,
     "allowJs": true,
+    "checkJs": true,
     "skipLibCheck": true,
     "types": ["node"],
     "typeRoots": ["./apps/web/node_modules/@types"]

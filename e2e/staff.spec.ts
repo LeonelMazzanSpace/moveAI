@@ -1,12 +1,12 @@
 // Flujo 7: panel de staff. Dashboard, clientes (búsqueda, alta, detalle, pausa), turnos y asistencia, pagos (filtros y
 // pago manual), seguimiento (alertas y contacto), check-ins (derivar a Rehab) y configuración.
 import type { Locator, Page } from '@playwright/test';
-import type { ClientDetailDto, ScheduleTemplateDto, StaffTimeSlotDto } from '../apps/web/src/lib/api/types';
+import type { ClientDetailDto, PublicSettingsDto, ScheduleTemplateDto, StaffTimeSlotDto } from '../apps/web/src/lib/api/types';
 import { type Client, expect, rowOf, staffCredentials, test, uniquePerson } from './fixtures';
 import type { ApiClient } from './support/api';
 import { pickDayAndTime } from './support/booking';
 import { moveSlotBack } from './support/sql';
-import { businessDate, businessTime } from './support/time';
+import { addDays, businessDate, businessTime, isoWeekday } from './support/time';
 
 // Tarjeta (alerta o respuesta de check-in) del cliente: el bloque más interno que tiene su nombre y el botón pedido.
 function cardOf(page: Page, name: string, button: string): Locator {
@@ -30,6 +30,19 @@ async function clientWithPainCheckin(staff: ApiClient, createClient: () => Promi
     goals: 'same',
   });
   return client;
+}
+
+// Turnos de Performance de los domingos a `time` dentro de la ventana de reserva: los que generó un horario semanal.
+async function sundaySlotsAt(staff: ApiClient, time: string): Promise<StaffTimeSlotDto[]> {
+  const { bookingWindowDays } = await staff.call<PublicSettingsDto>('GET', '/settings/public');
+  const today = businessDate();
+  const sundays = Array.from({ length: bookingWindowDays + 2 }, (_, offset) => addDays(today, offset)).filter(
+    (date) => isoWeekday(date) === 7,
+  );
+  const days = await Promise.all(
+    sundays.map((date) => staff.call<StaffTimeSlotDto[]>('GET', `/staff/time-slots?date=${date}&service=performance`)),
+  );
+  return days.flat().filter((slot) => businessTime(new Date(slot.startsAt)) === time);
 }
 
 test.describe('Staff', () => {
@@ -266,8 +279,8 @@ test.describe('Staff', () => {
     await expect(page.getByText('Plan eliminado.')).toBeVisible();
     await expect(planRow).toHaveCount(0);
 
-    // Horarios: un horario semanal (creado, desactivado y borrado) y un turno puntual. Horas propias de cada proyecto,
-    // así desktop y mobile no comparten filas ni turnos.
+    // Horarios: un horario semanal (creado, desactivado y borrado, y sus turnos generados cancelados) y un turno puntual.
+    // Horas propias de cada proyecto, así desktop y mobile no comparten filas ni turnos.
     await tabs.getByRole('link', { name: 'Horarios' }).click();
     await expect(page).toHaveURL(/tab=horarios/);
     await expect(page.getByRole('button', { name: 'Nuevo horario' })).toBeVisible();
@@ -293,6 +306,11 @@ test.describe('Staff', () => {
     await page.reload();
     await expect(page.getByRole('button', { name: 'Nuevo horario' })).toBeVisible();
     await expect(templateRow).toHaveCount(0);
+    // Borrar el horario no borra los turnos que ya generó para la ventana de reserva: se cancelan.
+    const generated = await sundaySlotsAt(staff, templateTime);
+    expect(generated.length).toBeGreaterThan(0);
+    for (const slot of generated) await staff.call('POST', `/staff/time-slots/${slot.id}/cancel`);
+    expect((await sundaySlotsAt(staff, templateTime)).filter((slot) => slot.cancelledAt === null)).toEqual([]);
 
     const slotDialog = page.getByRole('dialog', { name: 'Turno puntual' });
     await ui.clickUntil(page.getByRole('button', { name: 'Turno puntual' }), slotDialog);
