@@ -10,10 +10,12 @@
 //   WEB_URL                 (opcional) default http://localhost:3000
 //   API_URL                 (opcional) default http://localhost:3001/api
 //
-// Las capturas van a docs/manual/img/ con nombres estables (se borran las anteriores). La última parte recorre el
-// checkout de un paquete Recovery con un cliente sin paquete (Nicolás Acosta): crea una compra y la aprueba con el
-// simulador de pagos.
-import { mkdirSync, readdirSync, rmSync } from 'node:fs';
+// Las capturas se toman primero en un directorio temporal y solo si salieron todas se reemplazan las de
+// docs/manual/img/ (nombres estables; arquitectura.png no es de este script y no se toca). Si algo falla, las imágenes
+// actuales quedan como estaban. La última parte recorre el checkout de un paquete Recovery con un cliente sin paquete
+// (Nicolás Acosta): crea una compra y la aprueba con el simulador de pagos.
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -23,6 +25,7 @@ const API_URL = (process.env.API_URL ?? 'http://localhost:3001/api').replace(/\/
 const STAFF_EMAIL = process.env.MANUAL_STAFF_EMAIL ?? 'staff@example.com';
 const IMG_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../docs/manual/img');
 const VIEWPORT = { width: 1440, height: 900 };
+const KEPT_IMAGES = new Set(['arquitectura.png']);
 
 const CLIENT_EMAILS = {
   sofia: 'sofia.martinez@example.com',
@@ -35,6 +38,17 @@ function requireEnv(name) {
   const value = process.env[name];
   if (!value) throw new Error(`Falta la variable de entorno ${name}.`);
   return value;
+}
+
+let outputDir;
+
+// Reemplaza las capturas anteriores por las nuevas; se llama solo cuando todas salieron bien.
+function publishImages() {
+  mkdirSync(IMG_DIR, { recursive: true });
+  for (const file of readdirSync(IMG_DIR)) {
+    if (file.endsWith('.png') && !KEPT_IMAGES.has(file)) rmSync(resolve(IMG_DIR, file));
+  }
+  for (const file of readdirSync(outputDir)) copyFileSync(resolve(outputDir, file), resolve(IMG_DIR, file));
 }
 
 const todayLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Montevideo' }).format(new Date());
@@ -65,7 +79,7 @@ async function settle(page) {
 
 async function shot(page, name) {
   await settle(page);
-  await page.screenshot({ path: resolve(IMG_DIR, `${name}.png`) });
+  await page.screenshot({ path: resolve(outputDir, `${name}.png`) });
   const url = new URL(page.url());
   console.log(`• ${name}.png  (${url.pathname}${url.search})`);
 }
@@ -106,8 +120,7 @@ async function pickDayAndSlot(page, locator) {
 async function main() {
   const staffPassword = requireEnv('MANUAL_STAFF_PASSWORD');
   const clientPassword = requireEnv('MANUAL_CLIENT_PASSWORD');
-  mkdirSync(IMG_DIR, { recursive: true });
-  for (const file of readdirSync(IMG_DIR)) if (file.endsWith('.png')) rmSync(resolve(IMG_DIR, file));
+  outputDir = mkdtempSync(resolve(tmpdir(), 'move-manual-'));
 
   const browser = await chromium.launch();
   try {
@@ -192,12 +205,18 @@ async function main() {
     await nicolasPage.getByRole('button', { name: 'Aprobar' }).click();
     await nicolasPage.waitForURL(/\/checkout\/resultado/);
     await shot(nicolasPage, '24-checkout-resultado');
+    publishImages();
+    console.log(`\nListo: ${readdirSync(outputDir).length} capturas en ${IMG_DIR}`);
   } finally {
     await browser.close();
   }
 }
 
-main().catch((error) => {
-  console.error(`\nError: ${error.message}`);
-  process.exit(1);
-});
+main()
+  .catch((error) => {
+    console.error(`\nError: ${error.message}\nLas imágenes de docs/manual/img no se modificaron.`);
+    process.exitCode = 1;
+  })
+  .finally(() => {
+    if (outputDir) rmSync(outputDir, { recursive: true, force: true });
+  });

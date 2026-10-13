@@ -23,15 +23,15 @@ Se definen y validan en `apps/api/src/config/env.validation.ts`; si falta una ob
 | Variable | Producción | Propósito |
 |---|---|---|
 | `NODE_ENV` | Obligatoria (`production`) | Con `production` se exigen las credenciales de proveedores, se usan cookies `Secure` y se deshabilita el simulador de pagos |
-| `PORT` | Obligatoria | Puerto donde escucha la API. Definirlo siempre como propiedad del entorno (por ejemplo `8080`): Beanstalk configura Nginx para reenviar a ese puerto; sin la propiedad, Nginx reenvía al 5000. Solo dígitos |
+| `PORT` | Obligatoria | Puerto donde escucha la API. Definirlo siempre como propiedad del entorno (por ejemplo `8080`): Beanstalk configura Nginx para reenviar a ese puerto; sin la propiedad, Nginx reenvía al 5000. Solo dígitos, de 1 a 65535: cualquier otro valor (por ejemplo `0x1F90` o `8e3`) impide el arranque |
 | `WEB_URL` | Obligatoria | Origen exacto de la web, sin barra final (`https://move.uy`). Se usa para CORS, orígenes de confianza de Better Auth y links de los emails |
 | `API_PUBLIC_URL` | Obligatoria | URL pública de la API sin `/api` (`https://api.move.uy`). Base de Better Auth, callback de Google y `notification_url` del webhook de Mercado Pago |
 | `DB_HOST` | Obligatoria | Host de Neon. Usar el host **directo** (sin `-pooler`): los jobs usan locks de sesión de Postgres, que un pooler en modo transacción rompe |
-| `DB_PORT` | Obligatoria | `5432` |
+| `DB_PORT` | Obligatoria | `5432`. Solo dígitos, de 1 a 65535: cualquier otro valor impide el arranque |
 | `DB_USER` | Obligatoria | Usuario de la base en Neon |
 | `DB_PASSWORD` | Obligatoria | Contraseña de la base en Neon |
 | `DB_NAME` | Obligatoria | Nombre de la base nueva de MOVE en Neon |
-| `DB_SSL` | Obligatoria en la práctica (`true`) | Neon exige SSL. El default local es `false`; si falta en producción la conexión falla. Escribir exactamente `true`: `1` pasa la validación pero no activa SSL |
+| `DB_SSL` | Obligatoria en la práctica (`true`) | Neon exige SSL. El default local es `false`; si falta en producción la conexión falla. Solo `true` o `false`: cualquier otro valor (incluido `1`) impide el arranque |
 | `BETTER_AUTH_SECRET` | Obligatoria | Secreto de Better Auth, 32+ caracteres aleatorios (por ejemplo `openssl rand -base64 48`). Cambiarlo invalida las sesiones |
 | `COOKIE_DOMAIN` | Obligatoria en la práctica (`.move.uy`) | Dominio raíz de la cookie de sesión, para que web y API compartan la sesión. Vacío deja la cookie atada al host de la API |
 | `GOOGLE_CLIENT_ID` | Opcional | Cliente OAuth de Google. Va junto con `GOOGLE_CLIENT_SECRET`: se definen las dos o ninguna |
@@ -65,8 +65,8 @@ Variables que **no** van a producción: `E2E_DATABASE_NAME` (solo tests) y `CREA
      node_modules/.bin/typeorm migration:run -d dist/database/data-source.js
    ```
 
-   Pasar las variables en el comando (o exportarlas en la sesión) en lugar de crear un `.env`. El esquema solo cambia por migraciones: nunca `synchronize`.
-4. Cargar los datos iniciales (planes, plantillas de horarios y configuración, valores provisorios hasta que MOVE los confirme). Es idempotente:
+   Pasar las variables en el comando (o exportarlas en la sesión) en lugar de crear un `.env`. El esquema solo cambia por migraciones: nunca `synchronize`. En un ambiente ya desplegado, este paso aplica solo las migraciones nuevas y se repite en cada deploy que traiga una (por ejemplo, `PlansSlugUniqueWhenNotDeleted`, que permite reutilizar el identificador de un plan eliminado). Para revertir una migración, ver [Revertir la migración de slugs de planes](#revertir-la-migración-de-slugs-de-planes).
+4. Cargar los datos iniciales (planes, plantillas de horarios y configuración, valores provisorios hasta que MOVE los confirme). Es idempotente y no vuelve a crear un plan cuyo identificador ya existió, aunque el staff lo haya eliminado:
 
    ```bash
    DB_HOST=… DB_PORT=5432 DB_USER=… DB_PASSWORD=… DB_NAME=… DB_SSL=true node dist/database/seed.js
@@ -85,8 +85,9 @@ Variables que **no** van a producción: `E2E_DATABASE_NAME` (solo tests) y `CREA
 3. Cargar todas las variables de la [tabla](#variables-de-entorno-de-la-api) como propiedades del entorno.
 4. Subir el zip como nueva versión de la aplicación y desplegarla. Beanstalk usa el `Procfile` para arrancar y, al venir `node_modules` en el zip, no instala dependencias.
 5. Configurar el health check del balanceador en `GET /api/health` (*Load balancer → Processes → default → Health check path*, u opción `HealthCheckPath` de `aws:elasticbeanstalk:environment:process:default`). Responde `{"status":"ok"}`.
-6. **Proxy y límite de body de auth.** `/api/auth/*` rechaza con 413 cualquier request con más de 64 KB o con `Transfer-Encoding` sin `content-length`. El proxy (Nginx de Beanstalk o ALB) tiene que reenviar `content-length`: dejar `proxy_request_buffering on` (el default de Nginx) y no agregar configuración que lo desactive. Los `fetch` del navegador con body JSON siempre envían `content-length`.
-7. Subir con HTTPS (certificado en ACM asociado al balanceador) y dominio `api.move.uy`.
+6. **Solo JSON.** La API únicamente interpreta bodies JSON: un POST con formulario codificado (`application/x-www-form-urlencoded`) responde 400 `VALIDATION_FAILED`.
+7. **Proxy y límite de body de auth.** `/api/auth/*` rechaza con 413 cualquier request con más de 64 KB o con `Transfer-Encoding` sin `content-length`. El proxy (Nginx de Beanstalk o ALB) tiene que reenviar `content-length`: dejar `proxy_request_buffering on` (el default de Nginx) y no agregar configuración que lo desactive. Los `fetch` del navegador con body JSON siempre envían `content-length`.
+8. Subir con HTTPS (certificado en ACM asociado al balanceador) y dominio `api.move.uy`.
 
 ### Scheduler: una sola instancia
 
@@ -104,6 +105,22 @@ Iniciar un checkout está limitado por IP: `POST /api/checkout/booking` y `POST 
 - **IP real.** En Beanstalk la request pasa por el ALB y por el Nginx de la instancia, así que la API la recibe desde `127.0.0.1` con `X-Forwarded-For: <cliente>, <IP del ALB>`. Con `TRUST_PROXY_HOPS=2` la API toma la IP del cliente y descarta lo que el cliente haya agregado antes en el header. Si se cambia la topología (por ejemplo, se quita Nginx o se agrega CloudFront), ajustar el valor a la cantidad de proxies propios delante de la API. Un valor mayor que la cantidad real de proxies deja que el cliente elija su IP (igual que `true`); uno menor hace que todos los clientes compartan un mismo contador. Después de cualquier cambio de topología, repetir el ítem "IP real detrás del proxy" del [checklist](#8-checklist-de-verificación-posterior-al-deploy). Nunca usar `true`.
 - **Contadores en memoria por instancia.** El throttler guarda los contadores en la memoria del proceso: se pierden al reiniciar y no se comparten entre instancias. Con N instancias detrás del balanceador, el límite efectivo por IP es hasta N × el límite (con 2 instancias, hasta 20 por minuto y 40 por hora). Para un límite global hay que mover el storage del throttler a un almacén compartido (por ejemplo Redis), que el MVP no tiene.
 - Clientes que salen a internet con la misma IP pública (por ejemplo, el wifi del gimnasio) comparten los contadores.
+
+### Revertir la migración de slugs de planes
+
+`PlansSlugUniqueWhenNotDeleted` reemplaza la restricción única de `plans.slug` por un índice único que solo cuenta los planes no eliminados, así que el identificador de un plan eliminado se puede reutilizar. Revertirla (`migration:revert`, ver [Rollback](#9-rollback)) vuelve a la restricción única sobre **todas** las filas y **falla** si un plan eliminado y otro (vigente o eliminado) comparten identificador. Antes de revertir, desde `psql` contra la base del ambiente:
+
+```sql
+-- 1) ver los identificadores repetidos
+SELECT slug, count(*) AS filas, count(*) FILTER (WHERE deleted_at IS NOT NULL) AS eliminadas
+FROM plans GROUP BY slug HAVING count(*) > 1;
+
+-- 2) renombrar solo las filas eliminadas repetidas (las vigentes no se tocan)
+UPDATE plans SET slug = slug || '-del-' || left(id::text, 8)
+WHERE deleted_at IS NOT NULL AND slug IN (SELECT slug FROM plans GROUP BY slug HAVING count(*) > 1);
+```
+
+Volver a correr la consulta 1: no tiene que devolver filas. Recién entonces correr `node_modules/.bin/typeorm migration:revert -d dist/database/data-source.js` desde el bundle. Es un arreglo de datos, no de esquema: el esquema sigue cambiando solo por migraciones.
 
 ## 3. Dominios
 
@@ -145,7 +162,7 @@ Web y API van bajo el mismo dominio raíz para que la cookie de sesión sea firs
    - Los avisos con formato **IPN** (`?topic=…&id=…`) que Mercado Pago mande a esa URL no se pueden firmar y la API los responde **401**: es esperado y sin efectos. **No restablecer `MP_WEBHOOK_SECRET` por eso**: rompería los avisos firmados.
    - Mercado Pago no documenta si los avisos con formato Webhooks enviados a la `notification_url` de una preferencia traen un `x-signature` válido: confirmarlo con el primer pago real.
    - D68: antes de producción elegir entre (a) responder 200 sin efectos a los avisos IPN o que no sean de pagos antes de verificar la firma, o (b) quitar la `notification_url` de las preferencias y usar la URL del panel con una aplicación de Mercado Pago por ambiente (cada ambiente con su clave secreta). Recomendada: (b), confirmada con un pago real.
-6. Comportamiento a conocer: los pagos de plan rechazados quedan en `pending` (el cliente puede reintentar); la conciliación periódica también revisa las compras vencidas (`expired`) de cualquier tipo, de plan o de reserva, de los últimos 7 días, porque su preferencia todavía puede pagarse tarde (D60). Si un pago se aprueba cuando la reserva ya venció y el turno no tiene cupo, la compra queda aprobada y marcada para atención del staff (sin reembolso automático).
+6. Comportamiento a conocer: los pagos de plan rechazados quedan en `pending` (el cliente puede reintentar); la conciliación periódica también revisa las compras vencidas (`expired`) porque su preferencia todavía puede pagarse tarde: las de plan durante 7 días (D45) y las de reserva durante 72 horas (D60, D70). No vuelve a consultar las compras de reserva rechazadas (el rechazo libera la retención). Si un pago se aprueba cuando la reserva ya venció y el turno no tiene cupo, la compra queda aprobada y marcada para atención del staff (sin reembolso automático).
 
 ### Brevo
 

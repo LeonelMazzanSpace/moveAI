@@ -12,12 +12,16 @@ pnpm install
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 pnpm db:up                                   # Postgres 17 en Docker (contenedor move-postgres, puerto 5432)
-pnpm --filter @move/api migration:run        # crea el esquema
+pnpm --filter @move/api migration:run        # crea el esquema (en una base existente aplica las migraciones nuevas)
 pnpm --filter @move/api seed                 # planes, horarios y configuración provisorios (idempotente)
 pnpm dev                                     # web en :3000 y API en :3001 (/api)
 ```
 
-El `.env.example` de la API trae valores de desarrollo listos para usar. Las variables de la API están documentadas en [deploy.md](deploy.md#variables-de-entorno-de-la-api); la web usa `NEXT_PUBLIC_API_URL` (`http://localhost:3001/api`) y `NEXT_PUBLIC_GOOGLE_ENABLED`.
+El `.env.example` de la API trae valores de desarrollo listos para usar. En lugar de copiarlo a `apps/api/.env`, se puede exportar en el shell con `set -a; . apps/api/.env.example; set +a` (las variables exportadas tienen prioridad sobre un `.env`; hace falta `NODE_ENV=development`, que ya viene en el ejemplo). Las variables de la API están documentadas en [deploy.md](deploy.md#variables-de-entorno-de-la-api); la web usa `NEXT_PUBLIC_API_URL` (`http://localhost:3001/api`) y `NEXT_PUBLIC_GOOGLE_ENABLED`.
+
+`PORT` y `DB_PORT` aceptan solo dígitos (1 a 65535), `DB_SSL` y `SCHEDULER_ENABLED` solo `true` o `false`, y `TRUST_PROXY_HOPS` un dígito de 0 a 5: otro valor impide que la API arranque. `TRUST_PROXY_HOPS` queda en `0` (el default) en local, donde no hay proxies delante de la API; detrás del ALB + Nginx de Elastic Beanstalk va `2` y nunca `true` (ver [deploy.md](deploy.md#proxy-ip-del-cliente-y-límites-de-checkout)).
+
+La API solo interpreta bodies JSON: un POST con formulario codificado responde 400. Para una prueba rápida con datos de demostración (usuarios de ejemplo, reservas, pagos y alertas), seguir [Probar MOVE en local](manual/manual-de-usuario.md#probar-move-en-local) del manual.
 
 El seed carga los planes, precios y horarios del mockup como valores **provisorios**: Configuración muestra "Valores provisorios — confirmar con MOVE" mientras el ajuste `valuesProvisional` sea `true`.
 
