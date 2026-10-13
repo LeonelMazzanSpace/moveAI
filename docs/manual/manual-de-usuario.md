@@ -4,14 +4,131 @@ Plataforma de **Performance, Rehab y Recovery** de MOVE (Uruguay): registro, pla
 
 Este manual es la guía única para clientes, staff de MOVE y equipo técnico. Tiene una captura de cada pantalla y se ordena así:
 
-1. [Estado actual frente a MOVE.pdf](#estado-actual-frente-a-movepdf): qué está hecho, qué está simulado en local y qué falta, sección por sección del documento de alcance.
-2. [Parte 1: Clientes](#parte-1-clientes): cómo usar el sitio, contratar un plan y reservar.
-3. [Parte 2: Staff de MOVE](#parte-2-staff-de-move): el panel de gestión (clientes, turnos, pagos, seguimiento y configuración).
-4. [Parte 3: Cómo levantar todo](#parte-3-cómo-levantar-todo): el sistema completo en una computadora, paso a paso, y el orden para publicarlo en producción.
-5. [Parte 4: Proveedores, uno por uno](#parte-4-proveedores-uno-por-uno): qué falta configurar en Neon, AWS, Vercel, el dominio, Mercado Pago, Google, Brevo y Bitbucket, con los links a la documentación oficial.
-6. [Parte 5: Puesta en marcha y mantenimiento](#parte-5-puesta-en-marcha-y-mantenimiento): primer usuario de staff, checklist posterior al deploy, rollback y cómo regenerar este manual.
+1. [Probar MOVE en local](#probar-move-en-local): los pasos, en orden, para tener la plataforma funcionando en tu computadora con datos de demostración, y qué muestra cada usuario de demo.
+2. [Estado actual frente a MOVE.pdf](#estado-actual-frente-a-movepdf): qué está hecho, qué está simulado en local y qué falta, sección por sección del documento de alcance.
+3. [Parte 1: Clientes](#parte-1-clientes): cómo usar el sitio, contratar un plan y reservar.
+4. [Parte 2: Staff de MOVE](#parte-2-staff-de-move): el panel de gestión (clientes, turnos, pagos, seguimiento y configuración).
+5. [Parte 3: Cómo levantar todo](#parte-3-cómo-levantar-todo): el sistema completo en una computadora, paso a paso, y el orden para publicarlo en producción.
+6. [Parte 4: Proveedores, uno por uno](#parte-4-proveedores-uno-por-uno): qué falta configurar en Neon, AWS, Vercel, el dominio, Mercado Pago, Google, Brevo y Bitbucket, con los links a la documentación oficial.
+7. [Parte 5: Puesta en marcha y mantenimiento](#parte-5-puesta-en-marcha-y-mantenimiento): primer usuario de staff, checklist posterior al deploy, rollback y cómo regenerar este manual.
 
 > **Sobre los datos de las capturas.** Todas las imágenes salen de una base de demostración con personas, emails y teléfonos **inventados** (emails `@example.com`), cargada el 13/10/2026. Los planes, precios, horarios y umbrales que se ven son **provisorios** hasta que MOVE los confirme (ver [Reglas y valores provisorios](#reglas-y-valores-provisorios)). Hoy no hay una versión publicada: todo corre localmente (ver la [Parte 3](#parte-3-cómo-levantar-todo)).
+
+## Probar MOVE en local
+
+Esta sección es el camino más corto para ver la plataforma funcionando en tu computadora, con clientes, reservas, pagos y alertas de demostración. No hace falta ninguna cuenta de proveedor: Mercado Pago se reemplaza por un **simulador de pagos**, los emails de Brevo **no salen** (quedan registrados en la base) y el botón de Google queda oculto. Todos los datos son inventados.
+
+**Antes de empezar.** Node 24 (`nvm use` lee `.nvmrc`), pnpm 10 (`corepack enable`) y Docker abierto. Los puertos **3000** (web), **3001** (API) y **5432** (Postgres) tienen que estar libres. Los comandos se corren desde la raíz del repositorio. Vas a usar **tres consolas**: una para los pasos 1 a 7 y la API, otra para cargar los datos de demostración (paso 8) y otra para la web (paso 9).
+
+1. **Instalar las dependencias.**
+
+   ```bash
+   pnpm install
+   ```
+
+2. **Variables de entorno.** La API valida sus variables al arrancar y no arranca si falta una obligatoria. Los ejemplos traen valores de desarrollo listos para usar:
+
+   ```bash
+   cp apps/api/.env.example apps/api/.env
+   cp apps/web/.env.example apps/web/.env.local
+   ```
+
+   Si preferís no crear archivos, exportá las variables así. **El ejemplo de la API va solo en las consolas de la API (pasos 3 a 7) y en la de `manual:demo-data` (paso 8)**; incluye `NODE_ENV=development`, que la API exige:
+
+   ```bash
+   set -a; . apps/api/.env.example; set +a
+   ```
+
+   **En la consola de la web (paso 9) no cargues ese archivo**: trae `PORT=3001`, y la web toma su puerto de `PORT`, así que intentaría usar el 3001 (el de la API) y fallaría con `EADDRINUSE`. Ahí exportá solamente la URL de la API:
+
+   ```bash
+   export NEXT_PUBLIC_API_URL=http://localhost:3001/api
+   ```
+
+   Si reutilizás una consola donde ya cargaste el ejemplo, corré antes `unset PORT` o levantá la web con `pnpm dev:web -p 3000`.
+
+3. **Postgres.** Levanta Postgres 17 en Docker (contenedor `move-postgres`, base `move`, usuario y clave de desarrollo `move`) y espera a que figure como `healthy` en `docker ps` (unos segundos). Corrélo con los valores del ejemplo (base `move`): si tenés `DB_NAME` exportado con otro nombre, Docker recrearía el contenedor con esa base.
+
+   ```bash
+   pnpm db:up
+   ```
+
+4. **Esquema de la base.** Crea las tablas. Si ya tenías una base de una versión anterior, **el mismo comando aplica las migraciones nuevas** (por ejemplo, la que permite reutilizar el identificador de un plan eliminado): corrélo siempre después de actualizar el código.
+
+   ```bash
+   pnpm --filter @move/api migration:run
+   ```
+
+5. **Datos iniciales.** Planes, horarios y configuración provisorios (es idempotente: repetirlo no duplica nada). La primera vez imprime `Seed inserted plans=7 professionals=1 templates=100`.
+
+   ```bash
+   pnpm --filter @move/api seed
+   ```
+
+6. **Usuario de staff.** Usá el email `staff@example.com`: es el que esperan los scripts de demostración. La contraseña (8 caracteres o más) se escribe sin eco y **no se guarda en ningún archivo**; anotala, la vas a necesitar de nuevo en el paso 8.
+
+   ```bash
+   printf 'Contraseña del staff: '; read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD; echo
+   pnpm --filter @move/api user:create-staff -- --email staff@example.com --name "Equipo MOVE"
+   unset CREATE_STAFF_PASSWORD
+   ```
+
+   El comando imprime solo el id (`staff <id>`).
+
+7. **Levantar la API** (esta consola queda ocupada por la API). Al arrancar genera los turnos de los próximos días:
+
+   ```bash
+   pnpm dev:api
+   ```
+
+   En otra consola, `curl http://localhost:3001/api/health` tiene que responder `{"status":"ok"}`.
+
+8. **Cargar los datos de demostración** (consola 2, con la API del paso 7 corriendo). La contraseña del staff es **la misma** del paso 6; la de los clientes es una nueva, de 8 caracteres o más, común a todos los clientes de demo. Ninguna se imprime ni se escribe en un archivo:
+
+   ```bash
+   printf 'Contraseña del staff: '; read -rs MANUAL_STAFF_PASSWORD && export MANUAL_STAFF_PASSWORD; echo
+   printf 'Contraseña de los clientes: '; read -rs MANUAL_CLIENT_PASSWORD && export MANUAL_CLIENT_PASSWORD; echo
+   pnpm manual:demo-data
+   ```
+
+   El script comprueba que Docker y la base responden, imprime la **base destino** antes de escribir (`Base destino: move …`) y se **niega a cargar** datos si `DB_HOST` o `API_URL` no son locales (localhost, 127.0.0.1 o ::1). Tarda unos segundos. Solo se puede cargar **una vez por base**: si ya hay datos de demostración, avisa y no hace nada (para repetirlo, usá una base nueva: ver [Regenerar este manual](#regenerar-este-manual)). Las fechas son relativas al día de la carga (planes que vencen en unos días, asistencias de las últimas semanas, turnos de hoy).
+
+9. **Levantar la web** (consola 3, **sin** `PORT` exportado: ver el paso 2) y abrir `http://localhost:3000/ingresar`:
+
+   ```bash
+   pnpm dev:web
+   ```
+
+   Ingresá con `staff@example.com` y la contraseña del paso 6 para ver el panel de staff, o con cualquier cliente de la tabla de abajo y la contraseña del paso 8 (`MANUAL_CLIENT_PASSWORD`).
+
+**Usuarios de demostración.** Todos los clientes usan la misma contraseña (`MANUAL_CLIENT_PASSWORD`) y el staff la que se eligió en el paso 6. **Nunca hay contraseñas guardadas en el repositorio ni en este manual**: son las que vos elegís y exportás en tu consola.
+
+| Usuario (`@example.com`) | Qué muestra |
+|---|---|
+| `staff` | Todo el panel de staff: dashboard, clientes, turnos y asistencia, pagos, seguimiento, check-ins y configuración |
+| `sofia.martinez` | La clienta "al día": Plan Trimestral vigente (vence en 55 días) y un paquete Recovery de 4 sesiones con una sesión reservada. Asiste casi todos los días (con una ausencia y un no show en su historia), tiene reservas próximas y respondió el check-in |
+| `martin.rodriguez` | Plan Mensual vigente (vence en 12 días), reservas próximas, una reserva cancelada y el check-in respondido |
+| `lucia.pereira` | Plan Mensual **por vencer** (vence en 4 días): alerta "Por vencer", aviso de vencimiento en su perfil, una asistencia **pendiente de marcar** en el último turno y un check-in pendiente de responder |
+| `andres.silva` | Plan Mensual **vencido** (venció hace 5 días): alerta "Vencidos sin renovar"; no puede reservar y su perfil lo lleva a renovar |
+| `camila.fernandez` | Plan Trimestral vigente pero **inactiva** (casi 4 semanas sin asistir): alerta "Inactividad prolongada" con un contacto de WhatsApp registrado sin respuesta; tiene un check-in pendiente |
+| `joaquin.techera` | Plan Mensual con **pausa por lesión** y fecha de re-contacto hoy: estado "Pausa" y alerta "Re-contactar"; no recibe alertas ni emails automáticos |
+| `valentina.gomez` | Plan Trimestral pagado por **transferencia** (pago manual). Pasó más de una semana sin asistir: el staff la contactó y la alerta figura como gestionada. Tiene el check-in pendiente (es la que se ve en la pantalla de check-in) |
+| `federico.alvarez` | Respondió el check-in con una **molestia**: el staff lo derivó a Rehab, tiene el **seguimiento fisioterapéutico habilitado** y un turno de Rehab reservado (Reservar → Fisioterapia) |
+| `diego.machado` | Plan Mensual pagado en **efectivo** (pago manual). Alerta de **baja de frecuencia**, un no show en el último turno y un check-in con **cambio de objetivos** (alerta abierta) |
+| `nicolas.acosta` | Sin plan ni compras: sirve para contratar un **paquete Recovery** de punta a punta (checkout → simulador de pagos → resultado) |
+| `paula.rivero` | **Invitada**: compró la Evaluación de Rehab sin tener cuenta |
+| `mateo.lemos` | **Invitado**: compró una sesión individual de Recovery sin tener cuenta |
+
+Las cuentas de los invitados (`paula.rivero` y `mateo.lemos`) **no pueden ingresar** en local: su acceso se define con el link de un email de invitación y, en dry-run, el email no sale ni guarda el link (ver el paso 7 de [Local, paso a paso](#local-paso-a-paso)). Sirven para ver sus compras en **Pagos** y sus turnos en **Turnos y asistencia**.
+
+**Para volver a empezar** con una base limpia sin tocar otras: `docker exec move-postgres createdb -U move move_demo`, exportar `DB_NAME=move_demo` en las consolas de la API y de los scripts, y repetir desde el paso 4. **No corras `pnpm db:up` ni `pnpm db:down` con `DB_NAME` exportado distinto de `move`**: Docker recrearía el contenedor de Postgres con esa base. Para frenar todo: `Ctrl+C` en las consolas de la API y de la web, y `pnpm db:down` para apagar Postgres (los datos quedan en el volumen de Docker).
+
+**Si algo falla:**
+
+- **La API no arranca y el log dice qué variable falta o es inválida:** el paso 2 no se hizo en esa consola, o se editó un valor. `PORT` y `DB_PORT` aceptan solo dígitos (1 a 65535) y `DB_SSL` solo `true` o `false`.
+- **`manual:demo-data` dice que no puede conectar a la base:** Docker no está abierto o el contenedor `move-postgres` no está levantado (paso 3).
+- **`manual:demo-data` dice "Ya hay datos de demostración":** la base ya se cargó; usá una base nueva (ver arriba).
+- **El puerto 3000 o 3001 está ocupado:** cerrá la otra aplicación o cambiá `PORT` (API) y el puerto de la web, y mantené `WEB_URL`, `API_PUBLIC_URL` y `NEXT_PUBLIC_API_URL` apuntando a esos puertos.
 
 ## Estado actual frente a MOVE.pdf
 
@@ -163,17 +280,18 @@ Este manual es la guía única para clientes, staff de MOVE y equipo técnico. T
 - **Valores provisorios:** planes, precios, horarios y umbrales son los del mockup hasta que MOVE los confirme (Configuración → Reglas).
 - **Dominio:** el sitio actual de MOVE está en `moveperformance.uy`. El dominio de la plataforma nueva **no está decidido**; este manual usa `<dominio>` (y `api.<dominio>` para la API) como marcador. El código no tiene ningún dominio fijo: todo sale de variables de entorno.
 
-### Deuda conocida que afecta al usuario o al deploy
+### Deuda conocida y comportamientos a tener presentes
 
 | Tema | Efecto | Qué hacer por ahora |
 |---|---|---|
 | Vaciar un campo numérico opcional al editar un plan | No tiene efecto: el valor anterior queda | Desactivar el plan y crear uno nuevo con los valores correctos |
-| Navegación móvil del staff y del cliente | En pantallas chicas no hay menú de navegación (fiel al mockup) | Usar el panel de staff en computadora o tablet |
-| Links de invitación y de restablecer contraseña | Vencen a la hora | Pedir un link nuevo desde **¿Olvidaste tu contraseña?** |
-| `PORT` y `DB_PORT` | La validación y la lectura no interpretan igual valores raros (por ejemplo `0x1F`) | Escribir solo dígitos (`8080`, `5432`) |
-| `DB_SSL` | `DB_SSL=1` pasa la validación pero **no** activa SSL | Usar exactamente `DB_SSL=true` |
+| Links de invitación y de restablecer contraseña | La **invitación** (el staff crea un cliente, o un invitado reserva sin cuenta) dura **72 horas**; el **restablecimiento** de contraseña dura **1 hora**. Si por un error no se pudo extender la invitación a 72 horas, el email sale igual, con un link de 1 hora | Si un link venció, pedir uno nuevo desde **¿Olvidaste tu contraseña?** |
+| Cuentas sin contraseña (invitados y cuentas que solo ingresaron con Google) que piden **¿Olvidaste tu contraseña?** | Reciben el email de invitación (`account-invitation`, link de 72 horas) y no el de restablecimiento | Es intencional: el link les permite definir su primera contraseña |
+| Invitaciones de check-in que fallaron | Si Brevo rechaza una invitación de check-in (o falla el envío), no se reintenta sola; repetir **Enviar check-in** solo reenvía las invitaciones que nunca llegaron a intentarse (no a los clientes pausados ni dados de baja) | **Pendiente de decisión:** reintentar solo los errores de Brevo que aseguran que el email no salió, con un tope de intentos. Mientras tanto, revisar `email_logs` (estado `failed`) y avisar al cliente |
+| Contador **Necesitan intervención** de check-ins | Cuenta solo los check-ins cuya alerta (molestia o cambio de objetivos) sigue abierta. Puede dar 0 aunque haya una alerta de objetivos abierta del mismo check-in, si la de molestia ya se gestionó | Mirar las alertas abiertas en **Seguimiento** |
 | Límite de intentos del checkout | Se guarda en la memoria de cada instancia: con N instancias el límite real es hasta N veces el configurado, y se reinicia con cada deploy | Aceptable con una instancia; ver [AWS](#aws-elastic-beanstalk-api) |
-| Compras de reserva vencidas | La conciliación las vuelve a consultar en Mercado Pago durante 7 días por si llega un pago tardío | Nada: es intencional; si aparece una compra "Requiere atención", resolverla a mano |
+| Compras vencidas | La conciliación vuelve a consultar en Mercado Pago las compras de **reserva** vencidas durante **72 horas** y las de **plan** durante **7 días**, por si llega un pago tardío. No vuelve a consultar las rechazadas | Nada: es intencional; si aparece una compra "Requiere atención", resolverla a mano |
+| Identificador (slug) de un plan eliminado | Se puede reutilizar en un plan nuevo. El seed no vuelve a crear los planes que el staff eliminó. Revertir la migración que lo permite falla si un plan eliminado y uno vigente comparten identificador | Antes de revertirla, renombrar los duplicados eliminados (ver [`docs/deploy.md`](../deploy.md#revertir-la-migración-de-slugs-de-planes)) |
 | Botón de Google | Oculto hasta configurar las credenciales | [Google OAuth](#google-oauth-inicio-de-sesión-con-google) |
 
 ---
@@ -182,7 +300,7 @@ Este manual es la guía única para clientes, staff de MOVE y equipo técnico. T
 
 ### Sitio público
 
-No hace falta tener cuenta para mirar el sitio. La barra de arriba tiene **Inicio**, **Performance**, **Rehab**, **Recovery** y **Planes**, el botón **Ingresar** y el botón **Reservar**.
+No hace falta tener cuenta para mirar el sitio. La barra de arriba tiene **Inicio**, **Performance**, **Rehab**, **Recovery** y **Planes**, el botón **Ingresar** y el botón **Reservar**. En el celular la barra se reemplaza por un botón de menú (☰) arriba a la derecha: abre la lista de secciones, **Cerrar menú** la cierra y al elegir una sección el menú se cierra solo. Lo mismo ocurre en el perfil del cliente (el botón queda junto a la campana de avisos) y en el panel de staff (el botón queda arriba a la izquierda).
 
 #### Inicio
 
@@ -222,7 +340,7 @@ En **Reservá tu sesión** elegís la modalidad (**Sesión individual** o **Paqu
 
 #### Planes
 
-Compará los planes de Performance (Mensual, Trimestral, Semestral) y de Recovery. Con los botones **Todos / Performance / Recovery** filtrás por servicio. Los precios están en pesos uruguayos.
+Compará los planes de Performance (Mensual, Trimestral, Semestral) y de Recovery. Con los botones **Todos / Performance / Recovery** filtrás por servicio. Los precios están en pesos uruguayos y los paquetes de Recovery muestran el precio **por paquete** (`/paquete`), no por sesión.
 
 ![Planes](img/08-planes.png)
 
@@ -250,7 +368,7 @@ Compará los planes de Performance (Mensual, Trimestral, Semestral) y de Recover
 
 #### Ingresar y crear cuenta
 
-La pantalla de acceso tiene dos pestañas: **Iniciar sesión** (email y contraseña) y **Crear cuenta**. Para crear la cuenta completás nombre y apellido, email, teléfono (opcional) y una contraseña de al menos 8 caracteres. No hace falta confirmar el email para ingresar. Hay una sola cuenta por email.
+La pantalla de acceso tiene dos pestañas: **Iniciar sesión** (email y contraseña) y **Crear cuenta**. Para crear la cuenta completás nombre y apellido, email, teléfono (opcional) y una contraseña de al menos 8 caracteres. No hace falta confirmar el email para ingresar. Hay una sola cuenta por email. Si un dato no es válido, el formulario lo marca debajo del campo con un texto en español (por ejemplo, "Revisá este valor."); nunca muestra mensajes técnicos del sistema. Lo mismo vale para los demás formularios de la plataforma.
 
 ![Ingresar](img/12-ingresar.png)
 
@@ -264,7 +382,7 @@ Si querés reservar Rehab o Recovery sin ser alumno, no hace falta registrarte a
 
 #### Recuperar y restablecer la contraseña
 
-Desde **¿Olvidaste tu contraseña?** ingresás tu email y recibís un link para elegir una contraseña nueva.
+Desde **¿Olvidaste tu contraseña?** ingresás tu email y recibís un link para elegir una contraseña nueva (el link vale 1 hora). Si tu cuenta todavía no tiene contraseña (por ejemplo, se creó al reservar como invitado o solo ingresaste con Google), el email que recibís es el de invitación, con un link de 72 horas para definir tu primera contraseña.
 
 ![Recuperar contraseña](img/14-recuperar.png)
 
@@ -343,7 +461,7 @@ Si tenés un plan de Performance vigente y no estás en pausa, una vez por mes r
 
 ## Parte 2: Staff de MOVE
 
-Ingresá desde **Ingresar** con tu usuario de staff: la plataforma te lleva al panel. La barra lateral tiene **Dashboard**, **Clientes**, **Turnos y asistencia**, **Pagos**, **Seguimiento** (con un número de alertas abiertas y el subitem **Check-in**) y **Configuración**. Los usuarios de staff los crea el equipo técnico (ver [Primer staff de producción](#primer-staff-de-producción)); los clientes no pueden entrar al panel.
+Ingresá desde **Ingresar** con tu usuario de staff: la plataforma te lleva al panel. La barra lateral tiene **Dashboard**, **Clientes**, **Turnos y asistencia**, **Pagos**, **Seguimiento** (con un número de alertas abiertas y el subitem **Check-in**) y **Configuración**. En el celular la barra lateral se reemplaza por un botón de menú (☰) arriba a la izquierda, con las mismas secciones. Los servicios se llaman igual en todo el panel: **Performance**, **Fisioterapia** (Rehab) y **Recovery**. Los usuarios de staff los crea el equipo técnico (ver [Primer staff de producción](#primer-staff-de-producción)); los clientes no pueden entrar al panel.
 
 ### Dashboard
 
@@ -445,9 +563,9 @@ En cada alerta podés:
 
 #### Check-in de clientes
 
-El check-in mensual se envía por email el primer lunes de cada mes (10:00, hora de Montevideo) a los clientes con plan de Performance vigente que no estén en pausa; un cliente recibe como máximo uno por mes. Con **Enviar check-in** el staff lo puede enviar a mano.
+El check-in mensual se envía por email el primer lunes de cada mes (10:00, hora de Montevideo) a los clientes con plan de Performance vigente que no estén en pausa; un cliente recibe como máximo uno por mes. Con **Enviar check-in** el staff lo puede enviar a mano; si se repite el mismo mes, no duplica nada y solo manda las invitaciones que todavía no se habían enviado (los clientes en pausa o dados de baja no reciben nada).
 
-La pantalla muestra a la izquierda la **vista previa** de lo que ve el alumno y, a la derecha, los números del mes (enviados, respondidos y que requieren intervención) y las respuestas. Si el cliente contó una molestia, la respuesta tiene **Derivar a Rehab**: habilita el seguimiento fisioterapéutico de ese cliente, marca como gestionada la alerta de molestia y le envía un email con el link para reservar su turno de Rehab.
+La pantalla muestra a la izquierda la **vista previa** de lo que ve el alumno y, a la derecha, los números del mes (enviados, respondidos y que requieren intervención) y las respuestas. **Requieren intervención** cuenta solo los check-ins cuya alerta (molestia o cambio de objetivos) sigue abierta: si la alerta de molestia ya se gestionó, ese check-in deja de contar, aunque la alerta de objetivos del mismo check-in siga abierta (ver [Deuda conocida](#deuda-conocida-y-comportamientos-a-tener-presentes)). Si el cliente contó una molestia, la respuesta tiene **Derivar a Rehab**: habilita el seguimiento fisioterapéutico de ese cliente, marca como gestionada la alerta de molestia y le envía un email con el link para reservar su turno de Rehab.
 
 ![Check-in de clientes](img/34-staff-seguimiento-checkin.png)
 
@@ -457,7 +575,7 @@ La configuración tiene cuatro pestañas.
 
 #### Planes
 
-Alta, edición, desactivación y baja de los planes y paquetes de cada servicio (nombre, precio, período o sesiones, destacado).
+Alta, edición, desactivación y baja de los planes y paquetes, agrupados por servicio (Performance, Fisioterapia y Recovery): nombre, precio, período o sesiones y destacado. El identificador (slug) de un plan eliminado se puede reutilizar en un plan nuevo.
 
 ![Configuración: planes](img/35-staff-configuracion-planes.png)
 
@@ -512,6 +630,8 @@ Hoy **nada de esto está en la nube**: todo corre en una computadora, con Postgr
 
 ### Local, paso a paso
 
+Para una prueba rápida con datos de demostración, seguí [Probar MOVE en local](#probar-move-en-local). Esta sección explica cada pieza con más detalle.
+
 Requisitos: Node 24 (`nvm use` lee `.nvmrc`), pnpm 10 (`corepack enable`) y Docker.
 
 1. **Instalar.** Desde la raíz del repo:
@@ -529,7 +649,7 @@ Requisitos: Node 24 (`nvm use` lee `.nvmrc`), pnpm 10 (`corepack enable`) y Dock
      cp apps/web/.env.example apps/web/.env.local
      ```
 
-   - O exportar esas mismas variables en el shell, sin crear archivos (la API, las migraciones, el seed y los scripts del manual leen el entorno del proceso).
+   - O exportar esas mismas variables en el shell, sin crear archivos (la API, las migraciones, el seed y los scripts del manual leen el entorno del proceso): `set -a; . apps/api/.env.example; set +a`. Las variables exportadas tienen prioridad sobre las de un `.env`. Hace falta `NODE_ENV=development`: ya viene en el ejemplo. Cargá el ejemplo **solo en las consolas de la API y de los scripts del manual**, nunca en la de la web: trae `PORT=3001` y la web toma su puerto de `PORT`. En la consola de la web exportá solo `NEXT_PUBLIC_API_URL` (o corré antes `unset PORT`).
 
    La web necesita `NEXT_PUBLIC_API_URL=http://localhost:3001/api` (está en `apps/web/.env.example`). La lista completa de variables está en [Variables por proveedor](#variables-por-proveedor).
 
@@ -537,14 +657,14 @@ Requisitos: Node 24 (`nvm use` lee `.nvmrc`), pnpm 10 (`corepack enable`) y Dock
 
    ```bash
    pnpm db:up                                # Postgres 17 en Docker (contenedor move-postgres, puerto 5432)
-   pnpm --filter @move/api migration:run     # crea el esquema
+   pnpm --filter @move/api migration:run     # crea el esquema; en una base existente aplica las migraciones nuevas
    pnpm --filter @move/api seed              # planes, horarios y configuración provisorios (idempotente)
    ```
 
 4. **Primer usuario de staff.** La contraseña va por variable de entorno, nunca por argumento:
 
    ```bash
-   read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD
+   printf 'Contraseña del staff: '; read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD; echo
    pnpm --filter @move/api user:create-staff -- --email staff@example.com --name "Nombre Apellido"
    unset CREATE_STAFF_PASSWORD
    ```
@@ -565,6 +685,7 @@ Requisitos: Node 24 (`nvm use` lee `.nvmrc`), pnpm 10 (`corepack enable`) y Dock
 
    ```bash
    pnpm dev          # web en :3000 y API en :3001 (o por separado: pnpm dev:api y pnpm dev:web)
+                     # con las variables exportadas en el shell, usá consolas separadas: `pnpm dev` pasaría PORT=3001 también a la web
    curl http://localhost:3001/api/health      # {"status":"ok"}
    ```
 
@@ -666,7 +787,7 @@ Esta parte dice qué falta configurar en cada proveedor que nombra `MOVE.pdf`. L
 
 ### Variables por proveedor
 
-Todas las variables de la API se validan al arrancar (`apps/api/src/config/env.validation.ts`): si falta una obligatoria o tiene un valor inválido, la API no arranca y el log dice cuál. Las de la web se incrustan en el build.
+Todas las variables de la API se validan al arrancar (`apps/api/src/config/env.validation.ts`): si falta una obligatoria o tiene un valor inválido, la API no arranca y el log dice cuál. `PORT` y `DB_PORT` aceptan solo dígitos (1 a 65535), `DB_SSL` y `SCHEDULER_ENABLED` solo `true` o `false` y `TRUST_PROXY_HOPS` un dígito de 0 a 5. Las de la web se incrustan en el build.
 
 | Variable | Proveedor | Dónde se obtiene | Desarrollo | Producción |
 |---|---|---|---|---|
@@ -678,7 +799,7 @@ Todas las variables de la API se validan al arrancar (`apps/api/src/config/env.v
 | `DB_PORT` | Neon | Fijo | `5432` | `5432` |
 | `DB_USER` / `DB_PASSWORD` | Neon | Rol creado en el branch (la contraseña se ve una sola vez) | rol de desarrollo | rol de producción |
 | `DB_NAME` | Neon | Base creada en el branch | `<base de desarrollo>` | `<base de producción>` |
-| `DB_SSL` | Neon | Fijo (Neon exige SSL) | `true` | `true` |
+| `DB_SSL` | Neon | Fijo (Neon exige SSL). Solo `true` o `false` | `true` | `true` |
 | `BETTER_AUTH_SECRET` | — | Generarlo: `openssl rand -base64 48` (32+ caracteres; cambiarlo cierra todas las sesiones) | propio | propio |
 | `COOKIE_DOMAIN` | DNS | Dominio raíz del ambiente, con punto inicial | `.<dominio-dev>` | `.<dominio>` |
 | `TRUST_PROXY_HOPS` | AWS | Fijo para ALB + Nginx | `2` | `2` |
@@ -710,7 +831,7 @@ No van a ningún ambiente en la nube: `E2E_DATABASE_NAME` (solo tests) y `CREATE
    bash scripts/package-api-eb.sh                       # genera artifacts/move-api-<sha>.zip
    unzip artifacts/move-api-<sha>.zip -d /tmp/move-api && cd /tmp/move-api
    export DB_HOST=<host directo> DB_PORT=5432 DB_USER=<rol> DB_NAME=<base> DB_SSL=true
-   read -rs DB_PASSWORD && export DB_PASSWORD
+   printf 'Contraseña de la base: '; read -rs DB_PASSWORD && export DB_PASSWORD; echo
    node_modules/.bin/typeorm migration:run -d dist/database/data-source.js
    node dist/database/seed.js                            # planes, horarios y configuración provisorios (idempotente)
    ```
@@ -721,7 +842,7 @@ No van a ningún ambiente en la nube: `E2E_DATABASE_NAME` (solo tests) y `CREATE
 
 **Errores comunes:**
 
-- **La conexión falla o se corta:** falta `DB_SSL=true` (Neon exige SSL; `DB_SSL=1` **no** lo activa).
+- **La conexión falla o se corta:** falta `DB_SSL=true` (Neon exige SSL). `DB_SSL` solo acepta `true` o `false`: cualquier otro valor (por ejemplo `1`) impide que la API arranque.
 - **Jobs que se pisan o errores raros de locks:** se usó el host `-pooler`. Cambiar al host directo.
 - **`permission denied for schema public` al migrar:** el rol no es dueño de la base. Crear la base con ese rol como dueño.
 - **El branch de desarrollo desapareció:** quedó tildado el borrado automático del paso 3.
@@ -750,6 +871,7 @@ No van a ningún ambiente en la nube: `E2E_DATABASE_NAME` (solo tests) y `CREATE
 
 - **`TRUST_PROXY_HOPS=2`.** La request pasa por el ALB y por el Nginx de la instancia; con `2` la API toma la IP real del cliente para el límite de intentos del checkout. Un solo dígito de 0 a 5; **nunca `true`**: confiaría en todo el header `X-Forwarded-For`, que el cliente puede escribir. Un valor mayor que la cantidad real de proxies tiene el mismo problema; uno menor (o `0`) hace que todos los clientes compartan un contador y el checkout se bloquee para todos. Si cambia la topología (por ejemplo, se agrega CloudFront), ajustar el valor y repetir la prueba de IP del [checklist](#checklist-posterior-al-deploy).
 - **Límite de intentos en memoria.** El checkout acepta 10 intentos por minuto por IP y, al reservar Rehab o Recovery, 20 por hora. Los contadores viven en la memoria de cada instancia: con N instancias el límite real es hasta N veces el configurado. Personas en la misma red (por ejemplo, el wifi del gimnasio) comparten el límite.
+- **Solo JSON.** La API únicamente interpreta bodies JSON: un POST con formulario codificado (`application/x-www-form-urlencoded`) responde 400.
 - **Body de `/api/auth/*`.** La API rechaza con 413 los bodies de más de 64 KB o con `Transfer-Encoding` sin `content-length`. Nginx tiene que reenviar `content-length`: no desactivar `proxy_request_buffering` (está activo por defecto).
 - **Scheduler en una sola instancia.** Los jobs corren dentro de la API. Un lock de Postgres evita que dos instancias corran el mismo job a la vez, pero igual: dejar **una instancia**, o si se escala, `SCHEDULER_ENABLED=true` en una y `false` en las demás (solo esos dos valores).
 
@@ -757,7 +879,7 @@ No van a ningún ambiente en la nube: `E2E_DATABASE_NAME` (solo tests) y `CREATE
 
 **Errores comunes:**
 
-- **El entorno queda en rojo y el log dice qué variable falta o es inválida:** la API valida todo al arrancar. Revisar la tabla de variables (`SCHEDULER_ENABLED` solo `true`/`false`; `TRUST_PROXY_HOPS` un dígito; `PORT` y `DB_PORT` solo dígitos).
+- **El entorno queda en rojo y el log dice qué variable falta o es inválida:** la API valida todo al arrancar. Revisar la tabla de variables (`SCHEDULER_ENABLED` y `DB_SSL` solo `true`/`false`; `TRUST_PROXY_HOPS` un dígito; `PORT` y `DB_PORT` solo dígitos).
 - **502 Bad Gateway de Nginx:** `PORT` no definido o distinto del que espera Nginx; definirlo explícitamente.
 - **Health check en rojo con la API funcionando:** el path quedó en `/` (default); cambiarlo a `/api/health`.
 - **Todos los clientes reciben "Hiciste demasiados intentos":** falta `TRUST_PROXY_HOPS=2`.
@@ -850,7 +972,7 @@ Valores de cada ambiente:
 - **El pago se aprueba pero el plan tarda en activarse (hasta unos 20 minutos):** no llegó ningún aviso y el pago entra por la conciliación, que solo consulta las compras pendientes con más de `reconcileAfterMinutes` (10) y corre cada 10 minutos. En desarrollo es normal: los pagos con credenciales de prueba pueden no generar avisos. En producción, revisar `API_PUBLIC_URL` (con ella se arma la `notification_url` de cada preferencia, que tiene prioridad sobre la URL del panel; tiene que ser pública y HTTPS) y el historial de notificaciones de la aplicación.
 - **"No pudimos iniciar el pago" (502 `PAYMENT_PROVIDER_ERROR`):** token inválido o de otro ambiente, o Mercado Pago rechazó la preferencia. Con credenciales reales, `WEB_URL` y `API_PUBLIC_URL` tienen que ser públicas y HTTPS: en una computadora local se usa el simulador, no credenciales reales.
 - **No aparece el simulador en desarrollo en la nube:** es lo esperado; con `NODE_ENV=production` o con `MP_ACCESS_TOKEN` el simulador no existe.
-- **Comportamiento a conocer:** un pago de plan rechazado deja la compra pendiente para reintentar; la conciliación vuelve a consultar durante 7 días las compras vencidas por si llega un pago tardío; si un pago se aprueba cuando la reserva retenida ya venció y el turno se llenó, la compra queda aprobada y en **Requieren atención** (sin reembolso automático).
+- **Comportamiento a conocer:** un pago de plan rechazado deja la compra pendiente para reintentar; la conciliación vuelve a consultar por si llega un pago tardío las compras de reserva vencidas durante 72 horas y las de plan durante 7 días (no vuelve a consultar las reservas rechazadas); si un pago se aprueba cuando la reserva retenida ya venció y el turno se llenó, la compra queda aprobada y en **Requieren atención** (sin reembolso automático).
 
 ### Google OAuth (inicio de sesión con Google)
 
@@ -901,8 +1023,8 @@ Todos salen después de que se guarda la operación, se registran en `email_logs
 
 | Email | Asunto | Cuándo |
 |---|---|---|
-| `password-reset` | Restablecé tu contraseña de MOVE | El cliente pide restablecer su contraseña (link válido 1 hora) |
-| `account-invitation` | Activá tu cuenta de MOVE | El staff crea un cliente nuevo, o un invitado sin cuenta reserva la evaluación de Rehab o una sesión individual de Recovery (link válido 1 hora) |
+| `password-reset` | Restablecé tu contraseña de MOVE | El cliente pide restablecer su contraseña (link válido **1 hora**) |
+| `account-invitation` | Activá tu cuenta de MOVE | El staff crea un cliente nuevo, o un invitado sin cuenta reserva la evaluación de Rehab o una sesión individual de Recovery. También lo reciben, en lugar del de restablecimiento, las cuentas sin contraseña (invitados y cuentas que solo ingresaron con Google) que piden **¿Olvidaste tu contraseña?** (link válido **72 horas**; si no se puede extender, el email sale igual con un link de 1 hora) |
 | `booking-confirmed` | Tu reserva en MOVE está confirmada | Reserva confirmada, con plan o paquete o al aprobarse su pago |
 | `booking-cancelled` | Tu reserva en MOVE fue cancelada | El staff cancela una reserva |
 | `purchase-approved` | Recibimos tu pago | Se aprueba una compra |
@@ -948,7 +1070,7 @@ Los clientes se registran desde la web; el staff se crea por línea de comandos,
 
 ```bash
 cd /tmp/move-api          # bundle descomprimido: unzip artifacts/move-api-<sha>.zip -d /tmp/move-api
-read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD
+printf 'Contraseña del staff: '; read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD; echo
 # exportar también NODE_ENV, PORT, WEB_URL, API_PUBLIC_URL, DB_*, BETTER_AUTH_SECRET, MP_*, BREVO_* del ambiente
 SCHEDULER_ENABLED=false node dist/cli/create-staff.js --email <email> --name "<Nombre Apellido>"
 unset CREATE_STAFF_PASSWORD
@@ -981,17 +1103,18 @@ El comando arranca la aplicación, por eso necesita las mismas variables que la 
 
 ### Regenerar este manual
 
-Este manual y sus capturas se generan con datos de demostración inventados. Las contraseñas **nunca** van en el manual, en los scripts ni en los logs: se pasan por variables de entorno. Los scripts **no necesitan archivos `.env`**: toman todo del entorno del proceso. `manual:demo-data` usa `DB_NAME` y `DB_USER` del entorno (para la historia por SQL) y solo si faltan los lee de `apps/api/.env`, si ese archivo existe; si no hay ni entorno ni archivo, falla con un mensaje claro.
+Este manual y sus capturas se generan con datos de demostración inventados. Las contraseñas **nunca** van en el manual, en los scripts ni en los logs: se pasan por variables de entorno. Los scripts **no necesitan archivos `.env`**: toman todo del entorno del proceso. `manual:demo-data` usa `DB_NAME`, `DB_USER` y `DB_HOST` del entorno (para la historia por SQL) y solo si faltan los lee de `apps/api/.env`, si ese archivo existe (ignorando los comentarios `# …` en línea); si no hay ni entorno ni archivo, falla con un mensaje claro.
 
 ```bash
-# 1. Base de demostración vacía (migrada y con seed) y un staff creado con user:create-staff (paso 4 de "Local, paso a paso"),
+# 1. Base de demostración vacía (migrada y con seed) y un staff creado con user:create-staff (pasos 4 a 6 de "Probar MOVE en local"),
 #    usando como CREATE_STAFF_PASSWORD la misma contraseña que se va a pasar en MANUAL_STAFF_PASSWORD
-# 2. API y web corriendo, con la web compilada para producción (pnpm --filter @move/web build, con NODE_ENV=production
-#    si el shell tiene otro valor, y pnpm --filter @move/web start). Definir DB_NAME (y DB_USER si no es "move"),
+# 2. API corriendo (pnpm dev:api) y la web compilada para producción: pnpm --filter @move/web build y pnpm --filter @move/web start.
+#    El script de build ya fija NODE_ENV=production: no hace falta exportarlo ni cambiarlo. En la consola de la web no debe haber
+#    un PORT exportado (la web toma su puerto de PORT; el del ejemplo de la API es 3001). Definir DB_NAME (y DB_USER si no es "move"),
 #    API_URL (con /api) y WEB_URL (origen de la web); por defecto apuntan a http://localhost:3001/api y http://localhost:3000
 export DB_NAME=move_demo API_URL=http://localhost:3001/api WEB_URL=http://localhost:3000   # ejemplo
-read -rs MANUAL_STAFF_PASSWORD && export MANUAL_STAFF_PASSWORD
-read -rs MANUAL_CLIENT_PASSWORD && export MANUAL_CLIENT_PASSWORD     # mínimo 8 caracteres
+printf 'Contraseña del staff: '; read -rs MANUAL_STAFF_PASSWORD && export MANUAL_STAFF_PASSWORD; echo
+printf 'Contraseña de los clientes: '; read -rs MANUAL_CLIENT_PASSWORD && export MANUAL_CLIENT_PASSWORD; echo     # mínimo 8 caracteres
 pnpm exec playwright install chromium     # una sola vez
 pnpm manual:demo-data       # carga 10 clientes de ejemplo en distintos estados, reservas, pagos, alertas y check-ins
 pnpm manual:screenshots     # una captura por pantalla en docs/manual/img/ (1440×900)
@@ -1001,9 +1124,11 @@ pnpm manual:pdf             # genera docs/manual/manual-de-usuario.pdf (A4, imá
 ```
 
 - Para cambiar solo el texto o el diagrama no hace falta la base ni la API: alcanza con editar el Markdown (o `arquitectura.html` y correr `render-diagram.mjs`) y correr `pnpm manual:pdf`.
-- `manual:demo-data` falla con un mensaje claro si la base ya tiene datos de demostración. La historia (asistencias pasadas y planes que vencen o vencieron) no se puede crear por la API porque no admite reservar ni marcar asistencia en el pasado: esos datos se insertan con SQL en la base de desarrollo mediante `docker exec <contenedor> psql` (contenedor `move-postgres`, o `MANUAL_DB_CONTAINER`), solo para los clientes de demostración.
+- `manual:demo-data` hace estas comprobaciones **antes de escribir** nada: `API_URL` y `DB_HOST` (si está definido) son locales, Docker y la base responden (`SELECT 1`), y la base no tiene ya datos de demostración. Imprime la base destino (`Base destino: …`) y, si algo no se cumple, termina con un mensaje claro. La historia (asistencias pasadas y planes que vencen o vencieron) no se puede crear por la API porque no admite reservar ni marcar asistencia en el pasado: esos datos se insertan con SQL en la base de desarrollo mediante `docker exec <contenedor> psql` (contenedor `move-postgres`, o `MANUAL_DB_CONTAINER`), solo para los clientes de demostración.
+- `manual:screenshots` captura primero en un directorio temporal y **reemplaza las imágenes de `docs/manual/img/` solo si salieron todas las capturas esperadas (38)**: arma una carpeta nueva al lado y la renombra en el lugar de la actual, así que si algo falla las imágenes actuales quedan intactas y nunca queda un juego a medias. No toca `arquitectura.png`. Al agregar o quitar una pantalla hay que actualizar `EXPECTED_IMAGE_COUNT` en `scripts/manual/capture.mjs`.
+- No corras `pnpm db:up` ni `pnpm db:down` con `DB_NAME=move_demo` exportado: Docker recrearía el contenedor de Postgres con esa base. Crear la base de demostración con `docker exec move-postgres createdb -U move move_demo` alcanza.
 - `manual:screenshots` compra un paquete de Recovery con el cliente de demostración Nicolás Acosta (checkout → simulador → resultado); volver a correrlo agrega otra compra, así que para repetir las capturas conviene recrear la base de demostración. La captura de Recovery (`07`) se toma sin sesión iniciada, como un invitado.
-- Usuarios de la demostración: staff `staff@example.com` (o `MANUAL_STAFF_EMAIL`) con la contraseña de `MANUAL_STAFF_PASSWORD`; clientes `sofia.martinez@example.com`, `martin.rodriguez@example.com`, `lucia.pereira@example.com`, `andres.silva@example.com`, `camila.fernandez@example.com`, `joaquin.techera@example.com`, `valentina.gomez@example.com`, `federico.alvarez@example.com`, `diego.machado@example.com` y `nicolas.acosta@example.com`, todos con la contraseña de `MANUAL_CLIENT_PASSWORD`.
+- Usuarios de la demostración: la tabla de [Probar MOVE en local](#probar-move-en-local). El staff es `staff@example.com` (o `MANUAL_STAFF_EMAIL`) con la contraseña de `MANUAL_STAFF_PASSWORD`; los clientes, con la de `MANUAL_CLIENT_PASSWORD`.
 
 ### Valores provisorios y decisiones abiertas
 

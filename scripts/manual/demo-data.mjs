@@ -12,7 +12,12 @@
 //   MANUAL_DB_CONTAINER     (opcional) contenedor de Postgres, default move-postgres
 //   DB_NAME, DB_USER        base y usuario de Postgres para la historia por SQL. Se toman del entorno del proceso y,
 //                           solo si faltan, de apps/api/.env (si existe). Si no hay ni entorno ni archivo, falla.
+//   DB_HOST                 (opcional) mismo origen que las anteriores; si está definido tiene que ser local
+//                           (localhost, 127.0.0.1 o ::1): el script se niega a cargar datos en una base remota.
+//   API_URL                 tiene que apuntar a un host local (misma regla): el script se niega a registrar cuentas ni
+//                           comprar planes en una API remota.
 //
+// Antes de escribir nada comprueba que Docker y la base responden (`SELECT 1`) e imprime la base destino.
 // Las contraseñas nunca se imprimen. Falla con un mensaje claro si ya hay datos de demostración.
 //
 // Parte de la historia (asistencias pasadas, vigencias que vencen o vencieron) no se puede crear por HTTP porque
@@ -31,6 +36,7 @@ const DB_CONTAINER = process.env.MANUAL_DB_CONTAINER ?? 'move-postgres';
 const BUSINESS_TZ = 'America/Montevideo';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const MS_HOUR = 3_600_000;
+const LOCAL_DB_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
 const CLIENTS = [
   { key: 'sofia', name: 'Sofía Martínez', email: 'sofia.martinez@example.com', phone: '+598 99 000 101' },
@@ -84,12 +90,20 @@ function requireEnv(name) {
   return value;
 }
 
+// Valor de una línea KEY=valor: entre comillas se toma el contenido; sin comillas se descarta el comentario `# …` en línea.
+function parseEnvValue(raw) {
+  const value = raw.trim();
+  const quoted = /^(["'])(.*?)\1/.exec(value);
+  if (quoted) return quoted[2];
+  return value.replace(/(^|\s)#.*$/, '').trim();
+}
+
 function readEnvFile(file) {
   const values = {};
   if (!existsSync(file)) return values;
   for (const line of readFileSync(file, 'utf8').split('\n')) {
     const match = /^([A-Z_]+)=(.*)$/.exec(line.trim());
-    if (match) values[match[1]] = match[2].replace(/^["']|["']$/g, '');
+    if (match) values[match[1]] = parseEnvValue(match[2]);
   }
   return values;
 }
@@ -172,6 +186,39 @@ function createSql(dbName, dbUser) {
     if (result.status !== 0) throw new Error('No se pudo ejecutar SQL de historia (¿está levantado el contenedor de Postgres?).');
     return result.stdout.trim();
   };
+}
+
+// Falla antes de escribir nada si Docker, el contenedor o la base no responden.
+function assertDatabaseReachable(sql, dbName) {
+  try {
+    sql('SELECT 1;');
+  } catch {
+    throw new Error(
+      `No se pudo conectar a la base ${dbName} por Docker (contenedor ${DB_CONTAINER}). Levantá Postgres con pnpm db:up y creá la base antes de cargar los datos.`,
+    );
+  }
+}
+
+// La carga de demostración escribe usuarios y compras: solo se permite contra una base y una API locales.
+const isLocalHost = (host) => LOCAL_DB_HOSTS.has(host.toLowerCase());
+
+function assertLocalDatabaseHost() {
+  const host = databaseSetting('DB_HOST');
+  if (host && !isLocalHost(host)) {
+    throw new Error('DB_HOST no es local: los datos de demostración solo se cargan en una base local.');
+  }
+}
+
+function assertLocalApiUrl() {
+  let host;
+  try {
+    host = new URL(API_URL).hostname;
+  } catch {
+    throw new Error('API_URL no es una URL válida (por ejemplo http://localhost:3001/api).');
+  }
+  if (!isLocalHost(host)) {
+    throw new Error('API_URL no es local: los datos de demostración solo se cargan en una API local.');
+  }
 }
 
 const UUID = /^[0-9a-f-]{36}$/;
@@ -310,7 +357,11 @@ async function main() {
   const dbName = databaseSetting('DB_NAME');
   const dbUser = databaseSetting('DB_USER') ?? 'move';
   if (!dbName) throw new Error('No se sabe qué base usar: definí DB_NAME en el entorno (o creá apps/api/.env con DB_NAME).');
+  assertLocalApiUrl();
+  assertLocalDatabaseHost();
   const sql = createSql(dbName, dbUser);
+  assertDatabaseReachable(sql, dbName);
+  step(`Base destino: ${dbName} (usuario ${dbUser}, contenedor ${DB_CONTAINER}); API: ${API_URL}`);
   const today = businessDate();
 
   step('Ingresando como staff');
