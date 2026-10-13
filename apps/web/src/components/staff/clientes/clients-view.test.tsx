@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api/errors';
@@ -125,6 +125,27 @@ describe('ClientsView search', () => {
     await userEvent.type(searchBox(), 'ana ');
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/staff/clientes?q=ana'), { timeout: 1500 });
     expect(searchBox()).toHaveValue('ana ');
+  });
+
+  it('keeps a keystroke typed while the URL is still catching up with the last search', async () => {
+    mockApi();
+    renderView();
+    await screen.findByRole('row', { name: /Martina Suárez/ });
+    // A real navigation lands later than the debounce timer: hold the URL update until after the next keystroke.
+    let landUrl: () => void = () => undefined;
+    replace.mockImplementationOnce((url: string) => {
+      landUrl = () => {
+        search = url.split('?')[1] ?? '';
+        rerenderView();
+      };
+    });
+    await userEvent.type(searchBox(), 'ana');
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/staff/clientes?q=ana'), { timeout: 1500 });
+    await userEvent.type(searchBox(), 'm');
+    expect(searchBox()).toHaveValue('anam');
+    act(() => landUrl());
+    expect(searchBox()).toHaveValue('anam');
+    await waitFor(() => expect(replace).toHaveBeenLastCalledWith('/staff/clientes?q=anam'), { timeout: 1500 });
   });
 
   it('keeps a filter picked while the debounce is pending', async () => {

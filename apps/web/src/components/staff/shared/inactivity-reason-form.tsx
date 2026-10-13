@@ -15,6 +15,7 @@ import { INACTIVITY_REASON_CODES, INACTIVITY_REASON_LABEL } from './inactivity-r
 
 export const NOTE_MAX_LENGTH = 1000;
 export const NOTE_TOO_LONG = `La nota es demasiado larga (máximo ${NOTE_MAX_LENGTH} caracteres).`;
+export const NOTE_INVALID_CHARS = 'La nota contiene caracteres no permitidos.';
 
 const STALE_PAUSE_CODES: readonly string[] = ['NO_ACTIVE_PAUSE', 'PAUSE_ALREADY_ACTIVE'];
 
@@ -24,30 +25,49 @@ export function isStalePauseError(error: unknown): boolean {
 }
 
 /**
- * Puts the API's field errors in their fields; anything that is not tied to a known field goes to `root`.
+ * Puts the API's field errors in their fields with our own Spanish copy (the API text is English
+ * class-validator output and is never shown); anything not tied to a known field goes to `root`.
  */
-export function applyApiError<T extends FieldValues>(error: unknown, setError: UseFormSetError<T>, fields: readonly Path<T>[]): void {
+export function applyApiError<T extends FieldValues>(
+  error: unknown,
+  setError: UseFormSetError<T>,
+  fieldMessages: Partial<Record<Path<T>, string>>,
+): void {
   const details = error instanceof ApiError ? (error.details ?? []) : [];
   let placed = false;
-  for (const { field, messages } of details) {
-    const name = fields.find((candidate) => candidate === field);
-    const message = messages[0];
-    if (!name || !message) continue;
-    setError(name, { message });
+  for (const { field } of details) {
+    if (!Object.hasOwn(fieldMessages, field)) continue;
+    const message = fieldMessages[field as Path<T>];
+    if (!message) continue;
+    setError(field as Path<T>, { message });
     placed = true;
   }
   if (!placed) setError('root', { message: errorMessage(error) });
 }
 
+const NUL = '\u0000';
+const RECONTACT_MAX = '2099-12-31';
+
 const inactivityReasonSchema = z.object({
   reason: z.custom<InactivityReasonCode>((value) => typeof value === 'string' && Object.hasOwn(INACTIVITY_REASON_LABEL, value), 'Elegí un motivo.'),
-  note: z.string().trim().max(NOTE_MAX_LENGTH, NOTE_TOO_LONG),
-  recontactOn: z.string().refine((value) => value === '' || value >= businessTodayWeb(), 'La fecha de re-contacto no puede ser anterior a hoy.'),
+  note: z
+    .string()
+    .trim()
+    .max(NOTE_MAX_LENGTH, NOTE_TOO_LONG)
+    .refine((value) => !value.includes(NUL), NOTE_INVALID_CHARS),
+  recontactOn: z
+    .string()
+    .refine((value) => value === '' || value >= businessTodayWeb(), 'La fecha de re-contacto no puede ser anterior a hoy.')
+    .refine((value) => value === '' || value <= RECONTACT_MAX, 'La fecha de re-contacto no puede ser posterior a 2099.'),
 });
 
 type InactivityReasonFormValues = z.infer<typeof inactivityReasonSchema>;
 
-const FIELDS: readonly Path<InactivityReasonFormValues>[] = ['reason', 'note', 'recontactOn'];
+const FIELD_MESSAGES: Partial<Record<Path<InactivityReasonFormValues>, string>> = {
+  reason: 'Elegí un motivo válido.',
+  note: 'La nota no es válida.',
+  recontactOn: 'La fecha de re-contacto no es válida.',
+};
 
 export interface InactivityReasonValues {
   reason: InactivityReasonCode;
@@ -77,7 +97,7 @@ export function InactivityReasonForm({ onSubmit, submitLabel = 'Registrar motivo
     try {
       await onSubmit(toPayload(values));
     } catch (error) {
-      applyApiError(error, setError, FIELDS);
+      applyApiError(error, setError, FIELD_MESSAGES);
     }
   }
 

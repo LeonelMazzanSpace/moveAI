@@ -51,6 +51,8 @@ interface SearchBoxProps {
 function SearchBox({ q, onSearch }: SearchBoxProps) {
   const [value, setValue] = useState(q);
   const [syncedQ, setSyncedQ] = useState(q);
+  // Last (trimmed) value sent to the URL: a URL that merely catches up with it must not overwrite newer keystrokes.
+  const [lastSent, setLastSent] = useState(q);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // The timer fires later: it must call the latest onSearch (with the latest filter and page), not the one from the keystroke.
   const latestOnSearch = useRef(onSearch);
@@ -59,16 +61,23 @@ function SearchBox({ q, onSearch }: SearchBoxProps) {
   });
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  // Follow the URL (back/forward, cleared elsewhere) without overwriting what is being typed: the URL carries the trimmed value.
+  // Follow the URL only when it changes from somewhere else (back/forward, cleared elsewhere), not when it echoes what was sent.
   if (q !== syncedQ) {
     setSyncedQ(q);
-    if (value.trim() !== q) setValue(q);
+    if (q !== lastSent) {
+      setLastSent(q);
+      setValue(q);
+    }
   }
 
   function handleChange(next: string) {
     setValue(next);
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => latestOnSearch.current(next.trim()), SEARCH_DEBOUNCE_MS);
+    timer.current = setTimeout(() => {
+      const trimmed = next.trim();
+      setLastSent(trimmed);
+      latestOnSearch.current(trimmed);
+    }, SEARCH_DEBOUNCE_MS);
   }
 
   return (

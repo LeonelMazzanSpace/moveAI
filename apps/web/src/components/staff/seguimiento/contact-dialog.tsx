@@ -1,7 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Controller, useForm, type FieldPath } from 'react-hook-form';
+import { Controller, useForm, type Path } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import type { ContactChannel, ContactOutcome } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
-import { applyApiError, NOTE_MAX_LENGTH, NOTE_TOO_LONG } from '../shared/inactivity-reason-form';
+import { applyApiError, NOTE_INVALID_CHARS, NOTE_MAX_LENGTH, NOTE_TOO_LONG } from '../shared/inactivity-reason-form';
 import { CHANNEL_LABEL, OUTCOME_LABEL } from './alert-labels';
 import { useCreateContact, type ContactValues } from './use-followup';
 
@@ -19,12 +19,20 @@ const OUTCOMES = Object.keys(OUTCOME_LABEL) as ContactOutcome[];
 const contactSchema = z.object({
   channel: z.custom<ContactChannel>((value) => typeof value === 'string' && Object.hasOwn(CHANNEL_LABEL, value), 'Elegí un canal.'),
   outcome: z.custom<ContactOutcome>((value) => typeof value === 'string' && Object.hasOwn(OUTCOME_LABEL, value), 'Elegí un resultado.'),
-  note: z.string().trim().max(NOTE_MAX_LENGTH, NOTE_TOO_LONG),
+  note: z
+    .string()
+    .trim()
+    .max(NOTE_MAX_LENGTH, NOTE_TOO_LONG)
+    .refine((value) => !value.includes('\u0000'), NOTE_INVALID_CHARS),
 });
 
 type ContactFormValues = z.infer<typeof contactSchema>;
 
-const FIELDS: FieldPath<ContactFormValues>[] = ['channel', 'outcome', 'note'];
+const FIELD_MESSAGES: Partial<Record<Path<ContactFormValues>, string>> = {
+  channel: 'Elegí un canal válido.',
+  outcome: 'Elegí un resultado válido.',
+  note: 'La nota no es válida.',
+};
 
 function toPayload({ channel, outcome, note }: ContactFormValues): ContactValues {
   return { channel, outcome, ...(note && { note }) };
@@ -82,7 +90,7 @@ function ContactForm({ target, onClose }: { target: ContactTarget; onClose: () =
       await create.mutateAsync(toPayload(values));
       onClose();
     } catch (error) {
-      applyApiError(error, setError, FIELDS);
+      applyApiError(error, setError, FIELD_MESSAGES);
     }
   }
 

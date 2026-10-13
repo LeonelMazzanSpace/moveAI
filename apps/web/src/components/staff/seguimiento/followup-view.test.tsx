@@ -189,6 +189,46 @@ describe('FollowupView counters', () => {
   });
 });
 
+describe('FollowupView ids in request paths', () => {
+  const ODD_ALERT = alert({ id: 'a/b c?x', type: 'expired', client: { id: 'c/1 ?y', name: 'Federico Álvez', initials: 'FA' } });
+  const alertId = encodeURIComponent('a/b c?x');
+  const clientId = encodeURIComponent('c/1 ?y');
+
+  beforeEach(() => {
+    replace.mockReset();
+    apiFetch.mockReset();
+    toastError.mockReset();
+    search = '';
+    mockApi({ 'GET /staff/alerts': () => Promise.resolve([ODD_ALERT]) });
+  });
+
+  it('encodes the alert id when marking it handled', async () => {
+    renderView();
+    await userEvent.click(await screen.findByRole('button', { name: 'Marcar gestionado' }));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith(`/staff/alerts/${alertId}/handle`, { method: 'POST' }));
+  });
+
+  it('encodes the alert id when recording a contact', async () => {
+    renderView();
+    await userEvent.click(await screen.findByRole('button', { name: 'Contactar' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar contacto' }));
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(`/staff/alerts/${alertId}/contacts`, { method: 'POST', body: { channel: 'whatsapp', outcome: 'reached' } }),
+    );
+  });
+
+  it('encodes the client id when registering an inactivity reason', async () => {
+    renderView();
+    await userEvent.click(await screen.findByRole('button', { name: 'Registrar motivo' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Lesión' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(`/staff/clients/${clientId}/inactivity-reasons`, { method: 'POST', body: { reason: 'injury' } }),
+    );
+  });
+});
+
 describe('FollowupView contact dialog', () => {
   beforeEach(() => {
     replace.mockReset();
@@ -238,15 +278,26 @@ describe('FollowupView contact dialog', () => {
     expect(callsTo('/staff/alerts/a1/contacts', 'POST')).toBe(0);
   });
 
+  it('rejects a note with a NUL character without calling the API', async () => {
+    mockApi();
+    renderView();
+    const dialog = await openDialog();
+    fireEvent.change(within(dialog).getByLabelText('Nota'), { target: { value: 'hola\u0000chau' } });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar contacto' }));
+    expect(await within(dialog).findByText('La nota contiene caracteres no permitidos.')).toBeInTheDocument();
+    expect(callsTo('/staff/alerts/a1/contacts', 'POST')).toBe(0);
+  });
+
   it('shows the API field errors under the note and keeps the dialog open', async () => {
     mockApi({
       'POST /staff/alerts/a1/contacts': () =>
-        Promise.reject(new ApiError(400, 'VALIDATION_FAILED', 'x', [{ field: 'note', messages: ['La nota no es válida.'] }])),
+        Promise.reject(new ApiError(400, 'VALIDATION_FAILED', 'x', [{ field: 'note', messages: ['note must be shorter than or equal to 1000 characters'] }])),
     });
     renderView();
     const dialog = await openDialog();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar contacto' }));
     expect(await within(dialog).findByText('La nota no es válida.')).toBeInTheDocument();
+    expect(screen.queryByText(/must be/)).not.toBeInTheDocument();
     expect(within(dialog).getByLabelText('Nota')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
@@ -325,13 +376,14 @@ describe('FollowupView reason panel', () => {
     mockApi({
       'GET /staff/alerts': () => Promise.resolve([alert({ type: 'expired' })]),
       'POST /staff/clients/c1/inactivity-reasons': () =>
-        Promise.reject(new ApiError(400, 'VALIDATION_FAILED', 'x', [{ field: 'recontactOn', messages: ['La fecha no es válida.'] }])),
+        Promise.reject(new ApiError(400, 'VALIDATION_FAILED', 'x', [{ field: 'recontactOn', messages: ['recontactOn must be today or later'] }])),
     });
     renderView();
     await openPanel();
     await userEvent.click(screen.getByRole('button', { name: 'Lesión' }));
     await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
-    expect(await screen.findByText('La fecha no es válida.')).toBeInTheDocument();
+    expect(await screen.findByText('La fecha de re-contacto no es válida.')).toBeInTheDocument();
+    expect(screen.queryByText(/must be/)).not.toBeInTheDocument();
     expect(screen.getByLabelText('Fecha de re-contacto')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByRole('group', { name: 'Motivo' })).toBeInTheDocument();
   });

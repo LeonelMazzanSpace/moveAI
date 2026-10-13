@@ -89,6 +89,20 @@ describe('NewClientForm', () => {
     expect(apiFetch).toHaveBeenCalledWith('/staff/clients', { method: 'POST', body: { name: 'Ana Pérez', email: 'ana@test.move' } });
   });
 
+  it('sends the name, email and phone trimmed when they are typed with surrounding spaces', async () => {
+    apiFetch.mockResolvedValue({ id: 'c1' });
+    renderForm();
+    fireEvent.change(screen.getByLabelText('Nombre y apellido'), { target: { value: '  Ana Pérez  ' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: '  ana@test.move  ' } });
+    fireEvent.change(screen.getByLabelText('Teléfono (opcional)'), { target: { value: '  099123456  ' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Crear cliente' }));
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith('/staff/clientes/c1'));
+    expect(apiFetch).toHaveBeenCalledWith('/staff/clients', {
+      method: 'POST',
+      body: { name: 'Ana Pérez', email: 'ana@test.move', phone: '099123456' },
+    });
+  });
+
   it('rejects values that are too long without calling the API', async () => {
     renderForm();
     fireEvent.change(screen.getByLabelText('Nombre y apellido'), { target: { value: 'A'.repeat(81) } });

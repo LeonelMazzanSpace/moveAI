@@ -66,22 +66,45 @@ describe('InactivityReasonForm', () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ reason: 'vacation' }));
   });
 
-  it('places API field errors in their fields', async () => {
+  it('places API field errors in their fields with Spanish copy, never the English API text', async () => {
     onSubmit.mockRejectedValue(
       new ApiError(400, 'VALIDATION_FAILED', 'x', [
-        { field: 'reason', messages: ['Motivo inválido.'] },
-        { field: 'note', messages: ['Nota inválida.'] },
-        { field: 'recontactOn', messages: ['Fecha inválida.'] },
+        { field: 'reason', messages: ['reason must be one of the following values: vacation, injury'] },
+        { field: 'note', messages: ['note must not contain \u0000'] },
+        { field: 'recontactOn', messages: ['recontactOn must be today or later'] },
       ]),
     );
     renderForm();
     await userEvent.click(screen.getByRole('button', { name: 'Lesión' }));
     await userEvent.click(screen.getByRole('button', { name: 'Registrar motivo' }));
-    expect(await screen.findByText('Motivo inválido.')).toBeInTheDocument();
-    expect(screen.getByText('Nota inválida.')).toBeInTheDocument();
-    expect(screen.getByText('Fecha inválida.')).toBeInTheDocument();
+    expect(await screen.findByText('Elegí un motivo válido.')).toBeInTheDocument();
+    expect(screen.getByText('La nota no es válida.')).toBeInTheDocument();
+    expect(screen.getByText('La fecha de re-contacto no es válida.')).toBeInTheDocument();
+    expect(screen.queryByText(/must/)).not.toBeInTheDocument();
     expect(screen.getByLabelText('Nota interna (opcional)')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByLabelText('Fecha de re-contacto')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('rejects a re-contact date after 2099 with its own message', async () => {
+    renderForm();
+    await userEvent.click(screen.getByRole('button', { name: 'Lesión' }));
+    fireEvent.change(screen.getByLabelText('Fecha de re-contacto'), { target: { value: '2100-01-01' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar motivo' }));
+    expect(await screen.findByText('La fecha de re-contacto no puede ser posterior a 2099.')).toBeInTheDocument();
+    expect(screen.queryByText('La fecha de re-contacto no puede ser anterior a hoy.')).not.toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Fecha de re-contacto'), { target: { value: '2099-12-31' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar motivo' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ reason: 'injury', recontactOn: '2099-12-31' }));
+  });
+
+  it('rejects a note with a NUL character without calling the API', async () => {
+    renderForm();
+    await userEvent.click(screen.getByRole('button', { name: 'Lesión' }));
+    fireEvent.change(screen.getByLabelText('Nota interna (opcional)'), { target: { value: 'hola\u0000chau' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar motivo' }));
+    expect(await screen.findByText('La nota contiene caracteres no permitidos.')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('shows errors that are not tied to a field as an alert', async () => {
@@ -93,12 +116,12 @@ describe('InactivityReasonForm', () => {
   });
 
   it('ignores field errors for fields the form does not have', async () => {
-    onSubmit.mockRejectedValue(new ApiError(400, 'VALIDATION_FAILED', 'x', [{ field: 'secret', messages: ['no mostrar'] }]));
+    onSubmit.mockRejectedValue(new ApiError(400, 'VALIDATION_FAILED', 'x', [{ field: 'secret', messages: ['secret must not be shown'] }]));
     renderForm();
     await userEvent.click(screen.getByRole('button', { name: 'Lesión' }));
     await userEvent.click(screen.getByRole('button', { name: 'Registrar motivo' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Los datos enviados no son válidos.');
-    expect(screen.queryByText('no mostrar')).not.toBeInTheDocument();
+    expect(screen.queryByText('secret must not be shown')).not.toBeInTheDocument();
   });
 
   it('disables the submit button while the request is pending', async () => {

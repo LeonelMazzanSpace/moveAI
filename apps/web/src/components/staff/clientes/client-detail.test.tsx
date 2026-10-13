@@ -199,6 +199,23 @@ describe('ClientDetail refresh, ids and validation', () => {
     expect(apiFetch).toHaveBeenCalledWith(`/staff/clients/${encoded}/inactivity-reasons/end`, { method: 'POST' });
   });
 
+  it('encodes the client id when registering an inactivity reason', async () => {
+    const id = 'a/b c?x';
+    apiFetch.mockImplementation((_path: string, init?: { method?: string }) =>
+      Promise.resolve(init?.method ? {} : detail({ client: { ...detail().client, id } })),
+    );
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })}>
+        <ClientDetail id={id} />
+      </QueryClientProvider>,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Lesión' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar motivo' }));
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(`/staff/clients/${encodeURIComponent(id)}/inactivity-reasons`, { method: 'POST', body: { reason: 'injury' } }),
+    );
+  });
+
   it('reloads the detail after ending a pause', async () => {
     mockApi(detail({ activePause: PAUSE }), () => ({ ...PAUSE, endedAt: '2026-10-13T15:00:00.000Z' }));
     renderDetail();
@@ -287,7 +304,7 @@ describe('ClientDetail refresh, ids and validation', () => {
     apiFetch.mockImplementation((_path: string, init?: { method?: string }) => {
       if (init?.method) {
         return Promise.reject(
-          new ApiError(400, 'VALIDATION_FAILED', 'x', [{ field: 'recontactOn', messages: ['La fecha ya pasó.', 'otro'] }, { field: 'note', messages: ['Nota inválida.'] }]),
+          new ApiError(400, 'VALIDATION_FAILED', 'x', [{ field: 'recontactOn', messages: ['recontactOn must be today or later', 'recontactOn must be a valid ISO 8601 date string'] }, { field: 'note', messages: ['note must be shorter than or equal to 1000 characters'] }]),
         );
       }
       return Promise.resolve(detail());
@@ -295,10 +312,10 @@ describe('ClientDetail refresh, ids and validation', () => {
     renderDetail();
     await userEvent.click(await screen.findByRole('button', { name: 'Lesión' }));
     await userEvent.click(screen.getByRole('button', { name: 'Registrar motivo' }));
-    const recontact = await screen.findByText('La fecha ya pasó.');
-    expect(recontact).toBeInTheDocument();
+    expect(await screen.findByText('La fecha de re-contacto no es válida.')).toBeInTheDocument();
+    expect(screen.queryByText(/must/)).not.toBeInTheDocument();
     expect(screen.getByLabelText('Fecha de re-contacto')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByText('Nota inválida.')).toBeInTheDocument();
+    expect(screen.getByText('La nota no es válida.')).toBeInTheDocument();
     expect(screen.queryByText('Los datos enviados no son válidos.')).not.toBeInTheDocument();
   });
 
