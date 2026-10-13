@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import type { AuthUser } from '../../../common/auth/auth-user.js';
 import { CurrentUser } from '../../../common/auth/current-user.decorator.js';
 import { Roles } from '../../../common/auth/roles.decorator.js';
@@ -30,6 +30,7 @@ export class StaffCheckinsController {
   }
 
   @Post(':id/refer-rehab')
+  @HttpCode(200)
   referRehab(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string): Promise<CheckinResponseDto> {
     return this.checkins.referRehab(id, user.id);
   }

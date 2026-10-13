@@ -33,6 +33,18 @@ describe('inactivity reasons (e2e)', () => {
   const statusOf = async (alertId: string): Promise<string> =>
     (await ctx.dataSource.query(`SELECT status FROM followup_alerts WHERE id = $1`, [alertId]))[0].status as string;
 
+  async function waitForLockWaiters(expected: number): Promise<void> {
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline) {
+      const [{ waiting }] = await ctx.dataSource.query(
+        `SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+      );
+      if (waiting >= expected) return;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    throw new Error(`expected ${expected} backends waiting on a lock`);
+  }
+
   it('opens a pause and handles the open inactivity, frequency and expiry alerts of the client', async () => {
     const client = await signUpClient(ctx.app);
     const other = await signUpClient(ctx.app);
@@ -73,14 +85,33 @@ describe('inactivity reasons (e2e)', () => {
     expect(rows).toEqual([{ reason: 'vacation', active: false }, { reason: 'moving', active: true }]);
   });
 
+  // Barrier: an open transaction holds the client's active-pause key, so both requests are seen waiting on it before it
+  // rolls back.
   it('answers PAUSE_ALREADY_ACTIVE to one of two concurrent pauses', async () => {
     const client = await signUpClient(ctx.app);
-    const results = await Promise.all([
-      staff.agent.post(startPath(client.userId)).send({ reason: 'injury' }),
-      staff.agent.post(startPath(client.userId)).send({ reason: 'vacation' }),
-    ]);
+    const holder = ctx.dataSource.createQueryRunner();
+    await holder.connect();
+    await holder.startTransaction();
+    let pending: Promise<request.Response[]> | undefined;
+    try {
+      await holder.query(
+        `INSERT INTO inactivity_reasons (user_id, reason, created_by) VALUES ($1, 'moving', $2)`,
+        [client.userId, staff.userId],
+      );
+      pending = Promise.all([
+        staff.agent.post(startPath(client.userId)).send({ reason: 'injury' }),
+        staff.agent.post(startPath(client.userId)).send({ reason: 'vacation' }),
+      ]);
+      await waitForLockWaiters(2);
+    } finally {
+      await holder.rollbackTransaction();
+      await holder.release();
+    }
+    const results = (await pending) ?? [];
     expect(results.map((r) => r.status).sort((a, b) => a - b)).toEqual([201, 409]);
     expect(results.find((r) => r.status === 409)?.body.code).toBe('PAUSE_ALREADY_ACTIVE');
+    const rows = await ctx.dataSource.query(`SELECT reason FROM inactivity_reasons WHERE ended_at IS NULL`);
+    expect(rows).toEqual([{ reason: results.find((r) => r.status === 201)?.body.reason }]);
   });
 
   it('validates the reason, note and recontact date', async () => {
