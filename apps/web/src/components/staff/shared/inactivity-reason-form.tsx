@@ -1,16 +1,73 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Controller, useForm, type FieldValues, type Path, type UseFormSetError } from 'react-hook-form';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { ApiError, errorMessage } from '@/lib/api/errors';
 import type { InactivityReasonCode } from '@/lib/api/types';
 import { businessTodayWeb } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { INACTIVITY_REASON_CODES, INACTIVITY_REASON_LABEL } from './inactivity-reasons';
 
-const NOTE_MAX_LENGTH = 1000;
+export const NOTE_MAX_LENGTH = 1000;
+export const NOTE_TOO_LONG = `La nota es demasiado larga (máximo ${NOTE_MAX_LENGTH} caracteres).`;
+export const NOTE_INVALID_CHARS = 'La nota contiene caracteres no permitidos.';
+
+const STALE_PAUSE_CODES: readonly string[] = ['NO_ACTIVE_PAUSE', 'PAUSE_ALREADY_ACTIVE'];
+
+/** The screen was out of date: the pause was ended or started somewhere else. */
+export function isStalePauseError(error: unknown): boolean {
+  return error instanceof ApiError && STALE_PAUSE_CODES.includes(error.code);
+}
+
+/**
+ * Puts the API's field errors in their fields with our own Spanish copy (the API text is English
+ * class-validator output and is never shown); anything not tied to a known field goes to `root`.
+ */
+export function applyApiError<T extends FieldValues>(
+  error: unknown,
+  setError: UseFormSetError<T>,
+  fieldMessages: Partial<Record<Path<T>, string>>,
+): void {
+  const details = error instanceof ApiError ? (error.details ?? []) : [];
+  let placed = false;
+  for (const { field } of details) {
+    if (!Object.hasOwn(fieldMessages, field)) continue;
+    const message = fieldMessages[field as Path<T>];
+    if (!message) continue;
+    setError(field as Path<T>, { message });
+    placed = true;
+  }
+  if (!placed) setError('root', { message: errorMessage(error) });
+}
+
+const NUL = '\u0000';
+const RECONTACT_MAX = '2099-12-31';
+
+const inactivityReasonSchema = z.object({
+  reason: z.custom<InactivityReasonCode>((value) => typeof value === 'string' && Object.hasOwn(INACTIVITY_REASON_LABEL, value), 'Elegí un motivo.'),
+  note: z
+    .string()
+    .trim()
+    .max(NOTE_MAX_LENGTH, NOTE_TOO_LONG)
+    .refine((value) => !value.includes(NUL), NOTE_INVALID_CHARS),
+  recontactOn: z
+    .string()
+    .refine((value) => value === '' || value >= businessTodayWeb(), 'La fecha de re-contacto no puede ser anterior a hoy.')
+    .refine((value) => value === '' || value <= RECONTACT_MAX, 'La fecha de re-contacto no puede ser posterior a 2099.'),
+});
+
+type InactivityReasonFormValues = z.infer<typeof inactivityReasonSchema>;
+
+const FIELD_MESSAGES: Partial<Record<Path<InactivityReasonFormValues>, string>> = {
+  reason: 'Elegí un motivo válido.',
+  note: 'La nota no es válida.',
+  recontactOn: 'La fecha de re-contacto no es válida.',
+};
 
 export interface InactivityReasonValues {
   reason: InactivityReasonCode;
@@ -18,61 +75,59 @@ export interface InactivityReasonValues {
   recontactOn?: string;
 }
 
+function toPayload({ reason, note, recontactOn }: InactivityReasonFormValues): InactivityReasonValues {
+  return { reason, ...(note && { note }), ...(recontactOn && { recontactOn }) };
+}
+
 interface InactivityReasonFormProps {
-  onSubmit: (values: InactivityReasonValues) => void;
-  submitting: boolean;
+  onSubmit: (values: InactivityReasonValues) => Promise<unknown>;
+  submitLabel?: string;
 }
 
-interface FormErrors {
-  reason?: string;
-  recontactOn?: string;
-}
+export function InactivityReasonForm({ onSubmit, submitLabel = 'Registrar motivo' }: InactivityReasonFormProps) {
+  const {
+    register,
+    control,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<InactivityReasonFormValues>({ resolver: zodResolver(inactivityReasonSchema), defaultValues: { note: '', recontactOn: '' } });
 
-function validate(reason: InactivityReasonCode | null, recontactOn: string): FormErrors {
-  const errors: FormErrors = {};
-  if (!reason) errors.reason = 'Elegí un motivo.';
-  if (recontactOn && recontactOn < businessTodayWeb()) {
-    errors.recontactOn = 'La fecha de re-contacto no puede ser anterior a hoy.';
-  }
-  return errors;
-}
-
-export function InactivityReasonForm({ onSubmit, submitting }: InactivityReasonFormProps) {
-  const [reason, setReason] = useState<InactivityReasonCode | null>(null);
-  const [note, setNote] = useState('');
-  const [recontactOn, setRecontactOn] = useState('');
-  const [errors, setErrors] = useState<FormErrors>({});
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const found = validate(reason, recontactOn);
-    setErrors(found);
-    if (!reason || found.recontactOn) return;
-    const trimmed = note.trim();
-    onSubmit({ reason, ...(trimmed && { note: trimmed }), ...(recontactOn && { recontactOn }) });
+  async function submit(values: InactivityReasonFormValues) {
+    try {
+      await onSubmit(toPayload(values));
+    } catch (error) {
+      applyApiError(error, setError, FIELD_MESSAGES);
+    }
   }
 
   return (
-    <form noValidate onSubmit={handleSubmit} className="space-y-4">
-      <div role="group" aria-label="Motivo" className="flex flex-wrap gap-2">
-        {INACTIVITY_REASON_CODES.map((code) => (
-          <button
-            key={code}
-            type="button"
-            aria-pressed={code === reason}
-            onClick={() => setReason(code)}
-            className={cn(
-              'rounded px-3 py-1.5 text-[11px] font-semibold',
-              code === reason ? 'bg-primary text-primary-foreground' : 'border border-border hover:bg-soft',
-            )}
-          >
-            {INACTIVITY_REASON_LABEL[code]}
-          </button>
-        ))}
-      </div>
+    <form noValidate onSubmit={handleSubmit(submit)} className="space-y-4">
+      <Controller
+        control={control}
+        name="reason"
+        render={({ field }) => (
+          <div role="group" aria-label="Motivo" className="flex flex-wrap gap-2">
+            {INACTIVITY_REASON_CODES.map((code) => (
+              <button
+                key={code}
+                type="button"
+                aria-pressed={code === field.value}
+                onClick={() => field.onChange(code)}
+                className={cn(
+                  'rounded px-3 py-1.5 text-[11px] font-semibold',
+                  code === field.value ? 'bg-primary text-primary-foreground' : 'border border-border hover:bg-soft',
+                )}
+              >
+                {INACTIVITY_REASON_LABEL[code]}
+              </button>
+            ))}
+          </div>
+        )}
+      />
       {errors.reason ? (
         <p role="alert" className="text-xs text-danger">
-          {errors.reason}
+          {errors.reason.message}
         </p>
       ) : null}
       <div className="space-y-1.5">
@@ -83,9 +138,10 @@ export function InactivityReasonForm({ onSubmit, submitting }: InactivityReasonF
           id="inactivity-note"
           rows={3}
           maxLength={NOTE_MAX_LENGTH}
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
+          aria-invalid={errors.note ? true : undefined}
+          {...register('note')}
         />
+        {errors.note ? <p className="text-xs text-danger">{errors.note.message}</p> : null}
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="inactivity-recontact" className="text-xs text-muted-foreground">
@@ -94,19 +150,19 @@ export function InactivityReasonForm({ onSubmit, submitting }: InactivityReasonF
         <Input
           id="inactivity-recontact"
           type="date"
-          value={recontactOn}
           aria-invalid={errors.recontactOn ? true : undefined}
           className="w-44"
-          onChange={(event) => setRecontactOn(event.target.value)}
+          {...register('recontactOn')}
         />
-        {errors.recontactOn ? (
-          <p role="alert" className="text-xs text-danger">
-            {errors.recontactOn}
-          </p>
-        ) : null}
+        {errors.recontactOn ? <p className="text-xs text-danger">{errors.recontactOn.message}</p> : null}
       </div>
-      <Button type="submit" disabled={submitting}>
-        Registrar motivo
+      {errors.root ? (
+        <p role="alert" className="text-sm text-danger">
+          {errors.root.message}
+        </p>
+      ) : null}
+      <Button type="submit" disabled={isSubmitting}>
+        {submitLabel}
       </Button>
     </form>
   );

@@ -165,3 +165,168 @@ describe('ClientDetail', () => {
     expect(screen.getByRole('switch', { name: 'Seguimiento fisioterapéutico habilitado' })).toHaveAttribute('aria-checked', 'false');
   });
 });
+
+const detailGets = (id = 'c1') => apiFetch.mock.calls.filter(([path, init]) => path === `/staff/clients/${id}` && !init?.method).length;
+
+describe('ClientDetail refresh, ids and validation', () => {
+  beforeEach(() => {
+    apiFetch.mockReset();
+    toastSuccess.mockReset();
+    toastError.mockReset();
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-13T15:00:00.000Z') });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('encodes the client id in every request path', async () => {
+    const id = 'a/b c?x';
+    const encoded = encodeURIComponent(id);
+    const withPause = detail({ activePause: PAUSE, client: { ...detail().client, id } });
+    apiFetch.mockImplementation((path: string, init?: { method?: string }) => {
+      if (!init?.method) return Promise.resolve(withPause);
+      return Promise.resolve({});
+    });
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })}>
+        <ClientDetail id={id} />
+      </QueryClientProvider>,
+    );
+    await userEvent.click(await screen.findByRole('switch', { name: 'Seguimiento fisioterapéutico habilitado' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Finalizar pausa' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Sí, finalizar' }));
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Pausa finalizada'));
+    expect(apiFetch).toHaveBeenCalledWith(`/staff/clients/${encoded}`);
+    expect(apiFetch).toHaveBeenCalledWith(`/staff/clients/${encoded}/rehab-followup`, { method: 'PATCH', body: { enabled: true } });
+    expect(apiFetch).toHaveBeenCalledWith(`/staff/clients/${encoded}/inactivity-reasons/end`, { method: 'POST' });
+  });
+
+  it('encodes the client id when registering an inactivity reason', async () => {
+    const id = 'a/b c?x';
+    apiFetch.mockImplementation((_path: string, init?: { method?: string }) =>
+      Promise.resolve(init?.method ? {} : detail({ client: { ...detail().client, id } })),
+    );
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })}>
+        <ClientDetail id={id} />
+      </QueryClientProvider>,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Lesión' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar motivo' }));
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(`/staff/clients/${encodeURIComponent(id)}/inactivity-reasons`, { method: 'POST', body: { reason: 'injury' } }),
+    );
+  });
+
+  it('reloads the detail after ending a pause', async () => {
+    mockApi(detail({ activePause: PAUSE }), () => ({ ...PAUSE, endedAt: '2026-10-13T15:00:00.000Z' }));
+    renderDetail();
+    await userEvent.click(await screen.findByRole('button', { name: 'Finalizar pausa' }));
+    expect(detailGets()).toBe(1);
+    await userEvent.click(await screen.findByRole('button', { name: 'Sí, finalizar' }));
+    await waitFor(() => expect(detailGets()).toBe(2));
+  });
+
+  it('reloads the detail after registering a reason', async () => {
+    mockApi(detail(), () => ({ ...PAUSE, reason: 'vacation' }));
+    renderDetail();
+    await userEvent.click(await screen.findByRole('button', { name: 'Vacaciones' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar motivo' }));
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Motivo registrado'));
+    expect(detailGets()).toBe(2);
+  });
+
+  it('reloads the detail after toggling the follow-up', async () => {
+    mockApi(detail(), () => detail().client);
+    renderDetail();
+    await userEvent.click(await screen.findByRole('switch', { name: 'Seguimiento fisioterapéutico habilitado' }));
+    await waitFor(() => expect(detailGets()).toBe(2));
+  });
+
+  it('reloads a stale screen when the pause was already ended elsewhere (NO_ACTIVE_PAUSE)', async () => {
+    let gets = 0;
+    apiFetch.mockImplementation((_path: string, init?: { method?: string }) => {
+      if (init?.method) return Promise.reject(new ApiError(409, 'NO_ACTIVE_PAUSE', 'x'));
+      gets += 1;
+      return Promise.resolve(detail({ activePause: gets === 1 ? PAUSE : null }));
+    });
+    renderDetail();
+    await userEvent.click(await screen.findByRole('button', { name: 'Finalizar pausa' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Sí, finalizar' }));
+    await waitFor(() => expect(detailGets()).toBe(2));
+    expect(await screen.findByRole('button', { name: 'Registrar motivo' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Finalizar pausa' })).not.toBeInTheDocument();
+  });
+
+  it('reloads a stale screen when a pause already exists (PAUSE_ALREADY_ACTIVE)', async () => {
+    let gets = 0;
+    apiFetch.mockImplementation((_path: string, init?: { method?: string }) => {
+      if (init?.method) return Promise.reject(new ApiError(409, 'PAUSE_ALREADY_ACTIVE', 'x'));
+      gets += 1;
+      return Promise.resolve(detail({ activePause: gets === 1 ? null : PAUSE }));
+    });
+    renderDetail();
+    await userEvent.click(await screen.findByRole('button', { name: 'Lesión' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar motivo' }));
+    await waitFor(() => expect(detailGets()).toBe(2));
+    expect(await screen.findByRole('button', { name: 'Finalizar pausa' })).toBeInTheDocument();
+  });
+
+  it('does not reload the detail for other errors', async () => {
+    apiFetch.mockImplementation((_path: string, init?: { method?: string }) => {
+      if (init?.method) return Promise.reject(new ApiError(500, 'INTERNAL_ERROR', 'x'));
+      return Promise.resolve(detail({ activePause: PAUSE }));
+    });
+    renderDetail();
+    await userEvent.click(await screen.findByRole('button', { name: 'Finalizar pausa' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Sí, finalizar' }));
+    expect(await screen.findByText('Ocurrió un error inesperado.')).toBeInTheDocument();
+    expect(detailGets()).toBe(1);
+  });
+
+  it('rejects a note over 1000 characters and trims a padded one', async () => {
+    mockApi(detail(), () => ({ ...PAUSE }));
+    renderDetail();
+    await userEvent.click(await screen.findByRole('button', { name: 'Lesión' }));
+    fireEvent.change(screen.getByLabelText('Nota interna (opcional)'), { target: { value: 'x'.repeat(1001) } });
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar motivo' }));
+    expect(await screen.findByText('La nota es demasiado larga (máximo 1000 caracteres).')).toBeInTheDocument();
+    expect(apiFetch).toHaveBeenCalledTimes(1);
+    fireEvent.change(screen.getByLabelText('Nota interna (opcional)'), { target: { value: '   Se fue de viaje   ' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar motivo' }));
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith('/staff/clients/c1/inactivity-reasons', {
+        method: 'POST',
+        body: { reason: 'injury', note: 'Se fue de viaje' },
+      }),
+    );
+  });
+
+  it('shows the API field errors under their fields', async () => {
+    apiFetch.mockImplementation((_path: string, init?: { method?: string }) => {
+      if (init?.method) {
+        return Promise.reject(
+          new ApiError(400, 'VALIDATION_FAILED', 'x', [{ field: 'recontactOn', messages: ['recontactOn must be today or later', 'recontactOn must be a valid ISO 8601 date string'] }, { field: 'note', messages: ['note must be shorter than or equal to 1000 characters'] }]),
+        );
+      }
+      return Promise.resolve(detail());
+    });
+    renderDetail();
+    await userEvent.click(await screen.findByRole('button', { name: 'Lesión' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar motivo' }));
+    expect(await screen.findByText('La fecha de re-contacto no es válida.')).toBeInTheDocument();
+    expect(screen.queryByText(/must/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Fecha de re-contacto')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('La nota no es válida.')).toBeInTheDocument();
+    expect(screen.queryByText('Los datos enviados no son válidos.')).not.toBeInTheDocument();
+  });
+
+  it('shows an API error without field details above the form', async () => {
+    apiFetch.mockImplementation((_path: string, init?: { method?: string }) => {
+      if (init?.method) return Promise.reject(new ApiError(404, 'CLIENT_NOT_FOUND', 'x'));
+      return Promise.resolve(detail());
+    });
+    renderDetail();
+    await userEvent.click(await screen.findByRole('button', { name: 'Lesión' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar motivo' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('El cliente no existe.');
+  });
+});

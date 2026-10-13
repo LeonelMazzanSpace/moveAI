@@ -21,6 +21,7 @@ import { parseStatusFilter, StatusFilter, type ClientStatusFilter } from './stat
 const PATH = '/staff/clientes';
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
+const MAX_PAGE = 10_000;
 
 interface UrlState {
   q: string;
@@ -30,7 +31,7 @@ interface UrlState {
 
 function parsePage(value: string | null): number {
   const page = Number(value);
-  return Number.isInteger(page) && page >= 1 ? page : 1;
+  return Number.isInteger(page) && page >= 1 ? Math.min(page, MAX_PAGE) : 1;
 }
 
 function toUrl({ q, status, page }: UrlState): string {
@@ -43,23 +44,44 @@ function toUrl({ q, status, page }: UrlState): string {
 }
 
 interface SearchBoxProps {
-  initialValue: string;
+  q: string;
   onSearch: (q: string) => void;
 }
 
-function SearchBox({ initialValue, onSearch }: SearchBoxProps) {
-  const [value, setValue] = useState(initialValue);
+function SearchBox({ q, onSearch }: SearchBoxProps) {
+  const [value, setValue] = useState(q);
+  const [syncedQ, setSyncedQ] = useState(q);
+  // Last (trimmed) value sent to the URL: a URL that merely catches up with it must not overwrite newer keystrokes.
+  const [lastSent, setLastSent] = useState(q);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // The timer fires later: it must call the latest onSearch (with the latest filter and page), not the one from the keystroke.
+  const latestOnSearch = useRef(onSearch);
+  useEffect(() => {
+    latestOnSearch.current = onSearch;
+  });
   useEffect(() => () => clearTimeout(timer.current), []);
+
+  // Follow the URL only when it changes from somewhere else (back/forward, cleared elsewhere), not when it echoes what was sent.
+  if (q !== syncedQ) {
+    setSyncedQ(q);
+    if (q !== lastSent) {
+      setLastSent(q);
+      setValue(q);
+    }
+  }
 
   function handleChange(next: string) {
     setValue(next);
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => onSearch(next.trim()), SEARCH_DEBOUNCE_MS);
+    timer.current = setTimeout(() => {
+      const trimmed = next.trim();
+      setLastSent(trimmed);
+      latestOnSearch.current(trimmed);
+    }, SEARCH_DEBOUNCE_MS);
   }
 
   return (
-    <div className="relative w-72">
+    <div className="relative w-full min-w-0 flex-1 sm:w-72 sm:flex-none">
       <SearchIcon aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
       <Input
         type="search"
@@ -119,13 +141,14 @@ function ClientList({ state, onPageChange }: { state: UrlState; onPageChange: (p
 
   if (clients.isError) return <ErrorState error={clients.error} onRetry={() => void clients.refetch()} />;
   if (clients.isPending) return <Skeleton className="h-64" />;
-  if (clients.data.items.length === 0) {
-    return <EmptyState title="Sin clientes" description="No hay clientes que coincidan con la búsqueda o el filtro." />;
-  }
+  const { items, total } = clients.data;
+  const empty = <EmptyState title="Sin clientes" description="No hay clientes que coincidan con la búsqueda o el filtro." />;
+  // A page past the end is empty but must keep the pagination, or staff cannot go back.
+  if (items.length === 0 && state.page <= 1) return empty;
   return (
-    <div className="overflow-hidden rounded border border-border bg-card">
-      <ClientsTable rows={clients.data.items} />
-      <Pagination shown={clients.data.items.length} total={clients.data.total} page={state.page} onPageChange={onPageChange} />
+    <div className="min-w-0 max-w-full overflow-hidden rounded border border-border bg-card">
+      {items.length > 0 ? <ClientsTable rows={items} /> : empty}
+      <Pagination shown={items.length} total={total} page={state.page} onPageChange={onPageChange} />
     </div>
   );
 }
@@ -146,8 +169,8 @@ export function ClientsView() {
         title="Clientes"
         actions={
           <>
-            <SearchBox initialValue={state.q} onSearch={(q) => navigate({ ...state, q, page: 1 })} />
-            <Link href="/staff/clientes/nuevo" className={cn(buttonVariants(), 'h-auto px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em]')}>
+            <SearchBox q={state.q} onSearch={(q) => navigate({ ...state, q, page: 1 })} />
+            <Link href="/staff/clientes/nuevo" className={cn(buttonVariants(), 'h-auto shrink-0 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em]')}>
               Nuevo cliente
             </Link>
           </>

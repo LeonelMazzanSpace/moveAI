@@ -9,7 +9,7 @@ import { apiFetch } from '@/lib/api/client';
 import { errorMessage } from '@/lib/api/errors';
 import type { InactivityReasonDto } from '@/lib/api/types';
 import { formatDate } from '@/lib/format';
-import { InactivityReasonForm, type InactivityReasonValues } from '../shared/inactivity-reason-form';
+import { InactivityReasonForm, isStalePauseError, type InactivityReasonValues } from '../shared/inactivity-reason-form';
 import { INACTIVITY_REASON_LABEL } from '../shared/inactivity-reasons';
 
 export function useRefreshClients() {
@@ -26,11 +26,14 @@ function ActivePause({ clientId, pause }: { clientId: string; pause: InactivityR
   const refresh = useRefreshClients();
   const [confirming, setConfirming] = useState(false);
   const end = useMutation({
-    mutationFn: () => apiFetch<InactivityReasonDto>(`/staff/clients/${clientId}/inactivity-reasons/end`, { method: 'POST' }),
+    mutationFn: () => apiFetch<InactivityReasonDto>(`/staff/clients/${encodeURIComponent(clientId)}/inactivity-reasons/end`, { method: 'POST' }),
     onSuccess: async () => {
       await refresh();
       toast.success('Pausa finalizada');
       setConfirming(false);
+    },
+    onError: (error) => {
+      if (isStalePauseError(error)) void refresh();
     },
   });
 
@@ -76,10 +79,13 @@ function NewReason({ clientId }: { clientId: string }) {
   const refresh = useRefreshClients();
   const start = useMutation({
     mutationFn: (values: InactivityReasonValues) =>
-      apiFetch<InactivityReasonDto>(`/staff/clients/${clientId}/inactivity-reasons`, { method: 'POST', body: values }),
+      apiFetch<InactivityReasonDto>(`/staff/clients/${encodeURIComponent(clientId)}/inactivity-reasons`, { method: 'POST', body: values }),
     onSuccess: async () => {
       await refresh();
       toast.success('Motivo registrado');
+    },
+    onError: (error) => {
+      if (isStalePauseError(error)) void refresh();
     },
   });
 
@@ -88,12 +94,7 @@ function NewReason({ clientId }: { clientId: string }) {
       <p className="text-xs text-muted-foreground">
         Registrar un motivo pausa al cliente: no recibe alertas ni emails automáticos hasta que finalice la pausa.
       </p>
-      <InactivityReasonForm submitting={start.isPending} onSubmit={(values) => start.mutate(values)} />
-      {start.error ? (
-        <p role="alert" className="text-sm text-danger">
-          {errorMessage(start.error)}
-        </p>
-      ) : null}
+      <InactivityReasonForm onSubmit={(values) => start.mutateAsync(values)} />
     </div>
   );
 }

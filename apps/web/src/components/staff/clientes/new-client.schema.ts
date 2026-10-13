@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
+const EMAIL_MAX_LENGTH = 254;
+
 export const newClientSchema = z.object({
   name: z.string().trim().min(2, 'Ingresá el nombre (mínimo 2 caracteres).').max(80, 'El nombre es demasiado largo.'),
-  email: z.email('Ingresá un email válido.'),
+  email: z.string().trim().pipe(z.email('Ingresá un email válido.').max(EMAIL_MAX_LENGTH, 'El email es demasiado largo.')),
   phone: z
     .string()
     .trim()
