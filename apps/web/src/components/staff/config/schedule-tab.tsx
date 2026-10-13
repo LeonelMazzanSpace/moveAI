@@ -1,11 +1,12 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/move/empty-state';
 import { ErrorState } from '@/components/move/error-state';
 import { StatusBadge } from '@/components/move/status-badge';
+import { BUTTON_OUTLINE, BUTTON_PRIMARY } from '@/components/staff/form-primitives';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -13,7 +14,6 @@ import { apiFetch } from '@/lib/api/client';
 import { errorMessage } from '@/lib/api/errors';
 import type { ProfessionalDto, ScheduleTemplateDto, StaffTimeSlotDto } from '@/lib/api/types';
 import { SERVICE_LABEL } from '@/lib/format';
-import { BUTTON_OUTLINE, BUTTON_PRIMARY } from './plan-form';
 import { SERVICES } from './plan-form.schema';
 import { TemplateForm, WEEKDAY_SHORT, type SlotBody, type TemplateBody } from './template-form';
 
@@ -27,7 +27,7 @@ function sortTemplates(templates: ScheduleTemplateDto[]): ScheduleTemplateDto[] 
 }
 
 function createdMessage(created: number): string {
-  return created === 1 ? 'Se creó 1 turno' : `Se crearon ${created} turnos`;
+  return created === 1 ? 'Se creó 1 turno.' : `Se crearon ${created} turnos.`;
 }
 
 export function ScheduleTab() {
@@ -124,34 +124,32 @@ export function ScheduleTab() {
                 </TableHeader>
                 <TableBody>
                   {rows.map((template, index) => (
-                    <Fragment key={template.id}>
-                      <TableRow>
-                        <TableCell className="font-medium">
-                          {index === 0 || rows[index - 1].weekday !== template.weekday ? WEEKDAY_SHORT[template.weekday - 1] : ''}
-                        </TableCell>
-                        <TableCell>{template.startTime}</TableCell>
-                        <TableCell>{template.durationMinutes} min</TableCell>
-                        <TableCell>{template.capacity}</TableCell>
-                        <TableCell>{template.professionalName ?? '—'}</TableCell>
-                        <TableCell>
-                          <StatusBadge tone={template.active ? 'success' : 'neutral'}>
-                            {template.active ? 'Activo' : 'Inactivo'}
-                          </StatusBadge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end">
-                            <button
-                              type="button"
-                              className={BUTTON_OUTLINE}
-                              disabled={toggleTemplate.isPending}
-                              onClick={() => toggleTemplate.mutate(template)}
-                            >
-                              {template.active ? 'Desactivar' : 'Activar'}
-                            </button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    </Fragment>
+                    <TableRow key={template.id}>
+                      <TableCell className="font-medium">
+                        {index === 0 || rows[index - 1].weekday !== template.weekday ? WEEKDAY_SHORT[template.weekday - 1] : ''}
+                      </TableCell>
+                      <TableCell>{template.startTime}</TableCell>
+                      <TableCell>{template.durationMinutes} min</TableCell>
+                      <TableCell>{template.capacity}</TableCell>
+                      <TableCell>{template.professionalName ?? '—'}</TableCell>
+                      <TableCell>
+                        <StatusBadge tone={template.active ? 'success' : 'neutral'}>
+                          {template.active ? 'Activo' : 'Inactivo'}
+                        </StatusBadge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            className={BUTTON_OUTLINE}
+                            disabled={toggleTemplate.isPending}
+                            onClick={() => toggleTemplate.mutate(template)}
+                          >
+                            {template.active ? 'Desactivar' : 'Activar'}
+                          </button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   ))}
                 </TableBody>
               </Table>
@@ -170,7 +168,7 @@ export function ScheduleTab() {
             mode="template"
             professionals={activeProfessionals}
             submitting={createTemplate.isPending}
-            onSubmit={(body) => createTemplate.mutate(body)}
+            onSubmit={(body) => createTemplate.mutateAsync(body)}
             onCancel={closeDialog}
           />
         </DialogContent>
@@ -186,7 +184,7 @@ export function ScheduleTab() {
             mode="slot"
             professionals={activeProfessionals}
             submitting={createSlot.isPending}
-            onSubmit={(body) => createSlot.mutate(body)}
+            onSubmit={(body) => createSlot.mutateAsync(body)}
             onCancel={closeDialog}
           />
         </DialogContent>

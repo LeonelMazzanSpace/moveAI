@@ -15,6 +15,7 @@ interface RosterPagination {
 interface RosterTableProps {
   rows: RosterItemDto[];
   canMark: boolean;
+  markHint?: string;
   onMark: (bookingId: string, status: AttendanceStatus) => void;
   onCancel?: (bookingId: string) => void;
   pagination?: RosterPagination;
@@ -40,19 +41,20 @@ function rowState(row: RosterItemDto): RowState {
 
 const isInactive = (row: RosterItemDto): boolean => row.status === 'cancelled' || row.status === 'expired';
 
-function cancelledLabel(row: RosterItemDto): string | null {
+function inactiveLabel(row: RosterItemDto): string | null {
   if (!row.cancelledAt) return null;
-  return `Canceló ${formatDayMonth(row.cancelledAt)} — ${formatTime(row.cancelledAt)}`;
+  const verb = row.status === 'expired' ? 'Expiró' : 'Canceló';
+  return `${verb} ${formatDayMonth(row.cancelledAt)} — ${formatTime(row.cancelledAt)}`;
 }
 
-function RowActions({ row, canMark, onMark, onCancel }: Pick<RosterTableProps, 'canMark' | 'onMark' | 'onCancel'> & { row: RosterItemDto }) {
+function RowActions({ row, canMark, markHint, onMark, onCancel }: Pick<RosterTableProps, 'canMark' | 'markHint' | 'onMark' | 'onCancel'> & { row: RosterItemDto }) {
   if (isInactive(row)) {
-    return <span className="text-xs text-muted-foreground">{cancelledLabel(row)}</span>;
+    return <span className="text-xs text-muted-foreground">{inactiveLabel(row)}</span>;
   }
   return (
     <div className="flex items-center justify-end gap-2">
       {row.status === 'confirmed' ? (
-        <AttendanceButtons value={row.attendance} canMark={canMark} onMark={(status) => onMark(row.bookingId, status)} />
+        <AttendanceButtons value={row.attendance} canMark={canMark} hint={markHint} onMark={(status) => onMark(row.bookingId, status)} />
       ) : null}
       {onCancel ? (
         <button
@@ -88,7 +90,7 @@ function Pagination({ total, page, pageSize, onPageChange, shown }: RosterPagina
   );
 }
 
-export function RosterTable({ rows, canMark, onMark, onCancel, pagination }: RosterTableProps) {
+export function RosterTable({ rows, canMark, markHint, onMark, onCancel, pagination }: RosterTableProps) {
   return (
     <>
       <Table>
@@ -115,7 +117,7 @@ export function RosterTable({ rows, canMark, onMark, onCancel, pagination }: Ros
                   <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
                 </TableCell>
                 <TableCell className="px-6 py-3.5 text-right">
-                  <RowActions row={row} canMark={canMark} onMark={onMark} onCancel={onCancel} />
+                  <RowActions row={row} canMark={canMark} markHint={markHint} onMark={onMark} onCancel={onCancel} />
                 </TableCell>
               </TableRow>
             );

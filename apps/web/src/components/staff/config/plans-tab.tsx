@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { EmptyState } from '@/components/move/empty-state';
 import { ErrorState } from '@/components/move/error-state';
 import { StatusBadge } from '@/components/move/status-badge';
+import { BUTTON_DANGER, BUTTON_OUTLINE, BUTTON_PRIMARY } from '@/components/staff/form-primitives';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -13,7 +14,7 @@ import { apiFetch } from '@/lib/api/client';
 import { errorMessage } from '@/lib/api/errors';
 import type { PlanDto, Service } from '@/lib/api/types';
 import { formatUYU, SERVICE_LABEL } from '@/lib/format';
-import { BUTTON_DANGER, BUTTON_OUTLINE, BUTTON_PRIMARY, PlanForm } from './plan-form';
+import { PlanForm } from './plan-form';
 import { KIND_LABEL, SERVICES, type PlanFormPayload } from './plan-form.schema';
 
 const PLANS_KEY = ['staff', 'plans'] as const;
@@ -179,14 +180,14 @@ export function PlansTab() {
             <DialogDescription>Los cambios se reflejan de inmediato en el sitio público.</DialogDescription>
           </DialogHeader>
           {dialog?.type === 'create' ? (
-            <PlanForm mode="create" submitting={create.isPending} onSubmit={(payload) => create.mutate(payload)} onCancel={closeDialog} />
+            <PlanForm mode="create" submitting={create.isPending} onSubmit={(payload) => create.mutateAsync(payload)} onCancel={closeDialog} />
           ) : null}
           {dialog?.type === 'edit' ? (
             <PlanForm
               mode="edit"
               plan={dialog.plan}
               submitting={update.isPending}
-              onSubmit={(payload) => update.mutate({ id: dialog.plan.id, body: updateBody(payload) })}
+              onSubmit={(payload) => update.mutateAsync({ id: dialog.plan.id, body: updateBody(payload) })}
               onCancel={closeDialog}
             />
           ) : null}

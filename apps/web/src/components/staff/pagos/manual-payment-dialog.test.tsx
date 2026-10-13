@@ -1,11 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api/errors';
+import { EMPTY_MANUAL_PAYMENT, manualPaymentSchema } from './manual-payment.schema';
 
 const apiFetch = vi.fn();
 vi.mock('@/lib/api/client', () => ({ apiFetch }));
+const toastSuccess = vi.fn();
+vi.mock('sonner', () => ({ toast: { success: toastSuccess, error: vi.fn() } }));
 const { ManualPaymentDialog } = await import('./manual-payment-dialog');
 
 const trimestral = { id: 'p3', service: 'performance', kind: 'period_plan', slug: 'performance-trimestral', name: 'Plan Trimestral', price: 10500, active: true };
@@ -132,6 +135,75 @@ describe('ManualPaymentDialog', () => {
     await submit();
     expect(await screen.findByText('Usá hasta 2 decimales.')).toBeInTheDocument();
     expect(postCalls()).toHaveLength(0);
+  });
+
+  it.each(['10.5', '10.50', '0.01', '0'])('accepts the amount %s', async (value) => {
+    renderDialog();
+    await pickClientAndPlan();
+    await typeAmount(value);
+    await submit();
+    await waitFor(() => expect(postCalls()).toHaveLength(1));
+    expect(postCalls()[0]?.[1]).toMatchObject({ body: { amount: Number(value) } });
+  });
+
+  it.each(['1e3', '1E3', '5e-1', '.5'])('rejects the amount %s as not being a plain decimal number', async (value) => {
+    renderDialog();
+    await pickClientAndPlan();
+    fireEvent.change(screen.getByLabelText('Monto (UYU)'), { target: { value } });
+    await submit();
+    expect(await screen.findByText('Ingresá un monto válido.')).toBeInTheDocument();
+    expect(postCalls()).toHaveLength(0);
+  });
+
+  it.each(['1e3', '0x10', '1_000', '+5', '1e400', '5.', '1,5', '.5', ' '])('the schema rejects %j', (amount) => {
+    const result = manualPaymentSchema.safeParse({ ...EMPTY_MANUAL_PAYMENT, clientId: 'c1', planId: 'p3', amount });
+    expect(result.success).toBe(false);
+  });
+
+  it.each(['10.505', '0.001', '99.999'])('rejects the amount %s for having more than two decimals', async (value) => {
+    renderDialog();
+    await pickClientAndPlan();
+    await typeAmount(value);
+    await submit();
+    expect(await screen.findByText('Usá hasta 2 decimales.')).toBeInTheDocument();
+    expect(postCalls()).toHaveLength(0);
+  });
+
+  it('confirms the payment with a toast that ends in a period', async () => {
+    renderDialog();
+    await pickClientAndPlan();
+    await submit();
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Pago registrado.'));
+  });
+
+  it('links field errors to their inputs with aria attributes', async () => {
+    renderDialog();
+    await pickClientAndPlan();
+    await typeAmount('-1');
+    await submit();
+
+    const amount = screen.getByLabelText('Monto (UYU)');
+    const message = await screen.findByText('El monto no puede ser negativo.');
+    expect(amount).toHaveAttribute('aria-invalid', 'true');
+    expect(amount).toHaveAttribute('aria-describedby', message.id);
+    expect(screen.getByLabelText('Plan')).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('maps the field errors of an API validation failure onto the form', async () => {
+    manualPayment = async () => {
+      throw new ApiError(400, 'VALIDATION_FAILED', 'Los datos enviados no son válidos.', [
+        { field: 'amount', messages: ['amount must not be greater than 10000000'] },
+        { field: 'userId', messages: ['userId must be a UUID'] },
+      ]);
+    };
+    renderDialog();
+    await pickClientAndPlan();
+    await submit();
+
+    expect(await screen.findAllByText('Revisá este valor.')).toHaveLength(2);
+    expect(screen.queryByText(/must not be greater|must be a UUID|userId/)).toBeNull();
+    expect(screen.getByLabelText('Monto (UYU)')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Los datos enviados no son válidos.')).toBeInTheDocument();
   });
 
   it('refreshes the payments and client queries after recording', async () => {

@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@/lib/api/errors';
 import type { PlanDto } from '@/lib/api/types';
+import { planFormSchema, planToFormValues } from './plan-form.schema';
 
 const apiFetch = vi.fn();
 vi.mock('@/lib/api/client', () => ({ apiFetch }));
@@ -205,6 +207,140 @@ describe('PlansTab', () => {
     expect(hasNullValue(init.body)).toBe(false);
   });
 
+  describe('editing a session pack', () => {
+    const PACK: PlanDto = {
+      ...EXISTING_PLAN,
+      id: 'plan-pack',
+      service: 'recovery',
+      kind: 'session_pack',
+      slug: 'recovery-paquete-6',
+      name: 'Paquete 6 sesiones',
+      price: 4500,
+      periodMonths: null,
+      periodDays: 30,
+      sessionsIncluded: 6,
+      durationMinutes: null,
+    };
+
+    async function editPack(pack: PlanDto) {
+      apiFetch.mockImplementation(async (_path: string, init?: { method?: string; body?: Record<string, unknown> }) =>
+        init?.method === 'PATCH' ? { ...pack, ...init.body } : [pack],
+      );
+      renderTab();
+      await userEvent.click(await screen.findByRole('button', { name: 'Editar' }));
+      return within(await screen.findByRole('dialog'));
+    }
+
+    it('omits the duration from the PATCH when the pack has none', async () => {
+      const dialog = await editPack(PACK);
+      expect(dialog.getByLabelText('Duración (min)')).toHaveValue(null);
+      const price = dialog.getByLabelText('Precio (UYU)');
+      await userEvent.clear(price);
+      await userEvent.type(price, '4800');
+      await userEvent.click(dialog.getByRole('button', { name: 'Guardar' }));
+
+      await vi.waitFor(() => expect(writeCalls('PATCH')).toHaveLength(1));
+      const [path, init] = writeCalls('PATCH')[0];
+      expect(path).toBe('/staff/plans/plan-pack');
+      expect(init.body).toEqual({
+        slug: 'recovery-paquete-6',
+        name: 'Paquete 6 sesiones',
+        description: 'Entrená todo el mes.',
+        features: ['Clases ilimitadas'],
+        price: 4800,
+        periodDays: 30,
+        sessionsIncluded: 6,
+        featured: false,
+        active: true,
+        sortOrder: 1,
+      });
+      expect(Object.keys(init.body)).not.toContain('durationMinutes');
+      expect(Object.keys(init.body)).not.toContain('service');
+      expect(Object.keys(init.body)).not.toContain('kind');
+      expect(hasNullValue(init.body)).toBe(false);
+    });
+
+    it('sends the duration in the PATCH when the pack has one', async () => {
+      const dialog = await editPack({ ...PACK, durationMinutes: 45 });
+      expect(dialog.getByLabelText('Duración (min)')).toHaveValue(45);
+      await userEvent.click(dialog.getByRole('button', { name: 'Guardar' }));
+
+      await vi.waitFor(() => expect(writeCalls('PATCH')).toHaveLength(1));
+      expect(writeCalls('PATCH')[0][1].body).toEqual(expect.objectContaining({ periodDays: 30, sessionsIncluded: 6, durationMinutes: 45 }));
+      expect(hasNullValue(writeCalls('PATCH')[0][1].body)).toBe(false);
+    });
+
+    it('sends a duration typed into a pack that had none', async () => {
+      const dialog = await editPack(PACK);
+      await userEvent.type(dialog.getByLabelText('Duración (min)'), '50');
+      await userEvent.click(dialog.getByRole('button', { name: 'Guardar' }));
+
+      await vi.waitFor(() => expect(writeCalls('PATCH')).toHaveLength(1));
+      expect(writeCalls('PATCH')[0][1].body).toEqual(expect.objectContaining({ durationMinutes: 50 }));
+    });
+  });
+
+  it('names the rehab service "Fisioterapia" in the tables and the form', async () => {
+    renderTab();
+    expect(await screen.findByRole('heading', { name: 'Fisioterapia' })).toBeInTheDocument();
+    expect(screen.getByText('Todavía no hay planes de Fisioterapia.')).toBeInTheDocument();
+    const dialog = await openNewPlanDialog();
+    expect(dialog.getByRole('option', { name: 'Fisioterapia' })).toBeInTheDocument();
+    expect(dialog.queryByRole('option', { name: 'Rehab' })).toBeNull();
+  });
+
+  it.each([
+    ['1e2', 'Ingresá un número entero.'],
+    ['12.5', 'Ingresá un número entero.'],
+    ['10000001', 'Debe estar entre 0 y 10000000.'],
+  ])('rejects the price %s with no request', async (value, message) => {
+    renderTab();
+    const dialog = await openNewPlanDialog();
+    await userEvent.type(dialog.getByLabelText('Nombre'), 'Performance anual');
+    await userEvent.type(dialog.getByLabelText('Identificador'), 'performance-anual');
+    await userEvent.type(dialog.getByLabelText('Meses'), '12');
+    fireEvent.change(dialog.getByLabelText('Precio (UYU)'), { target: { value } });
+    await userEvent.click(dialog.getByRole('button', { name: 'Guardar' }));
+    expect(await dialog.findByText(message)).toBeInTheDocument();
+    expect(writeCalls('POST')).toHaveLength(0);
+  });
+
+  it('links field errors to their inputs with aria attributes', async () => {
+    renderTab();
+    const dialog = await openNewPlanDialog();
+    await userEvent.type(dialog.getByLabelText('Identificador'), 'Plan Anual');
+    await userEvent.click(dialog.getByRole('button', { name: 'Guardar' }));
+
+    const slug = dialog.getByLabelText('Identificador');
+    const message = await dialog.findByText('Usá minúsculas, números y guiones.');
+    expect(slug).toHaveAttribute('aria-invalid', 'true');
+    expect(slug).toHaveAttribute('aria-describedby', message.id);
+    expect(dialog.getByLabelText('Descripción')).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('shows the field errors of an API validation failure inline', async () => {
+    apiFetch.mockImplementation(async (_path: string, init?: { method?: string }) => {
+      if (init?.method === 'POST') {
+        throw new ApiError(400, 'VALIDATION_FAILED', 'Los datos enviados no son válidos.', [
+          { field: 'slug', messages: ['slug must match /^[a-z0-9]+(?:-[a-z0-9]+)*$/ regular expression'] },
+          { field: 'description', messages: ['description must be shorter than or equal to 400 characters'] },
+        ]);
+      }
+      return [EXISTING_PLAN];
+    });
+    renderTab();
+    const dialog = await openNewPlanDialog();
+    await fillCommonFields(dialog, 'Performance anual', 'performance-anual', '30000');
+    await userEvent.type(dialog.getByLabelText('Meses'), '12');
+    await userEvent.click(dialog.getByRole('button', { name: 'Guardar' }));
+
+    expect(await dialog.findAllByText('Revisá este valor.')).toHaveLength(2);
+    expect(dialog.queryByText(/must match|must be shorter|regular expression|description must/)).toBeNull();
+    expect(dialog.getByLabelText('Identificador')).toHaveAttribute('aria-invalid', 'true');
+    expect(dialog.getByLabelText('Descripción')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
   it('reports an API error and keeps the dialog open', async () => {
     const { toast } = await import('sonner');
     apiFetch.mockImplementation(async (_path: string, init?: { method?: string }) => {
@@ -219,5 +355,24 @@ describe('PlansTab', () => {
 
     await vi.waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
+
+describe('planFormSchema integers', () => {
+  const base = { ...planToFormValues(EXISTING_PLAN), name: 'Plan', slug: 'plan' };
+
+  it.each(['1e3', '0x10', '1_000', ' ', '-1', '+5', '1.0'])('rejects %j as a price', (price) => {
+    expect(planFormSchema.safeParse({ ...base, price }).success).toBe(false);
+  });
+
+  it.each([
+    ['0', 0],
+    ['3900', 3900],
+    [' 3900 ', 3900],
+    ['007', 7],
+    ['10000000', 10_000_000],
+  ])('accepts %j as a price', (price, expected) => {
+    const result = planFormSchema.safeParse({ ...base, price });
+    expect(result.success && result.data.price).toBe(expected);
   });
 });

@@ -1,12 +1,6 @@
-import type { Service, StaffTimeSlotDto } from '@/lib/api/types';
+import type { StaffTimeSlotDto } from '@/lib/api/types';
 import { formatTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
-
-export const SERVICE_NAMES: Record<Service, string> = {
-  performance: 'Performance',
-  recovery: 'Recovery',
-  rehab: 'Fisioterapia',
-};
 
 interface SlotChipsProps {
   slots: StaffTimeSlotDto[];

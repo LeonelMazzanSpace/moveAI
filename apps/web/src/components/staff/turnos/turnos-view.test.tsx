@@ -34,12 +34,17 @@ const MARTINA: RosterItemDto = {
   status: 'confirmed', attendance: null, cancelledAt: null,
 };
 
+// While true, every GET stays pending: the cache keeps whatever the mutation left in it.
+let readsHang = false;
+const never = () => new Promise<never>(() => undefined);
+
 function mockApi(attendance?: () => Promise<unknown>) {
   apiFetch.mockImplementation((path: string, init?: { method?: string }) => {
+    if (path.endsWith('/attendance') && init?.method === 'PUT' && attendance) return attendance();
+    if (readsHang) return never();
     if (path === '/staff/time-slots') return Promise.resolve(SLOTS);
     if (path === '/staff/time-slots/pending-attendance') return Promise.resolve([SLOTS[1]]);
     if (path.endsWith('/roster')) return Promise.resolve(roster([MARTINA]));
-    if (path.endsWith('/attendance') && init?.method === 'PUT' && attendance) return attendance();
     return Promise.reject(new Error(`unexpected ${path}`));
   });
 }
@@ -59,6 +64,7 @@ describe('TurnosView', () => {
     apiFetch.mockReset();
     toastError.mockReset();
     search = 'fecha=2026-10-12&servicio=performance';
+    readsHang = false;
     vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-12T22:00:00.000Z') });
   });
   afterEach(() => vi.useRealTimers());
@@ -90,7 +96,7 @@ describe('TurnosView', () => {
     expect(screen.getByRole('link', { name: /19:00/ })).toHaveAttribute('href', expect.stringContaining('turno=s2'));
   });
 
-  it('marks attendance optimistically and reverts with the contract message on error', async () => {
+  it('marks attendance optimistically and rolls back right after the rejection, before any refetch settles', async () => {
     let reject: (error: ApiError) => void = () => undefined;
     mockApi(() => new Promise((_, rej) => { reject = rej; }));
     renderView();
@@ -100,10 +106,92 @@ describe('TurnosView', () => {
     expect(apiFetch).toHaveBeenCalledWith('/staff/bookings/b1/attendance', { method: 'PUT', body: { status: 'present' } });
     expect(screen.getByRole('group', { name: 'Presentes' })).toHaveTextContent('9');
 
+    // From here on the refetch triggered by onSettled never answers, so the screen can only show the rollback.
+    readsHang = true;
     reject(new ApiError(409, 'ATTENDANCE_NOT_ALLOWED', 'x'));
-    await waitFor(() => expect(within(screen.getByRole('row', { name: /Martina Suárez/ })).getByText('Pendiente')).toBeInTheDocument());
-    expect(toastError).toHaveBeenCalledWith('Todavía no se puede registrar la asistencia de este turno.');
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith('Todavía no se puede registrar la asistencia de este turno.'));
+    expect(within(screen.getByRole('row', { name: /Martina Suárez/ })).getByText('Pendiente')).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Presentes' })).toHaveTextContent('8');
+    expect(screen.getByRole('group', { name: 'Reservas' })).toHaveTextContent('12/14');
+  });
+
+  it('wraps the header actions and the service tabs so the page does not scroll sideways at 375 px', async () => {
+    mockApi();
+    renderView();
+    const tabs = await screen.findByRole('group', { name: 'Servicio' });
+    expect(tabs).toHaveClass('flex-wrap');
+    expect(tabs.parentElement).toHaveClass('flex-wrap');
+    expect(tabs.parentElement).toContainElement(screen.getByLabelText('Fecha'));
+  });
+
+  it('names the rehab service "Fisioterapia" in the tabs, the slot title and the empty state', async () => {
+    mockApi();
+    const { unmount } = renderView();
+    expect(await screen.findByRole('button', { name: 'Fisioterapia' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Rehab' })).toBeNull();
+    unmount();
+
+    search = 'fecha=2026-10-12&servicio=rehab';
+    apiFetch.mockImplementation((path: string) =>
+      Promise.resolve(path === '/staff/time-slots' ? [slot({ id: 'r1', service: 'rehab' })] : path.endsWith('/roster') ? roster([MARTINA]) : []),
+    );
+    const second = renderView();
+    expect(await screen.findByText('Turno 18:00 — Fisioterapia')).toBeInTheDocument();
+    second.unmount();
+
+    apiFetch.mockImplementation((path: string) => Promise.resolve(path === '/staff/time-slots' ? [] : []));
+    renderView();
+    expect(await screen.findByText('No hay turnos de Fisioterapia para este día.')).toBeInTheDocument();
+  });
+
+  it('tells the staff when the pending attendance list cannot be loaded and lets them retry', async () => {
+    let failing = true;
+    apiFetch.mockImplementation((path: string) => {
+      if (path === '/staff/time-slots/pending-attendance') {
+        return failing ? Promise.reject(new ApiError(500, 'INTERNAL_ERROR', 'x')) : Promise.resolve([SLOTS[1]]);
+      }
+      if (path === '/staff/time-slots') return Promise.resolve(SLOTS);
+      return Promise.resolve(roster([MARTINA]));
+    });
+    renderView();
+    const alert = await screen.findByText('No pudimos cargar los turnos con asistencia pendiente.');
+    expect(alert.closest('[role="alert"]')).toBeInTheDocument();
+    expect(screen.queryByText(/^Hay \d+ turnos? con asistencia pendiente$/)).toBeNull();
+
+    failing = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(await screen.findByText('Hay 1 turno con asistencia pendiente')).toBeInTheDocument();
+    expect(screen.queryByText('No pudimos cargar los turnos con asistencia pendiente.')).toBeNull();
+  });
+
+  it('explains why marking is unavailable for a future slot, linking the help to the buttons', async () => {
+    search = 'fecha=2026-10-14&servicio=performance';
+    apiFetch.mockImplementation((path: string) => {
+      if (path === '/staff/time-slots') return Promise.resolve([slot({ id: 'f1', startsAt: '2026-10-14T21:00:00.000Z' })]);
+      if (path === '/staff/time-slots/pending-attendance') return Promise.resolve([]);
+      return Promise.resolve(roster([MARTINA]));
+    });
+    renderView();
+    const button = await screen.findByRole('button', { name: 'Presente' });
+    const hintId = button.getAttribute('aria-describedby');
+    expect(hintId).toBeTruthy();
+    expect(document.getElementById(hintId ?? '')).toHaveTextContent('Disponible desde el día del turno');
+  });
+
+  it('gives no attendance help for a cancelled slot', async () => {
+    search = 'fecha=2026-10-12&servicio=performance';
+    apiFetch.mockImplementation((path: string) => {
+      if (path === '/staff/time-slots') return Promise.resolve([slot({ id: 'x1', cancelledAt: '2026-10-11T12:00:00.000Z' })]);
+      if (path === '/staff/time-slots/pending-attendance') return Promise.resolve([]);
+      return Promise.resolve(roster([MARTINA]));
+    });
+    renderView();
+    expect(await screen.findByText('Turno cancelado')).toBeInTheDocument();
+    const button = screen.getByRole('button', { name: 'Presente' });
+    expect(button).toBeDisabled();
+    expect(button).not.toHaveAttribute('aria-describedby');
+    expect(screen.queryByText('Disponible desde el día del turno')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Acciones del turno' })).toBeNull();
   });
 
   it('keeps attendance buttons disabled for future slots', async () => {
