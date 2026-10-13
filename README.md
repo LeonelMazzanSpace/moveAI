@@ -39,6 +39,7 @@ El `.env.example` de la API trae valores de desarrollo. Sin credenciales de prov
 | API | `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` | Mercado Pago (vacíos = simulador en desarrollo; obligatorios en producción) |
 | API | `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME` | Brevo (vacíos = dry-run en desarrollo; obligatorios en producción) |
 | API | `SCHEDULER_ENABLED` | `true` o `false`; activo en una sola instancia |
+| API | `TRUST_PROXY_HOPS` | Proxies delante de la API cuya entrada de `X-Forwarded-For` se acepta para tomar la IP del cliente: un dígito de 0 a 5, default `0`; `2` detrás del ALB + Nginx de Elastic Beanstalk; nunca `true` (ver [docs/deploy.md](docs/deploy.md)) |
 | Web | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_GOOGLE_ENABLED` | URL de la API (con `/api`) y botón de Google |
 
 ## Scripts raíz
@@ -59,7 +60,7 @@ Scripts de la API (`pnpm --filter @move/api <script>`):
 | Script | Qué hace |
 |---|---|
 | `seed` | Carga planes, horarios y configuración provisorios (idempotente) |
-| `user:create-staff -- --email <e> --name <n>` | Crea un usuario staff; la contraseña va en `CREATE_STAFF_PASSWORD` (preferible a `--password`) |
+| `user:create-staff -- --email <e> --name <n> [--promote-existing]` | Crea un usuario staff; la contraseña va en `CREATE_STAFF_PASSWORD` (preferible a `--password`). Si el email ya existe se rechaza, salvo con `--promote-existing` (D54), que convierte esa cuenta en staff; `--name` solo se usa al crear una cuenta nueva |
 | `test:e2e` | E2E de la API |
 | `migration:generate` / `migration:run` / `migration:revert` / `migration:show` | Migraciones |
 
