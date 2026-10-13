@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { PerformanceSchedule } from '@/components/booking/performance-schedule';
 import { DisplayTitle } from '@/components/move/display-title';
 import { PageContainer } from '@/components/move/page-container';
 import { CtaLink, Hero } from '@/components/public/hero';
@@ -62,10 +63,14 @@ export default function PerformancePage() {
         </PageContainer>
       </section>
 
-      <section id="horarios" className="border-t border-border" />
+      <section id="horarios" className="border-t border-border">
+        <PageContainer className="pb-2 pt-16">
+          <PerformanceSchedule />
+        </PageContainer>
+      </section>
 
-      <section className="border-t border-border">
-        <PageContainer className="py-10">
+      <section>
+        <PageContainer className="pb-16 pt-6">
           <div className="rounded border border-border bg-soft px-5 py-4 text-xs leading-relaxed text-muted-foreground">
             <span className="font-semibold text-foreground">Plan vencido:</span> la plataforma bloquea nuevas reservas y te
             orienta hacia el proceso de renovación.
