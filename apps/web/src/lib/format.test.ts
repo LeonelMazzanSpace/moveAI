@@ -7,6 +7,8 @@ import {
   formatDayMonth,
   formatTime,
   formatUYU,
+  formatWeekdayLong,
+  formatWeekdayShort,
   initials,
   SERVICE_LABEL,
 } from './format';
@@ -49,6 +51,21 @@ describe('format', () => {
     expect(formatDate('2026-13-45')).toBe('—');
     expect(formatDate('2026-02-30')).toBe('—');
     expect(formatDate('2026-11-15T99:99:99Z')).toBe('—');
+  });
+
+  it.each(['', 'no es una fecha', '2026-13-45', '2026-11-15T99:99:99Z'])('shows a dash instead of throwing for %j', (value) => {
+    expect(formatDayMonth(value)).toBe('—');
+    expect(formatTime(value)).toBe('—');
+    expect(formatWeekdayLong(value)).toBe('—');
+    expect(formatWeekdayShort(value)).toBe('—');
+    expect(formatDateLong(value)).toBe('—');
+  });
+
+  it('keeps formatting valid input after the guard', () => {
+    expect(formatWeekdayLong('2026-10-13')).toBe('Martes');
+    expect(formatWeekdayShort('2026-10-13')).toBe('Mar');
+    expect(formatDayMonth('2026-11-16T00:00:00.000Z')).toBe('15/11');
+    expect(formatTime('2026-11-16T02:30:00.000Z')).toBe('23:30');
   });
 
   describe('Montevideo day edges (UTC-3, no DST)', () => {

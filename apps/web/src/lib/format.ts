@@ -3,6 +3,7 @@ import type { Service } from './api/types';
 const TIME_ZONE = 'America/Montevideo';
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
+const NO_VALUE = '—';
 const WEEKDAYS_LONG = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
 export const SERVICE_LABEL: Record<Service, string> = {
@@ -76,31 +77,37 @@ export function formatUYU(n: number): string {
 
 export function formatDate(d: string): string {
   const parts = validDateParts(d);
-  if (!parts) return '—';
+  if (!parts) return NO_VALUE;
   const { year, month, day } = parts;
   return `${pad(day)}/${pad(month)}/${year}`;
 }
 
 export function formatDayMonth(d: string): string {
-  const { month, day } = dateParts(d);
+  const parts = validDateParts(d);
+  if (!parts) return NO_VALUE;
+  const { month, day } = parts;
   return `${pad(day)}/${pad(month)}`;
 }
 
 export function formatTime(iso: string): string {
-  const { hour, minute } = instantParts(new Date(iso));
+  const instant = new Date(iso);
+  if (Number.isNaN(instant.getTime())) return NO_VALUE;
+  const { hour, minute } = instantParts(instant);
   return `${hour}:${minute}`;
 }
 
 export function formatWeekdayLong(d: string): string {
-  return WEEKDAYS_LONG[weekdayIndex(dateParts(d))];
+  const parts = validDateParts(d);
+  return parts ? WEEKDAYS_LONG[weekdayIndex(parts)] : NO_VALUE;
 }
 
 export function formatWeekdayShort(d: string): string {
-  return formatWeekdayLong(d).slice(0, 3);
+  const parts = validDateParts(d);
+  return parts ? WEEKDAYS_LONG[weekdayIndex(parts)].slice(0, 3) : NO_VALUE;
 }
 
 export function formatDateLong(d: string): string {
-  return `${formatWeekdayLong(d)} ${formatDate(d)}`;
+  return validDateParts(d) ? `${formatWeekdayLong(d)} ${formatDate(d)}` : NO_VALUE;
 }
 
 export function initials(name: string): string {

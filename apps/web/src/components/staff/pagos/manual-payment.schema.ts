@@ -12,6 +12,15 @@ export const MANUAL_METHOD_LABEL: Record<ManualPaymentMethod, string> = {
 export const MANUAL_METHODS = Object.keys(MANUAL_METHOD_LABEL) as ManualPaymentMethod[];
 
 const MAX_NOTE_LENGTH = 500;
+// Plain decimal with up to two decimals: no exponent, hex, sign or bare dot (`Number()` would accept all of them).
+const AMOUNT_PATTERN = /^\d+(\.\d{1,2})?$/;
+const TOO_MANY_DECIMALS = /^\d+\.\d{3,}$/;
+
+function invalidAmountMessage(text: string, amount: number): string {
+  if (amount < 0) return 'El monto no puede ser negativo.';
+  if (TOO_MANY_DECIMALS.test(text)) return 'Usá hasta 2 decimales.';
+  return 'Ingresá un monto válido.';
+}
 
 export interface ManualPaymentPayload {
   userId: string;
@@ -40,16 +49,13 @@ export const manualPaymentSchema = z
       ctx.addIssue({ code: 'custom', path: ['amount'], message: 'Ingresá un monto.' });
       return;
     }
-    if (amount < 0) {
-      ctx.addIssue({ code: 'custom', path: ['amount'], message: 'El monto no puede ser negativo.' });
+    if (!AMOUNT_PATTERN.test(text)) {
+      ctx.addIssue({ code: 'custom', path: ['amount'], message: invalidAmountMessage(text, amount) });
       return;
     }
     if (amount > MAX_MONEY_AMOUNT) {
       ctx.addIssue({ code: 'custom', path: ['amount'], message: 'El monto no puede superar $ 10.000.000.' });
       return;
-    }
-    if (Number(amount.toFixed(2)) !== amount) {
-      ctx.addIssue({ code: 'custom', path: ['amount'], message: 'Usá hasta 2 decimales.' });
     }
   })
   .transform((values): ManualPaymentPayload => {

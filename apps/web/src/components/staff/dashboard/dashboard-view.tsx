@@ -8,9 +8,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { apiFetch } from '@/lib/api/client';
 import type { AlertCountsDto, AlertType, DashboardDto, StaffTimeSlotDto } from '@/lib/api/types';
-import { businessTodayWeb, formatTime } from '@/lib/format';
+import { businessTodayWeb, formatTime, SERVICE_LABEL } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { SERVICE_NAMES } from '../turnos/slot-chips';
 import { ClientKpis } from '../clientes/client-kpis';
 
 const ALERT_CARDS: { type: AlertType; label: string }[] = [
@@ -95,7 +94,7 @@ function TodaySlots({ slots }: { slots: StaffTimeSlotDto[] }) {
               {slots.map((slot) => (
                 <TableRow key={slot.id} className={cn(slot.cancelledAt && 'opacity-50')}>
                   <TableCell className={cn('px-4 py-3.5 font-medium', slot.cancelledAt && 'line-through')}>{formatTime(slot.startsAt)}</TableCell>
-                  <TableCell className="px-4 py-3.5">{SERVICE_NAMES[slot.service]}</TableCell>
+                  <TableCell className="px-4 py-3.5">{SERVICE_LABEL[slot.service]}</TableCell>
                   <TableCell className="px-4 py-3.5 text-muted-foreground">{`${slot.booked}/${slot.capacity}`}</TableCell>
                   <TableCell className="px-4 py-3.5 text-muted-foreground">{slot.present}</TableCell>
                   <TableCell className="px-4 py-3.5 text-right">

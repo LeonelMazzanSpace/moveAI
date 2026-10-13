@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api/errors';
+import { EMPTY_MANUAL_PAYMENT, manualPaymentSchema } from './manual-payment.schema';
 
 const apiFetch = vi.fn();
 vi.mock('@/lib/api/client', () => ({ apiFetch }));
@@ -145,6 +146,20 @@ describe('ManualPaymentDialog', () => {
     expect(postCalls()[0]?.[1]).toMatchObject({ body: { amount: Number(value) } });
   });
 
+  it.each(['1e3', '1E3', '5e-1', '.5'])('rejects the amount %s as not being a plain decimal number', async (value) => {
+    renderDialog();
+    await pickClientAndPlan();
+    fireEvent.change(screen.getByLabelText('Monto (UYU)'), { target: { value } });
+    await submit();
+    expect(await screen.findByText('Ingresá un monto válido.')).toBeInTheDocument();
+    expect(postCalls()).toHaveLength(0);
+  });
+
+  it.each(['1e3', '0x10', '1_000', '+5', '1e400', '5.', '1,5', '.5', ' '])('the schema rejects %j', (amount) => {
+    const result = manualPaymentSchema.safeParse({ ...EMPTY_MANUAL_PAYMENT, clientId: 'c1', planId: 'p3', amount });
+    expect(result.success).toBe(false);
+  });
+
   it.each(['10.505', '0.001', '99.999'])('rejects the amount %s for having more than two decimals', async (value) => {
     renderDialog();
     await pickClientAndPlan();
@@ -185,9 +200,10 @@ describe('ManualPaymentDialog', () => {
     await pickClientAndPlan();
     await submit();
 
-    expect(await screen.findByText('amount must not be greater than 10000000')).toBeInTheDocument();
-    expect(screen.getByText('userId must be a UUID')).toBeInTheDocument();
+    expect(await screen.findAllByText('Revisá este valor.')).toHaveLength(2);
+    expect(screen.queryByText(/must not be greater|must be a UUID|userId/)).toBeNull();
     expect(screen.getByLabelText('Monto (UYU)')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Los datos enviados no son válidos.')).toBeInTheDocument();
   });
 
   it('refreshes the payments and client queries after recording', async () => {

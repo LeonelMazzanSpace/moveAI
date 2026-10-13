@@ -322,7 +322,7 @@ describe('PlansTab', () => {
     apiFetch.mockImplementation(async (_path: string, init?: { method?: string }) => {
       if (init?.method === 'POST') {
         throw new ApiError(400, 'VALIDATION_FAILED', 'Los datos enviados no son válidos.', [
-          { field: 'slug', messages: ['El identificador ya está en uso por otro plan'] },
+          { field: 'slug', messages: ['slug must match /^[a-z0-9]+(?:-[a-z0-9]+)*$/ regular expression'] },
           { field: 'description', messages: ['description must be shorter than or equal to 400 characters'] },
         ]);
       }
@@ -334,9 +334,10 @@ describe('PlansTab', () => {
     await userEvent.type(dialog.getByLabelText('Meses'), '12');
     await userEvent.click(dialog.getByRole('button', { name: 'Guardar' }));
 
-    expect(await dialog.findByText('El identificador ya está en uso por otro plan')).toBeInTheDocument();
-    expect(dialog.getByText('description must be shorter than or equal to 400 characters')).toBeInTheDocument();
+    expect(await dialog.findAllByText('Revisá este valor.')).toHaveLength(2);
+    expect(dialog.queryByText(/must match|must be shorter|regular expression|description must/)).toBeNull();
     expect(dialog.getByLabelText('Identificador')).toHaveAttribute('aria-invalid', 'true');
+    expect(dialog.getByLabelText('Descripción')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 

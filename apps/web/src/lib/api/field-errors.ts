@@ -1,12 +1,15 @@
 import { ApiError } from './errors';
 
+/** The API's validation messages are class-validator's English text with property names: never shown to the user. */
+export const FIELD_ERROR_MESSAGE = 'Revisá este valor.';
+
 interface ServerFieldError {
   type: 'server';
   message: string;
 }
 
 /**
- * Copies the `details` of an API validation error onto the form fields that exist, using the first message of each.
+ * Marks the form fields named in the `details` of an API validation error with `FIELD_ERROR_MESSAGE`.
  * `rename` maps API field names to form field names when they differ. Returns whether any field got an error.
  */
 export function applyFieldErrors<TName extends string>(
@@ -20,9 +23,8 @@ export function applyFieldErrors<TName extends string>(
   for (const { field, messages } of error.details) {
     const root = field.split(/[.[]/)[0];
     const name = Object.hasOwn(rename, root) ? rename[root] : fields.find((candidate) => candidate === root);
-    const message = messages[0];
-    if (name === undefined || message === undefined) continue;
-    setError(name, { type: 'server', message });
+    if (name === undefined || messages.length === 0) continue;
+    setError(name, { type: 'server', message: FIELD_ERROR_MESSAGE });
     applied = true;
   }
   return applied;

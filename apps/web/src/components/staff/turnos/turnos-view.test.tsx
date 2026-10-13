@@ -115,6 +115,15 @@ describe('TurnosView', () => {
     expect(screen.getByRole('group', { name: 'Reservas' })).toHaveTextContent('12/14');
   });
 
+  it('wraps the header actions and the service tabs so the page does not scroll sideways at 375 px', async () => {
+    mockApi();
+    renderView();
+    const tabs = await screen.findByRole('group', { name: 'Servicio' });
+    expect(tabs).toHaveClass('flex-wrap');
+    expect(tabs.parentElement).toHaveClass('flex-wrap');
+    expect(tabs.parentElement).toContainElement(screen.getByLabelText('Fecha'));
+  });
+
   it('names the rehab service "Fisioterapia" in the tabs, the slot title and the empty state', async () => {
     mockApi();
     const { unmount } = renderView();

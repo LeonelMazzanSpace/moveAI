@@ -88,9 +88,11 @@ describe('RulesTab', () => {
     await userEvent.type(field, '60');
     await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
 
-    const message = await screen.findByText('cancelLimitHours must not be greater than 48');
+    const message = await screen.findByText('Revisá este valor.');
     expect(field).toHaveAttribute('aria-invalid', 'true');
     expect(field).toHaveAttribute('aria-describedby', message.id);
+    expect(screen.queryByText(/must not be greater/)).toBeNull();
+    expect(screen.queryByText(/cancelLimitHours/)).toBeNull();
     expect(toast.error).toHaveBeenCalledWith('Los datos enviados no son válidos.');
   });
 
