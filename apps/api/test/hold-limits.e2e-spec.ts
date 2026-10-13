@@ -168,6 +168,49 @@ describe('payment holds and checkout throttling (e2e)', () => {
       expect(await count('purchases')).toBe(10);
     });
 
+    // D58: the throttler reads Date.now(), so moving it past each minute window simulates an hour without waiting.
+    describe('hourly window', () => {
+      let offset = 0;
+      beforeEach(() => {
+        offset = 0;
+        const realNow = Date.now.bind(Date);
+        vi.spyOn(Date, 'now').mockImplementation(() => realNow() + offset);
+      });
+      afterEach(() => { vi.restoreAllMocks(); });
+
+      async function spreadOverMinutes(send: () => request.Test): Promise<void> {
+        for (let minute = 0; minute < 2; minute += 1) {
+          for (let i = 0; i < 10; i += 1) await send().expect(201);
+          offset += 61_000;
+        }
+      }
+
+      it('limits guest checkouts to 20 per hour per IP even when no minute goes over 10', async () => {
+        const planId = await planIdBySlug(ctx.dataSource, 'recovery-sesion');
+        const timeSlotId = await recoverySlot('08:00', 25);
+        await spreadOverMinutes(() => http().post('/api/checkout/booking').send({ planId, timeSlotId, guest: guest() }));
+        const before = await counts();
+        expect(before).toMatchObject({ users: 20, purchases: 20 });
+
+        const res = await http().post('/api/checkout/booking').send({ planId, timeSlotId, guest: guest() }).expect(429);
+        expect(res.body).toEqual({
+          statusCode: 429,
+          code: 'RATE_LIMITED',
+          message: 'Hiciste demasiados intentos. Esperá un minuto y probá de nuevo.',
+        });
+        expect(res.headers['retry-after']).toEqual(expect.any(String));
+        expect(await counts()).toEqual(before);
+      });
+
+      it('does not apply the hourly window to plan checkouts', async () => {
+        const { agent } = await signUpClient(ctx.app);
+        const planId = await planIdBySlug(ctx.dataSource, 'performance-mensual');
+        await spreadOverMinutes(() => agent.post('/api/checkout/plan').send({ planId }));
+        await agent.post('/api/checkout/plan').send({ planId }).expect(201);
+        expect(await count('purchases')).toBe(21);
+      });
+    });
+
     it('does not throttle the other endpoints', async () => {
       const planId = await planIdBySlug(ctx.dataSource, 'recovery-sesion');
       const timeSlotId = await recoverySlot('08:00', 20);

@@ -31,7 +31,13 @@ pnpm --filter @move/api user:create-staff -- --email staff@example.com --name "N
 unset CREATE_STAFF_PASSWORD
 ```
 
-Si el email ya existe, esa cuenta pasa a ser staff. El comando imprime solo el id. El nombre debe tener entre 2 y 80 caracteres y la contraseña al menos 8.
+El comando imprime solo el id. El nombre debe tener entre 2 y 80 caracteres y la contraseña al menos 8.
+
+Si ya existe una cuenta con ese email, el comando la rechaza. Para convertirla en staff, agregar `--promote-existing`: la cuenta queda con la contraseña dada, se cierran sus sesiones y el email queda verificado. `--name` sigue siendo obligatorio, pero solo se usa al crear una cuenta nueva; el nombre de una cuenta existente no cambia.
+
+```bash
+pnpm --filter @move/api user:create-staff -- --email cliente@example.com --name "Nombre Apellido" --promote-existing
+```
 
 ## Proveedores en desarrollo
 

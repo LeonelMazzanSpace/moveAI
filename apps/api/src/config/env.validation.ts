@@ -103,6 +103,14 @@ class EnvironmentVariables {
   @IsOptional()
   @IsIn(['true', 'false'])
   SCHEDULER_ENABLED?: string;
+
+  // D58: proxies in front of the API whose X-Forwarded-For entry is trusted (2 = ALB + Nginx). Never `true`: the client
+  // would choose its own IP and get past the checkout throttler.
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(5)
+  TRUST_PROXY_HOPS: number = 0;
 }
 
 // `KEY=` in a .env file counts as an absent variable.

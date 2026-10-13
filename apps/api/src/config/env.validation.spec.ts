@@ -48,4 +48,19 @@ describe('env validation', () => {
     expect(() => validate({ ...base, SCHEDULER_ENABLED: 'true' })).not.toThrow();
     expect(() => validate({ ...base, SCHEDULER_ENABLED: '0' })).toThrow();
   });
+
+  describe('TRUST_PROXY_HOPS', () => {
+    it('defaults to 0 when absent or empty', () => {
+      expect(validate(base).TRUST_PROXY_HOPS).toBe(0);
+      expect(validate({ ...base, TRUST_PROXY_HOPS: '' }).TRUST_PROXY_HOPS).toBe(0);
+    });
+
+    it.each([['0', 0], ['2', 2], ['5', 5]])('accepts %s', (value, expected) => {
+      expect(validate({ ...base, TRUST_PROXY_HOPS: value }).TRUST_PROXY_HOPS).toBe(expected);
+    });
+
+    it.each(['-1', '6', '1.5', 'abc', 'true'])('rejects %s', (value) => {
+      expect(() => validate({ ...base, TRUST_PROXY_HOPS: value })).toThrow();
+    });
+  });
 });

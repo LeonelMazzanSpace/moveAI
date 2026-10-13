@@ -5,4 +5,5 @@ export const appConfig = registerAs('app', () => ({
   webUrl: process.env.WEB_URL ?? 'http://localhost:3000',
   apiPublicUrl: process.env.API_PUBLIC_URL ?? 'http://localhost:3001',
   nodeEnv: process.env.NODE_ENV ?? 'development',
+  trustProxyHops: parseInt(process.env.TRUST_PROXY_HOPS || '0', 10),
 }));
