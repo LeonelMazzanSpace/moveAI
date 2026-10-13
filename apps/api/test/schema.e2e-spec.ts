@@ -1,8 +1,10 @@
 import { DataSource } from 'typeorm';
 import { databaseConfig } from '../src/config/database.config.js';
 import { ALL_ENTITIES } from '../src/database/entities.js';
+import { DefaultSettings1791901335369 } from '../src/database/migrations/1791901335369-DefaultSettings.js';
 import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
 import { buildDataSourceOptions } from '../src/database/typeorm.options.js';
+import { SETTING_DB_KEYS, SETTINGS_DEFAULTS } from '../src/modules/settings/settings.defaults.js';
 import { resetDb } from './utils/db.js';
 
 describe('schema (e2e)', () => {
@@ -19,9 +21,39 @@ describe('schema (e2e)', () => {
     return row.id as string;
   };
 
+  const SELECT_SETTINGS = 'SELECT key, value FROM settings ORDER BY key';
+  const expectedSettings = (Object.keys(SETTING_DB_KEYS) as (keyof typeof SETTING_DB_KEYS)[])
+    .map((field) => ({ key: SETTING_DB_KEYS[field], value: SETTINGS_DEFAULTS[field] }))
+    .sort((a, b) => a.key.localeCompare(b.key));
+
   it('has default settings after reset', async () => {
-    const rows: { key: string }[] = await ds.query('SELECT key FROM settings ORDER BY key');
+    const rows: { key: string; value: unknown }[] = await ds.query(SELECT_SETTINGS);
     expect(rows).toHaveLength(12);
+    expect(rows).toEqual(expectedSettings);
+  });
+
+  it('inserts the default settings in the DefaultSettings migration', async () => {
+    const runner = ds.createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+    try {
+      await runner.query('TRUNCATE settings');
+      await new DefaultSettings1791901335369().up(runner);
+      const rows: { key: string; value: unknown }[] = await runner.query(SELECT_SETTINGS);
+      expect(rows).toEqual(expectedSettings);
+    } finally {
+      await runner.rollbackTransaction();
+      await runner.release();
+    }
+  });
+
+  it('empties every other table on reset', async () => {
+    await insertUser('c@test.move');
+    await seedCatalogAndSchedule(ds);
+    await resetDb(ds);
+    const [{ count: users }] = await ds.query('SELECT count(*)::int AS count FROM users');
+    const [{ count: plans }] = await ds.query('SELECT count(*)::int AS count FROM plans');
+    expect([users, plans]).toEqual([0, 0]);
   });
 
   it('rejects a second active booking for the same user and slot', async () => {
@@ -40,10 +72,10 @@ describe('schema (e2e)', () => {
   it('enforces plan shape checks', async () => {
     await expect(
       ds.query(`INSERT INTO plans (service, kind, slug, name, price) VALUES ('performance', 'period_plan', 'x', 'X', 100)`),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/check constraint/);
     await expect(
       ds.query(`INSERT INTO plans (service, kind, slug, name, price, period_months) VALUES ('recovery', 'period_plan', 'y', 'Y', 100, 1)`),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/check constraint/);
   });
 
   it('reads date columns as business date strings', async () => {
