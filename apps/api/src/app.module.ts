@@ -16,6 +16,7 @@ import { BookingsModule } from './modules/bookings/bookings.module.js';
 import { CatalogModule } from './modules/catalog/catalog.module.js';
 import { FollowupModule } from './modules/followup/followup.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
+import { PaymentsModule } from './modules/payments/payments.module.js';
 import { SettingsModule } from './modules/settings/settings.module.js';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module.js';
 import { UsersModule } from './modules/users/users.module.js';
@@ -40,6 +41,7 @@ import { UsersModule } from './modules/users/users.module.js';
     AgendaModule,
     SubscriptionsModule,
     BookingsModule,
+    PaymentsModule,
     FollowupModule,
   ],
 })
