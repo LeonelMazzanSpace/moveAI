@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useId, useState } from 'react';
 import { EmptyState } from '@/components/move/empty-state';
 import { ErrorState } from '@/components/move/error-state';
-import { BUTTON_OUTLINE, BUTTON_PRIMARY, FormField, SELECT_CLASS } from '@/components/staff/config/plan-form';
+import { BUTTON_OUTLINE, BUTTON_PRIMARY, FormField, SELECT_CLASS } from '@/components/staff/form-primitives';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
 import type { Paginated, PaymentMethod, PurchaseStatus, StaffPaymentDto } from '@/lib/api/types';

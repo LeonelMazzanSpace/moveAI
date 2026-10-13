@@ -6,6 +6,8 @@ import { ApiError } from '@/lib/api/errors';
 
 const apiFetch = vi.fn();
 vi.mock('@/lib/api/client', () => ({ apiFetch }));
+const toastSuccess = vi.fn();
+vi.mock('sonner', () => ({ toast: { success: toastSuccess, error: vi.fn() } }));
 const { ManualPaymentDialog } = await import('./manual-payment-dialog');
 
 const trimestral = { id: 'p3', service: 'performance', kind: 'period_plan', slug: 'performance-trimestral', name: 'Plan Trimestral', price: 10500, active: true };
@@ -132,6 +134,60 @@ describe('ManualPaymentDialog', () => {
     await submit();
     expect(await screen.findByText('Usá hasta 2 decimales.')).toBeInTheDocument();
     expect(postCalls()).toHaveLength(0);
+  });
+
+  it.each(['10.5', '10.50', '0.01', '0'])('accepts the amount %s', async (value) => {
+    renderDialog();
+    await pickClientAndPlan();
+    await typeAmount(value);
+    await submit();
+    await waitFor(() => expect(postCalls()).toHaveLength(1));
+    expect(postCalls()[0]?.[1]).toMatchObject({ body: { amount: Number(value) } });
+  });
+
+  it.each(['10.505', '0.001', '99.999'])('rejects the amount %s for having more than two decimals', async (value) => {
+    renderDialog();
+    await pickClientAndPlan();
+    await typeAmount(value);
+    await submit();
+    expect(await screen.findByText('Usá hasta 2 decimales.')).toBeInTheDocument();
+    expect(postCalls()).toHaveLength(0);
+  });
+
+  it('confirms the payment with a toast that ends in a period', async () => {
+    renderDialog();
+    await pickClientAndPlan();
+    await submit();
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Pago registrado.'));
+  });
+
+  it('links field errors to their inputs with aria attributes', async () => {
+    renderDialog();
+    await pickClientAndPlan();
+    await typeAmount('-1');
+    await submit();
+
+    const amount = screen.getByLabelText('Monto (UYU)');
+    const message = await screen.findByText('El monto no puede ser negativo.');
+    expect(amount).toHaveAttribute('aria-invalid', 'true');
+    expect(amount).toHaveAttribute('aria-describedby', message.id);
+    expect(screen.getByLabelText('Plan')).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('maps the field errors of an API validation failure onto the form', async () => {
+    manualPayment = async () => {
+      throw new ApiError(400, 'VALIDATION_FAILED', 'Los datos enviados no son válidos.', [
+        { field: 'amount', messages: ['amount must not be greater than 10000000'] },
+        { field: 'userId', messages: ['userId must be a UUID'] },
+      ]);
+    };
+    renderDialog();
+    await pickClientAndPlan();
+    await submit();
+
+    expect(await screen.findByText('amount must not be greater than 10000000')).toBeInTheDocument();
+    expect(screen.getByText('userId must be a UUID')).toBeInTheDocument();
+    expect(screen.getByLabelText('Monto (UYU)')).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('refreshes the payments and client queries after recording', async () => {

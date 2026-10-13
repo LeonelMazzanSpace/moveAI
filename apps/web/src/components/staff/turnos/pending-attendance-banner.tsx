@@ -1,11 +1,11 @@
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 import type { StaffTimeSlotDto } from '@/lib/api/types';
-import { businessTodayWeb, formatDayMonth, formatTime, formatWeekdayShort } from '@/lib/format';
-import { SERVICE_NAMES } from './slot-chips';
+import { businessDateOf, formatDayMonth, formatTime, formatWeekdayShort, SERVICE_LABEL } from '@/lib/format';
 
 function slotHref(slot: StaffTimeSlotDto): string {
   const params = new URLSearchParams({
-    fecha: businessTodayWeb(new Date(slot.startsAt)),
+    fecha: businessDateOf(slot.startsAt),
     servicio: slot.service,
     turno: slot.id,
   });
@@ -13,11 +13,29 @@ function slotHref(slot: StaffTimeSlotDto): string {
 }
 
 function slotLabel(slot: StaffTimeSlotDto): string {
-  const date = businessTodayWeb(new Date(slot.startsAt));
-  return `${formatWeekdayShort(date)} ${formatDayMonth(date)} ${formatTime(slot.startsAt)} · ${SERVICE_NAMES[slot.service]} (${slot.pendingAttendance} sin marcar)`;
+  const date = businessDateOf(slot.startsAt);
+  return `${formatWeekdayShort(date)} ${formatDayMonth(date)} ${formatTime(slot.startsAt)} · ${SERVICE_LABEL[slot.service]} (${slot.pendingAttendance} sin marcar)`;
 }
 
-export function PendingAttendanceBanner({ slots }: { slots: StaffTimeSlotDto[] }) {
+interface PendingAttendanceBannerProps {
+  slots: StaffTimeSlotDto[];
+  isError?: boolean;
+  onRetry?: () => void;
+}
+
+export function PendingAttendanceBanner({ slots, isError = false, onRetry }: PendingAttendanceBannerProps) {
+  if (isError) {
+    return (
+      <div role="alert" className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded border border-border bg-danger-muted px-6 py-3">
+        <p className="text-sm text-danger">No pudimos cargar los turnos con asistencia pendiente.</p>
+        {onRetry ? (
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            Reintentar
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
   if (slots.length === 0) return null;
   const title =
     slots.length === 1 ? 'Hay 1 turno con asistencia pendiente' : `Hay ${slots.length} turnos con asistencia pendiente`;

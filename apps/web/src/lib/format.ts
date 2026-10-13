@@ -7,7 +7,7 @@ const WEEKDAYS_LONG = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Vi
 
 export const SERVICE_LABEL: Record<Service, string> = {
   performance: 'Performance',
-  rehab: 'Rehab',
+  rehab: 'Fisioterapia',
   recovery: 'Recovery',
 };
 
@@ -47,6 +47,18 @@ function dateParts(value: string): DateParts {
   return { year, month, day };
 }
 
+function isCalendarDate({ year, month, day }: DateParts): boolean {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+// Null when the value is neither a real YYYY-MM-DD date nor a parseable instant.
+function validDateParts(value: string): DateParts | null {
+  if (!DATE_ONLY.test(value) && Number.isNaN(new Date(value).getTime())) return null;
+  const parts = dateParts(value);
+  return isCalendarDate(parts) ? parts : null;
+}
+
 const pad = (n: number): string => String(n).padStart(2, '0');
 
 function toIsoDate({ year, month, day }: DateParts): string {
@@ -63,7 +75,9 @@ export function formatUYU(n: number): string {
 }
 
 export function formatDate(d: string): string {
-  const { year, month, day } = dateParts(d);
+  const parts = validDateParts(d);
+  if (!parts) return '—';
+  const { year, month, day } = parts;
   return `${pad(day)}/${pad(month)}/${year}`;
 }
 
@@ -94,12 +108,16 @@ export function initials(name: string): string {
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
-    .map((word) => word[0].toUpperCase())
+    .map((word) => Array.from(word)[0].toUpperCase())
     .join('');
 }
 
 export function businessTodayWeb(now: Date = new Date()): string {
   return toIsoDate(instantParts(now));
+}
+
+export function businessDateOf(instant: string): string {
+  return businessTodayWeb(new Date(instant));
 }
 
 export function addDaysWeb(date: string, n: number): string {

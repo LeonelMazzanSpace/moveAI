@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_MONEY_AMOUNT } from '@/components/staff/form-primitives';
 import type { PaymentMethod, PlanDto } from '@/lib/api/types';
 
 export type ManualPaymentMethod = Extract<PaymentMethod, 'cash' | 'transfer'>;
@@ -11,11 +12,6 @@ export const MANUAL_METHOD_LABEL: Record<ManualPaymentMethod, string> = {
 export const MANUAL_METHODS = Object.keys(MANUAL_METHOD_LABEL) as ManualPaymentMethod[];
 
 const MAX_NOTE_LENGTH = 500;
-export const MAX_AMOUNT = 10_000_000;
-
-function hasMoreThanTwoDecimals(amount: number): boolean {
-  return Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-6;
-}
 
 export interface ManualPaymentPayload {
   userId: string;
@@ -48,11 +44,11 @@ export const manualPaymentSchema = z
       ctx.addIssue({ code: 'custom', path: ['amount'], message: 'El monto no puede ser negativo.' });
       return;
     }
-    if (amount > MAX_AMOUNT) {
+    if (amount > MAX_MONEY_AMOUNT) {
       ctx.addIssue({ code: 'custom', path: ['amount'], message: 'El monto no puede superar $ 10.000.000.' });
       return;
     }
-    if (hasMoreThanTwoDecimals(amount)) {
+    if (Number(amount.toFixed(2)) !== amount) {
       ctx.addIssue({ code: 'custom', path: ['amount'], message: 'Usá hasta 2 decimales.' });
     }
   })

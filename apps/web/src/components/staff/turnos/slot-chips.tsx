@@ -1,12 +1,9 @@
-import type { Service, StaffTimeSlotDto } from '@/lib/api/types';
+import type { StaffTimeSlotDto } from '@/lib/api/types';
 import { formatTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-export const SERVICE_NAMES: Record<Service, string> = {
-  performance: 'Performance',
-  recovery: 'Recovery',
-  rehab: 'Fisioterapia',
-};
+// Kept only for staff/dashboard/dashboard-view.tsx, which still imports it from here.
+export { SERVICE_LABEL as SERVICE_NAMES } from '@/lib/format';
 
 interface SlotChipsProps {
   slots: StaffTimeSlotDto[];

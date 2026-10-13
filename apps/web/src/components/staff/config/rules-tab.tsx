@@ -7,13 +7,14 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { ErrorState } from '@/components/move/error-state';
 import { StatusBadge } from '@/components/move/status-badge';
+import { BUTTON_PRIMARY, CHECKBOX_CLASS, FormField, fieldA11y } from '@/components/staff/form-primitives';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
 import { errorMessage } from '@/lib/api/errors';
+import { applyFieldErrors } from '@/lib/api/field-errors';
 import type { SettingsDto } from '@/lib/api/types';
-import { BUTTON_PRIMARY, CHECKBOX_CLASS, FormField } from './plan-form';
 import {
   changedSettings,
   RULE_FIELDS,
@@ -24,11 +25,12 @@ import {
 } from './rules-form.schema';
 
 const SETTINGS_KEY = ['staff', 'settings'] as const;
+const RULES_FIELDS: readonly (keyof RulesFormInput)[] = [...RULE_FIELDS.map((field) => field.name), 'checkinMonthlyEnabled'];
 
 function RulesForm({ settings }: { settings: SettingsDto }) {
   const uid = useId();
   const queryClient = useQueryClient();
-  const { register, handleSubmit, reset, formState } = useForm<RulesFormInput, unknown, RulesFormValues>({
+  const { register, handleSubmit, reset, setError, formState } = useForm<RulesFormInput, unknown, RulesFormValues>({
     resolver: zodResolver(rulesFormSchema),
     defaultValues: settingsToFormValues(settings),
   });
@@ -41,7 +43,10 @@ function RulesForm({ settings }: { settings: SettingsDto }) {
       reset(settingsToFormValues(updated));
       return queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
     },
-    onError: (error) => toast.error(errorMessage(error)),
+    onError: (error) => {
+      applyFieldErrors(error, RULES_FIELDS, setError);
+      toast.error(errorMessage(error));
+    },
   });
 
   function onValid(values: RulesFormValues) {
@@ -72,6 +77,7 @@ function RulesForm({ settings }: { settings: SettingsDto }) {
               type="number"
               inputMode="decimal"
               step={field.step}
+              {...fieldA11y(`${uid}-${field.name}`, errors[field.name]?.message)}
               {...register(field.name, { valueAsNumber: true })}
             />
           </FormField>

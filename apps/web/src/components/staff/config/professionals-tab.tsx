@@ -9,13 +9,14 @@ import { z } from 'zod';
 import { EmptyState } from '@/components/move/empty-state';
 import { ErrorState } from '@/components/move/error-state';
 import { StatusBadge } from '@/components/move/status-badge';
+import { BUTTON_OUTLINE, BUTTON_PRIMARY, FormField, fieldA11y } from '@/components/staff/form-primitives';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { apiFetch } from '@/lib/api/client';
 import { errorMessage } from '@/lib/api/errors';
+import { applyFieldErrors } from '@/lib/api/field-errors';
 import type { ProfessionalDto } from '@/lib/api/types';
-import { BUTTON_OUTLINE, BUTTON_PRIMARY, FormField } from './plan-form';
 
 const PROFESSIONALS_KEY = ['staff', 'professionals'] as const;
 
@@ -23,11 +24,12 @@ const professionalSchema = z.object({
   name: z.string().trim().min(2, 'Ingresá al menos 2 caracteres.').max(80, 'Máximo 80 caracteres.'),
 });
 type ProfessionalValues = z.infer<typeof professionalSchema>;
+const PROFESSIONAL_FIELDS: readonly (keyof ProfessionalValues)[] = ['name'];
 
 export function ProfessionalsTab() {
   const uid = useId();
   const queryClient = useQueryClient();
-  const { register, handleSubmit, reset, formState } = useForm<ProfessionalValues>({
+  const { register, handleSubmit, reset, setError, formState } = useForm<ProfessionalValues>({
     resolver: zodResolver(professionalSchema),
     defaultValues: { name: '' },
   });
@@ -46,7 +48,10 @@ export function ProfessionalsTab() {
       reset();
       return refresh();
     },
-    onError,
+    onError: (mutationError) => {
+      applyFieldErrors(mutationError, PROFESSIONAL_FIELDS, setError);
+      onError(mutationError);
+    },
   });
   const toggle = useMutation({
     mutationFn: (professional: ProfessionalDto) =>
@@ -67,7 +72,12 @@ export function ProfessionalsTab() {
       >
         <div className="min-w-60 flex-1">
           <FormField id={`${uid}-name`} label="Nombre del profesional" error={formState.errors.name?.message}>
-            <Input id={`${uid}-name`} autoComplete="off" {...register('name')} />
+            <Input
+              id={`${uid}-name`}
+              autoComplete="off"
+              {...fieldA11y(`${uid}-name`, formState.errors.name?.message)}
+              {...register('name')}
+            />
           </FormField>
         </div>
         <button type="submit" className={`${BUTTON_PRIMARY} mt-[26px]`} disabled={create.isPending}>
