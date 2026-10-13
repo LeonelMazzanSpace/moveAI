@@ -8,7 +8,6 @@ import { SettingsModule } from '../settings/settings.module.js';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { CheckoutController } from './controllers/checkout.controller.js';
-import { DevSimulatorController } from './controllers/dev-simulator.controller.js';
 import { StaffPaymentsController } from './controllers/staff-payments.controller.js';
 import { WebhookController } from './controllers/webhook.controller.js';
 import { ReconcilePaymentsJob } from './jobs/reconcile-payments.job.js';
@@ -20,7 +19,7 @@ import { PaymentsService } from './services/payments.service.js';
   imports: [
     SettingsModule, NotificationsModule, UsersModule, AuthModule, CatalogModule, AgendaModule, SubscriptionsModule, BookingsModule,
   ],
-  controllers: [CheckoutController, WebhookController, DevSimulatorController, StaffPaymentsController],
+  controllers: [CheckoutController, WebhookController, StaffPaymentsController],
   providers: [PaymentsService, CheckoutService, MercadoPagoService, ReconcilePaymentsJob],
   exports: [PaymentsService, ReconcilePaymentsJob],
 })

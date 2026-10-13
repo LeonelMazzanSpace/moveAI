@@ -16,6 +16,13 @@ const genericBody = (code: ErrorCode): ApiErrorBody => {
   return { statusCode: status, code, message };
 };
 
+// body-parser throws http-errors (413 too large, 400 bad JSON…) that are not Nest HttpExceptions.
+const exposedClientStatus = (exception: unknown): number | null => {
+  if (typeof exception !== 'object' || exception === null) return null;
+  const { status, expose } = exception as { status?: unknown; expose?: unknown };
+  return typeof status === 'number' && status >= 400 && status < 500 && expose === true ? status : null;
+};
+
 export function toErrorBody(exception: unknown): ApiErrorBody {
   if (exception instanceof AppError) return exception.getResponse() as ApiErrorBody;
   if (exception instanceof HttpException) {
@@ -24,6 +31,8 @@ export function toErrorBody(exception: unknown): ApiErrorBody {
     const fallback: ErrorCode = status < 500 ? 'VALIDATION_FAILED' : 'INTERNAL_ERROR';
     return genericBody(CODE_BY_STATUS[status] ?? fallback);
   }
+  const clientStatus = exposedClientStatus(exception);
+  if (clientStatus !== null) return genericBody(CODE_BY_STATUS[clientStatus] ?? 'VALIDATION_FAILED');
   return genericBody('INTERNAL_ERROR');
 }
 

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/move/empty-state';
 import { ErrorState } from '@/components/move/error-state';
+import { StatusBadge } from '@/components/move/status-badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -55,7 +56,8 @@ function BookingRow({ booking, onCancel }: { booking: BookingDto; onCancel: (boo
           Cancelar
         </Button>
       ) : null}
-      {!booking.canCancel && booking.source === 'payment' ? (
+      {booking.status === 'pending_payment' ? <StatusBadge tone="warning">Pago pendiente</StatusBadge> : null}
+      {!booking.canCancel && booking.source === 'payment' && booking.status !== 'pending_payment' ? (
         <span className="text-xs text-muted-foreground">Cancelación con MOVE</span>
       ) : null}
     </li>

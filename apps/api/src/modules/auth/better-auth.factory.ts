@@ -16,6 +16,7 @@ export interface BetterAuthDeps {
 }
 
 const logger = new Logger('BetterAuth');
+const USER_AGENT_LENGTH = 512;
 
 // Better Auth stores sign-up fields as sent: apply the PATCH /me rules (trim, bounds, no NUL) before it writes the user.
 // `image` is never accepted here: the web does not send it and Google's image arrives through the OAuth callback.
@@ -44,6 +45,16 @@ export function createBetterAuth(deps: BetterAuthDeps) {
     // Profile edits go through PATCH /api/me, which validates them.
     disabledPaths: ['/update-user'],
     hooks: { before: validateSignUp },
+    databaseHooks: {
+      session: {
+        create: {
+          // The User-Agent header is client-controlled: cap what is stored in sessions.user_agent.
+          before: async (session) => ({
+            data: { ...session, userAgent: session.userAgent?.slice(0, USER_AGENT_LENGTH) ?? null },
+          }),
+        },
+      },
+    },
     // Forward only the message: Better Auth passes raw errors (e.g. pg details with emails) as extra arguments.
     logger: {
       log: (level, message) => {

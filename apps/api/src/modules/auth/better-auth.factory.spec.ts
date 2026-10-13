@@ -61,9 +61,22 @@ describe('createBetterAuth', () => {
 
   it('forwards only the log message to Nest, never the extra arguments', () => {
     const error = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-    make().options.logger.log?.('error', 'Failed to create user', new Error('Key (email)=(a@x) already exists'));
+    const log = make().options.logger.log as ((level: string, message: string, ...extra: unknown[]) => void) | undefined;
+    log?.('error', 'Failed to create user', new Error('Key (email)=(a@x) already exists'));
     expect(error).toHaveBeenCalledWith('Failed to create user');
     error.mockRestore();
+  });
+
+  it('truncates the session user agent to 512 characters before it is stored', async () => {
+    const before = make().options.databaseHooks?.session?.create?.before;
+    expect(before).toBeTypeOf('function');
+    const session = { id: 's1', userId: 'u1', token: 't', expiresAt: new Date(), createdAt: new Date(), updatedAt: new Date() };
+    const long = await before?.({ ...session, userAgent: 'a'.repeat(2000) });
+    expect(long).toMatchObject({ data: { userAgent: 'a'.repeat(512) } });
+    const short = await before?.({ ...session, userAgent: 'Mozilla/5.0' });
+    expect(short).toMatchObject({ data: { userAgent: 'Mozilla/5.0' } });
+    const none = await before?.({ ...session, userAgent: null });
+    expect(none).toMatchObject({ data: { userAgent: null } });
   });
 
   it('uses secure and cross-subdomain cookies when configured', () => {
