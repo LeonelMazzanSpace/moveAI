@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { RecoveryBookingFlow } from '@/components/checkout/recovery-booking-flow';
 import { DisplayTitle } from '@/components/move/display-title';
 import { PageContainer } from '@/components/move/page-container';
 import { Hero } from '@/components/public/hero';
@@ -19,6 +20,11 @@ const TAGS = ['Abierto a público general', 'Sin plan previo'];
 async function RecoveryPlans() {
   const plans = await loadPlans('recovery');
   return <RecoveryModalities plans={plans} />;
+}
+
+async function RecoveryReservation() {
+  const plans = await loadPlans('recovery');
+  return <RecoveryBookingFlow plans={plans} />;
 }
 
 export default function RecoveryPage() {
@@ -58,7 +64,13 @@ export default function RecoveryPage() {
         </PageContainer>
       </section>
 
-      <section id="reservar" className="border-t border-border" />
+      <section id="reservar" className="border-t border-border">
+        <PageContainer className="py-16">
+          <Suspense fallback={<PlansSkeleton />}>
+            <RecoveryReservation />
+          </Suspense>
+        </PageContainer>
+      </section>
 
       <HowItWorks />
     </>
