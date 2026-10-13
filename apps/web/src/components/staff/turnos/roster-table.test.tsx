@@ -107,3 +107,94 @@ describe('RosterTable', () => {
     expect(onCancel).toHaveBeenCalledWith('b1');
   });
 });
+
+describe('RosterTable on mobile', () => {
+  it('stacks each booking as a card so the attendance and cancel buttons need no horizontal swipe', () => {
+    render(<RosterTable rows={[row({ bookingId: 'b1' })]} canMark onMark={vi.fn()} onCancel={vi.fn()} />);
+    const first = screen.getByRole('row', { name: /Martina Suárez/ });
+    expect(first).toHaveClass('max-md:grid');
+    expect(first.closest('table')).toHaveClass('max-md:block');
+    expect(screen.getByRole('columnheader', { name: 'Registrar' }).closest('thead')).toHaveClass('max-md:sr-only');
+    const actions = within(first).getByRole('button', { name: 'Presente' }).closest('td');
+    expect(actions).toHaveClass('max-md:col-span-2');
+    expect(within(first).getByRole('button', { name: 'Cancelar reserva de Martina Suárez' }).closest('td')).toBe(actions);
+  });
+
+  it('labels the cells whose header is hidden on mobile', () => {
+    render(<RosterTable rows={[row({ bookingId: 'b1' })]} canMark onMark={vi.fn()} />);
+    const cells = Array.from(screen.getByRole('row', { name: /Martina Suárez/ }).querySelectorAll('td'));
+    expect(cells.map((cell) => cell.getAttribute('data-label'))).toEqual([null, 'Plan', 'Última asistencia', null, null]);
+  });
+});
+
+describe('RosterTable button hover tints', () => {
+  const GHOST_HOVER = ['hover:bg-muted', 'hover:text-foreground', 'dark:hover:bg-muted/50'];
+
+  it.each([
+    ['present', 'Presente', 'success'],
+    ['absent', 'Ausente', 'danger'],
+    ['no_show', 'No show', 'danger'],
+  ] as const)('keeps the %s tint on hover, in light and dark, when it is the active attendance', (attendance, name, tone) => {
+    render(<RosterTable rows={[row({ bookingId: 'b1', attendance })]} canMark onMark={vi.fn()} />);
+    const button = screen.getByRole('button', { name });
+    expect(button).toHaveClass(`bg-${tone}-muted`, `text-${tone}`, `hover:bg-${tone}-muted`, `hover:text-${tone}`, `dark:hover:bg-${tone}-muted`);
+    for (const ghost of GHOST_HOVER) expect(button).not.toHaveClass(ghost);
+  });
+
+  it('tints an inactive attendance button on hover in dark too, only while marking is allowed', () => {
+    render(<RosterTable rows={[row({ bookingId: 'b1' })]} canMark onMark={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Presente' })).toHaveClass('hover:bg-success-muted', 'dark:hover:bg-success-muted');
+    expect(screen.getByRole('button', { name: 'Ausente' })).toHaveClass('hover:bg-danger-muted', 'dark:hover:bg-danger-muted');
+    expect(screen.getByRole('button', { name: 'No show' })).toHaveClass('hover:bg-danger-muted', 'dark:hover:bg-danger-muted');
+  });
+
+  it('does not tint the attendance buttons on hover while marking is not allowed', () => {
+    render(<RosterTable rows={[row({ bookingId: 'b1' })]} canMark={false} onMark={vi.fn()} />);
+    for (const name of ['Presente', 'Ausente', 'No show']) {
+      const button = screen.getByRole('button', { name });
+      expect(button.className).not.toMatch(/hover:bg-(success|danger)-muted/);
+    }
+  });
+
+  it('keeps the cancel button transparent on hover in dark too, turning only its text red', () => {
+    render(<RosterTable rows={[row({ bookingId: 'b1' })]} canMark onMark={vi.fn()} onCancel={vi.fn()} />);
+    const cancel = screen.getByRole('button', { name: 'Cancelar reserva de Martina Suárez' });
+    expect(cancel).toHaveClass('hover:bg-transparent', 'dark:hover:bg-transparent', 'hover:text-danger');
+    for (const ghost of GHOST_HOVER) expect(cancel).not.toHaveClass(ghost);
+  });
+});
+
+describe('RosterTable semantics below md', () => {
+  const renderRows = () =>
+    render(<RosterTable rows={[row({ bookingId: 'b1' }), row({ bookingId: 'b2', client: { id: 'r', name: 'Rodrigo Silva' } })]} canMark onMark={vi.fn()} />);
+
+  it('spells the table roles so they survive display block/grid', () => {
+    renderRows();
+    const table = screen.getByRole('table');
+    expect(table).toHaveAttribute('role', 'table');
+    expect(screen.getAllByRole('rowgroup')).toHaveLength(2);
+    expect(screen.getAllByRole('row')).toHaveLength(3);
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+      'Alumno',
+      'Plan',
+      'Última asistencia',
+      'Estado',
+      'Registrar',
+    ]);
+    for (const element of table.querySelectorAll('thead, tbody, tr, th, td')) expect(element).toHaveAttribute('role');
+  });
+
+  it('labels the student and status cells for assistive technology', () => {
+    renderRows();
+    const first = screen.getAllByRole('row')[1];
+    expect(within(first).getByRole('cell', { name: /^Alumno:\s*Martina Suárez$/ })).toBeInTheDocument();
+    expect(within(first).getByRole('cell', { name: /^Estado:\s*Pendiente$/ })).toBeInTheDocument();
+  });
+
+  it('shows the cells in the same order on mobile as in the DOM', () => {
+    renderRows();
+    const cells = Array.from(screen.getAllByRole('row')[1].querySelectorAll('td'));
+    expect(cells.map((cell) => cell.getAttribute('data-label'))).toEqual([null, 'Plan', 'Última asistencia', null, null]);
+    for (const cell of cells) expect(cell.className).not.toMatch(/max-md:(order|row-start|col-start)/);
+  });
+});

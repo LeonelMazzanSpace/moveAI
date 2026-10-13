@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { AttendanceStatus, RosterItemDto } from '@/lib/api/types';
 import { formatDayMonth, formatTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { MOBILE_CELL, MOBILE_LABELLED_CELL, MOBILE_ROW, MOBILE_TABLE, MOBILE_TABLE_BODY, MOBILE_TABLE_HEAD } from '@/components/staff/shared/mobile-card';
 import { AttendanceButtons } from './attendance-buttons';
 
 interface RosterPagination {
@@ -54,7 +55,7 @@ function RowActions({ row, canMark, markHint, onMark, onCancel }: Pick<RosterTab
     return <span className="text-xs text-muted-foreground">{inactiveLabel(row)}</span>;
   }
   return (
-    <div className="flex items-center justify-end gap-2">
+    <div className="flex items-center justify-end gap-2 max-md:flex-wrap max-md:justify-start">
       {row.status === 'confirmed' ? (
         <AttendanceButtons value={row.attendance} canMark={canMark} hint={markHint} onMark={(status) => onMark(row.bookingId, status)} />
       ) : null}
@@ -63,7 +64,7 @@ function RowActions({ row, canMark, markHint, onMark, onCancel }: Pick<RosterTab
           type="button"
           aria-label={`Cancelar reserva de ${row.client.name}`}
           onClick={() => onCancel(row.bookingId)}
-          className={moveButton({ variant: 'ghost', className: 'px-2 text-muted-foreground hover:bg-transparent hover:text-danger' })}
+          className={moveButton({ variant: 'ghost', className: 'px-2 text-muted-foreground hover:bg-transparent hover:text-danger dark:hover:bg-transparent' })}
         >
           Cancelar
         </button>
@@ -95,30 +96,34 @@ function Pagination({ total, page, pageSize, onPageChange, shown }: RosterPagina
 export function RosterTable({ rows, canMark, markHint, onMark, onCancel, pagination }: RosterTableProps) {
   return (
     <>
-      <Table>
-        <TableHeader>
-          <TableRow className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            <TableHead className="px-6">Alumno</TableHead>
-            <TableHead className="px-6">Plan</TableHead>
-            <TableHead className="px-6">Última asistencia</TableHead>
-            <TableHead className="px-6">Estado</TableHead>
-            <TableHead className="px-6 text-right">Registrar</TableHead>
+      <Table role="table" className={MOBILE_TABLE}>
+        <TableHeader role="rowgroup" className={MOBILE_TABLE_HEAD}>
+          <TableRow role="row" className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <TableHead role="columnheader" className="px-6">Alumno</TableHead>
+            <TableHead role="columnheader" className="px-6">Plan</TableHead>
+            <TableHead role="columnheader" className="px-6">Última asistencia</TableHead>
+            <TableHead role="columnheader" className="px-6">Estado</TableHead>
+            <TableHead role="columnheader" className="px-6 text-right">Registrar</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody>
+        <TableBody role="rowgroup" className={MOBILE_TABLE_BODY}>
           {rows.map((row) => {
             const state = rowState(row);
             return (
-              <TableRow key={row.bookingId} className={cn(isInactive(row) && 'opacity-50')}>
-                <TableCell className={cn('px-6 py-3.5 font-medium', isInactive(row) && 'line-through')}>{row.client.name}</TableCell>
-                <TableCell className="px-6 py-3.5 text-muted-foreground">{row.planName ?? '—'}</TableCell>
-                <TableCell className="px-6 py-3.5 text-muted-foreground">
+              <TableRow role="row" key={row.bookingId} className={cn(MOBILE_ROW, isInactive(row) && 'opacity-50')}>
+                <TableCell role="cell" className={cn('px-6 py-3.5 font-medium', MOBILE_CELL, 'max-md:col-span-2', isInactive(row) && 'line-through')}>
+                  <span className="sr-only">Alumno: </span>
+                  {row.client.name}
+                </TableCell>
+                <TableCell role="cell" data-label="Plan" className={cn('px-6 py-3.5 text-muted-foreground', MOBILE_LABELLED_CELL)}>{row.planName ?? '—'}</TableCell>
+                <TableCell role="cell" data-label="Última asistencia" className={cn('px-6 py-3.5 text-muted-foreground', MOBILE_LABELLED_CELL)}>
                   {row.lastAttendanceOn ? formatDayMonth(row.lastAttendanceOn) : '—'}
                 </TableCell>
-                <TableCell className="px-6 py-3.5">
+                <TableCell role="cell" className={cn('px-6 py-3.5', MOBILE_CELL, 'max-md:col-span-2')}>
+                  <span className="sr-only">Estado: </span>
                   <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
                 </TableCell>
-                <TableCell className="px-6 py-3.5 text-right">
+                <TableCell role="cell" className={cn('px-6 py-3.5 text-right', MOBILE_CELL, 'max-md:col-span-2 max-md:text-left')}>
                   <RowActions row={row} canMark={canMark} markHint={markHint} onMark={onMark} onCancel={onCancel} />
                 </TableCell>
               </TableRow>
