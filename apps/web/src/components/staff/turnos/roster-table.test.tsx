@@ -126,3 +126,40 @@ describe('RosterTable on mobile', () => {
     expect(cells.map((cell) => cell.getAttribute('data-label'))).toEqual([null, 'Plan', 'Última asistencia', null, null]);
   });
 });
+
+describe('RosterTable button hover tints', () => {
+  const GHOST_HOVER = ['hover:bg-muted', 'hover:text-foreground', 'dark:hover:bg-muted/50'];
+
+  it.each([
+    ['present', 'Presente', 'success'],
+    ['absent', 'Ausente', 'danger'],
+    ['no_show', 'No show', 'danger'],
+  ] as const)('keeps the %s tint on hover, in light and dark, when it is the active attendance', (attendance, name, tone) => {
+    render(<RosterTable rows={[row({ bookingId: 'b1', attendance })]} canMark onMark={vi.fn()} />);
+    const button = screen.getByRole('button', { name });
+    expect(button).toHaveClass(`bg-${tone}-muted`, `text-${tone}`, `hover:bg-${tone}-muted`, `hover:text-${tone}`, `dark:hover:bg-${tone}-muted`);
+    for (const ghost of GHOST_HOVER) expect(button).not.toHaveClass(ghost);
+  });
+
+  it('tints an inactive attendance button on hover in dark too, only while marking is allowed', () => {
+    render(<RosterTable rows={[row({ bookingId: 'b1' })]} canMark onMark={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Presente' })).toHaveClass('hover:bg-success-muted', 'dark:hover:bg-success-muted');
+    expect(screen.getByRole('button', { name: 'Ausente' })).toHaveClass('hover:bg-danger-muted', 'dark:hover:bg-danger-muted');
+    expect(screen.getByRole('button', { name: 'No show' })).toHaveClass('hover:bg-danger-muted', 'dark:hover:bg-danger-muted');
+  });
+
+  it('does not tint the attendance buttons on hover while marking is not allowed', () => {
+    render(<RosterTable rows={[row({ bookingId: 'b1' })]} canMark={false} onMark={vi.fn()} />);
+    for (const name of ['Presente', 'Ausente', 'No show']) {
+      const button = screen.getByRole('button', { name });
+      expect(button.className).not.toMatch(/hover:bg-(success|danger)-muted/);
+    }
+  });
+
+  it('keeps the cancel button transparent on hover in dark too, turning only its text red', () => {
+    render(<RosterTable rows={[row({ bookingId: 'b1' })]} canMark onMark={vi.fn()} onCancel={vi.fn()} />);
+    const cancel = screen.getByRole('button', { name: 'Cancelar reserva de Martina Suárez' });
+    expect(cancel).toHaveClass('hover:bg-transparent', 'dark:hover:bg-transparent', 'hover:text-danger');
+    for (const ghost of GHOST_HOVER) expect(cancel).not.toHaveClass(ghost);
+  });
+});

@@ -15,9 +15,9 @@ interface AttendanceOption {
 }
 
 const OPTIONS: AttendanceOption[] = [
-  { status: 'present', short: 'P', label: 'Presente', activeClass: 'bg-success-muted text-success', hoverClass: 'hover:bg-success-muted hover:text-success' },
-  { status: 'absent', short: 'A', label: 'Ausente', title: 'Ausente: avisó fuera de plazo', activeClass: 'bg-danger-muted text-danger', hoverClass: 'hover:bg-danger-muted hover:text-danger' },
-  { status: 'no_show', short: 'NS', label: 'No show', title: 'No show: no avisó', activeClass: 'bg-danger-muted text-danger', hoverClass: 'hover:bg-danger-muted hover:text-danger' },
+  { status: 'present', short: 'P', label: 'Presente', activeClass: 'bg-success-muted text-success', hoverClass: 'hover:bg-success-muted hover:text-success dark:hover:bg-success-muted' },
+  { status: 'absent', short: 'A', label: 'Ausente', title: 'Ausente: avisó fuera de plazo', activeClass: 'bg-danger-muted text-danger', hoverClass: 'hover:bg-danger-muted hover:text-danger dark:hover:bg-danger-muted' },
+  { status: 'no_show', short: 'NS', label: 'No show', title: 'No show: no avisó', activeClass: 'bg-danger-muted text-danger', hoverClass: 'hover:bg-danger-muted hover:text-danger dark:hover:bg-danger-muted' },
 ];
 
 interface AttendanceButtonsProps {

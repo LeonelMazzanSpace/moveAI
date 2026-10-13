@@ -64,7 +64,7 @@ function RowActions({ row, canMark, markHint, onMark, onCancel }: Pick<RosterTab
           type="button"
           aria-label={`Cancelar reserva de ${row.client.name}`}
           onClick={() => onCancel(row.bookingId)}
-          className={moveButton({ variant: 'ghost', className: 'px-2 text-muted-foreground hover:bg-transparent hover:text-danger' })}
+          className={moveButton({ variant: 'ghost', className: 'px-2 text-muted-foreground hover:bg-transparent hover:text-danger dark:hover:bg-transparent' })}
         >
           Cancelar
         </button>
