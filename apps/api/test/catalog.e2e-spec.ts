@@ -2,7 +2,7 @@ import request from 'supertest';
 import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
 import { createTestApp, type TestApp } from './utils/app.js';
 import { signUpClient, signUpStaff, type TestAgent } from './utils/auth.js';
-import { resetDb } from './utils/db.js';
+import { resetDb, waitForLockWaiters } from './utils/db.js';
 
 const validPlan = { service: 'performance', kind: 'period_plan', slug: 'performance-anual', name: 'Plan Anual', price: 36000, periodMonths: 12 };
 
@@ -106,18 +106,6 @@ describe('catalog (e2e)', () => {
       await staff.post('/api/staff/plans').send({ ...validPlan, slug: 'performance-mensual' }).expect(409).expect(expectCode('SLUG_TAKEN'));
     });
 
-    async function waitForLockWaiters(expected: number): Promise<void> {
-      const deadline = Date.now() + 10_000;
-      while (Date.now() < deadline) {
-        const [{ waiting }] = await ctx.dataSource.query(
-          `SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
-        );
-        if (waiting >= expected) return;
-        await new Promise((resolve) => setTimeout(resolve, 20));
-      }
-      throw new Error(`expected ${expected} backends waiting on a lock`);
-    }
-
     // Barrier: an open transaction holds the slug in the unique index, so both POSTs pass the existence check and are
     // seen waiting on it before it rolls back; the one that loses the race hits the index and must answer 409, not 500.
     it('answers SLUG_TAKEN, never 500, to the loser of two concurrent creates with the same slug', async () => {
@@ -131,7 +119,7 @@ describe('catalog (e2e)', () => {
           [validPlan.slug],
         );
         pending = Promise.all([staff.post('/api/staff/plans').send(validPlan), staff.post('/api/staff/plans').send(validPlan)]);
-        await waitForLockWaiters(2);
+        await waitForLockWaiters(ctx.dataSource, 2);
       } catch (error) {
         await holder.rollbackTransaction();
         await holder.release();

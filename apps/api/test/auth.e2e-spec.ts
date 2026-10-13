@@ -359,6 +359,11 @@ describe('UsersService (e2e)', () => {
   beforeAll(async () => { ctx = await createTestApp(); users = ctx.app.get(UsersService); });
   afterAll(async () => { await ctx.app.close(); });
   beforeEach(async () => { await resetDb(ctx.dataSource); });
+  // Compared inside Postgres, at full precision: a write in the same millisecond as the previous one cannot flake.
+  const updatedAt = async (id: string): Promise<string> =>
+    (await ctx.dataSource.query(`SELECT updated_at::text AS at FROM users WHERE id = $1`, [id]))[0].at;
+  const movedSince = async (id: string, at: string): Promise<boolean> =>
+    (await ctx.dataSource.query(`SELECT updated_at > $2::timestamptz AS moved FROM users WHERE id = $1`, [id, at]))[0].moved;
 
   it('lists clients by name, without staff or deleted users', async () => {
     const bruno = await signUp(ctx.app, { name: 'Bruno' });
@@ -390,8 +395,6 @@ describe('UsersService (e2e)', () => {
   it('promotes a user to staff with a verified email inside the given transaction', async () => {
     const { userId } = await signUp(ctx.app);
     const other = await signUp(ctx.app);
-    const updatedAt = async (id: string): Promise<number> =>
-      new Date((await ctx.dataSource.query(`SELECT updated_at FROM users WHERE id = $1`, [id]))[0].updated_at).getTime();
     const [promotedBefore, otherBefore] = [await updatedAt(userId), await updatedAt(other.userId)];
     await ctx.dataSource.transaction((manager) => users.promoteToStaff(manager, userId));
     const rows = await ctx.dataSource.query(
@@ -401,8 +404,8 @@ describe('UsersService (e2e)', () => {
       { id: userId, role: 'staff', email_verified: true },
       { id: other.userId, role: 'client', email_verified: false },
     ]));
-    expect(await updatedAt(userId)).toBeGreaterThan(promotedBefore);
-    expect(await updatedAt(other.userId)).toBe(otherBefore);
+    expect(await movedSince(userId, promotedBefore)).toBe(true);
+    expect(await movedSince(other.userId, otherBefore)).toBe(false);
     await expect(ctx.dataSource.transaction(async (manager) => {
       await users.promoteToStaff(manager, other.userId);
       throw new Error('rollback');
@@ -412,12 +415,11 @@ describe('UsersService (e2e)', () => {
 
   it('sets only the staff role inside the given transaction and moves updated_at', async () => {
     const { userId } = await signUp(ctx.app);
-    const read = async () => (await ctx.dataSource.query(`SELECT role, email_verified, updated_at FROM users WHERE id = $1`, [userId]))[0];
-    const before = await read();
+    const before = await updatedAt(userId);
     await ctx.dataSource.transaction((manager) => users.setStaffRole(manager, userId));
-    const after = await read();
-    expect(after).toMatchObject({ role: 'staff', email_verified: false });
-    expect(new Date(after.updated_at).getTime()).toBeGreaterThan(new Date(before.updated_at).getTime());
+    const [after] = await ctx.dataSource.query(`SELECT role, email_verified FROM users WHERE id = $1`, [userId]);
+    expect(after).toEqual({ role: 'staff', email_verified: false });
+    expect(await movedSince(userId, before)).toBe(true);
     await ctx.dataSource.query(`UPDATE users SET role = 'client' WHERE id = $1`, [userId]);
     await expect(ctx.dataSource.transaction(async (manager) => {
       await users.setStaffRole(manager, userId);

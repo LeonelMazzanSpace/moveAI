@@ -3,9 +3,11 @@ import request from 'supertest';
 import { addDays, businessMonth, businessToday } from '../src/common/time/business-time.js';
 import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
 import { CheckinsService } from '../src/modules/followup/services/checkins.service.js';
+import type { UserModel } from '../src/modules/users/models/user.model.js';
+import { UsersService } from '../src/modules/users/services/users.service.js';
 import { createTestApp, type TestApp } from './utils/app.js';
 import { signUp, signUpClient, signUpStaff } from './utils/auth.js';
-import { resetDb } from './utils/db.js';
+import { resetDb, waitForLockWaiters } from './utils/db.js';
 import { givePerformancePlan } from './utils/fixtures.js';
 
 describe('check-ins (e2e)', () => {
@@ -59,18 +61,6 @@ describe('check-ins — rules (e2e)', () => {
   };
   const sortByKey = <T extends { key: string }>(rows: T[]): T[] => [...rows].sort((a, b) => a.key.localeCompare(b.key));
 
-  async function waitForLockWaiters(expected: number): Promise<void> {
-    const deadline = Date.now() + 10_000;
-    while (Date.now() < deadline) {
-      const [{ waiting }] = await ctx.dataSource.query(
-        `SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
-      );
-      if (waiting >= expected) return;
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
-    throw new Error(`expected ${expected} backends waiting on a lock`);
-  }
-
   it('sends only to clients with a current Performance plan who are not paused', async () => {
     const staff = await signUpStaff(ctx.app, ctx.dataSource);
     const eligible = await withPlan('Martina Suárez');
@@ -105,7 +95,7 @@ describe('check-ins — rules (e2e)', () => {
     try {
       await holder.query(`INSERT INTO checkins (user_id, period) VALUES ($1, $2)`, [client.userId, period()]);
       pending = Promise.all([checkins.send(period()), checkins.send(period())]);
-      await waitForLockWaiters(2);
+      await waitForLockWaiters(ctx.dataSource, 2);
     } catch (error) {
       await holder.rollbackTransaction();
       await holder.release();
@@ -148,6 +138,29 @@ describe('check-ins — rules (e2e)', () => {
     expect((await staff.agent.post('/api/staff/checkins/send').expect(201)).body.sent).toBe(0);
     expect(sortByKey(await invites())).toEqual(sortByKey(expected));
     expect(await ctx.dataSource.query(`SELECT id FROM email_logs WHERE user_id = $1`, [deleted.userId])).toEqual([]);
+  });
+
+  // The user lookup already drops deleted users; stubbing it to return everyone leaves the SQL filter of
+  // `emailMissingInvites` (`u.deleted_at IS NULL`) as the only thing keeping a deleted client from being emailed.
+  it('does not select the check-in of a deleted client for an invite, whatever the user lookup returns', async () => {
+    const orphan = await withPlan();
+    const deleted = await withPlan();
+    for (const { userId } of [orphan, deleted]) {
+      await ctx.dataSource.query(`INSERT INTO checkins (user_id, period) VALUES ($1, $2)`, [userId, period()]);
+    }
+    await ctx.dataSource.query(`UPDATE users SET deleted_at = now() WHERE id = $1`, [deleted.userId]);
+    const everyone = async (ids: string[]): Promise<UserModel[]> => ids.map((id) => ({
+      id, name: 'Test', email: `${id}@test.move`, role: 'client', phone: null, rehabFollowupEnabled: false, createdAt: new Date(),
+    }));
+    const lookup = vi.spyOn(UsersService.prototype, 'findByIds').mockImplementation(everyone);
+    try {
+      await ctx.app.get(CheckinsService).send(period());
+      expect(lookup).toHaveBeenCalled();
+    } finally {
+      lookup.mockRestore();
+    }
+    const emailed = await ctx.dataSource.query(`SELECT user_id AS "userId" FROM email_logs`);
+    expect(emailed).toEqual([{ userId: orphan.userId }]);
   });
 
   it('lets only the owner answer and validates the answers', async () => {

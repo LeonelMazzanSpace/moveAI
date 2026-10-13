@@ -12,3 +12,16 @@ export async function resetDb(dataSource: DataSource): Promise<void> {
   }
   await insertDefaultSettings(dataSource);
 }
+
+// Waits until at least `expected` backends of the database are blocked on a lock: the barrier of the concurrency specs.
+export async function waitForLockWaiters(dataSource: DataSource, expected: number): Promise<void> {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const [{ waiting }] = await dataSource.query(
+      `SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+    );
+    if (waiting >= expected) return;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error(`expected ${expected} backends waiting on a lock`);
+}

@@ -4,7 +4,7 @@ import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
 import { SubscriptionsService } from '../src/modules/subscriptions/services/subscriptions.service.js';
 import { createTestApp, type TestApp } from './utils/app.js';
 import { signUpClient, signUpStaff } from './utils/auth.js';
-import { resetDb } from './utils/db.js';
+import { resetDb, waitForLockWaiters } from './utils/db.js';
 
 describe('subscriptions (e2e)', () => {
   let ctx: TestApp;
@@ -12,18 +12,6 @@ describe('subscriptions (e2e)', () => {
   beforeAll(async () => { ctx = await createTestApp(); subs = ctx.app.get(SubscriptionsService); });
   afterAll(async () => { await ctx.app.close(); });
   beforeEach(async () => { await resetDb(ctx.dataSource); await seedCatalogAndSchedule(ctx.dataSource); });
-
-  async function waitForLockWaiters(expected: number): Promise<void> {
-    const deadline = Date.now() + 10_000;
-    while (Date.now() < deadline) {
-      const [{ waiting }] = await ctx.dataSource.query(
-        `SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
-      );
-      if (waiting >= expected) return;
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
-    throw new Error(`expected ${expected} backends waiting on a lock`);
-  }
 
   // Barrier: a separate connection takes the lock first, `start` fires the competing work without awaiting it, and the
   // lock is only released once `waiters` backends are blocked on it, so the work really overlaps.
@@ -35,7 +23,7 @@ describe('subscriptions (e2e)', () => {
     try {
       await gate.query(lock.sql, lock.params);
       pending = start();
-      await waitForLockWaiters(waiters);
+      await waitForLockWaiters(ctx.dataSource, waiters);
     } finally {
       await gate.commitTransaction();
       await gate.release();
