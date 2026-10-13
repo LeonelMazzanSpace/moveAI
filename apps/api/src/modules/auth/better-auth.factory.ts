@@ -1,5 +1,8 @@
+import { Logger } from '@nestjs/common';
 import { betterAuth } from 'better-auth';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
 import type { Pool } from 'pg';
+import { cleanText, NAME_LENGTH, PHONE_LENGTH } from '../users/dto/update-me.dto.js';
 
 export interface BetterAuthDeps {
   pool: Pool;
@@ -12,6 +15,21 @@ export interface BetterAuthDeps {
   sendResetPassword: (data: { user: { id: string; email: string; name: string }; url: string; token: string }) => Promise<void>;
 }
 
+const logger = new Logger('BetterAuth');
+
+// Better Auth stores sign-up fields as sent: apply the PATCH /me rules (trim, bounds, no NUL) before it writes the user.
+const validateSignUp = createAuthMiddleware(async (ctx) => {
+  if (ctx.path !== '/sign-up/email') return;
+  const body = (ctx.body ?? {}) as Record<string, unknown>;
+  const name = cleanText(body.name, NAME_LENGTH);
+  const hasPhone = body.phone !== undefined && body.phone !== null;
+  const phone = hasPhone ? cleanText(body.phone, PHONE_LENGTH) : null;
+  if (name === null || (hasPhone && phone === null)) {
+    throw new APIError('BAD_REQUEST', { code: 'VALIDATION_FAILED', message: 'Los datos enviados no son válidos.' });
+  }
+  return { context: { body: { ...body, name, ...(phone === null ? {} : { phone }) } } };
+});
+
 // The only Better Auth instance of the app. Tables and columns follow the Data contract mapping.
 export function createBetterAuth(deps: BetterAuthDeps) {
   return betterAuth({
@@ -20,6 +38,18 @@ export function createBetterAuth(deps: BetterAuthDeps) {
     baseURL: deps.baseURL,
     basePath: '/api/auth',
     trustedOrigins: [deps.webUrl],
+    // Profile edits go through PATCH /api/me, which validates them.
+    disabledPaths: ['/update-user'],
+    hooks: { before: validateSignUp },
+    // Forward only the message: Better Auth passes raw errors (e.g. pg details with emails) as extra arguments.
+    logger: {
+      log: (level, message) => {
+        if (level === 'error') logger.error(message);
+        else if (level === 'warn') logger.warn(message);
+        else if (level === 'info') logger.log(message);
+        else logger.debug(message);
+      },
+    },
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 8,
@@ -27,6 +57,11 @@ export function createBetterAuth(deps: BetterAuthDeps) {
       sendResetPassword: ({ user, url, token }) =>
         deps.sendResetPassword({ user: { id: user.id, email: user.email, name: user.name }, url, token }),
       resetPasswordTokenExpiresIn: 3600,
+      revokeSessionsOnPasswordReset: true,
+      // D40: completing a reset or invitation link proves inbox ownership, so Google can link to the account afterwards.
+      onPasswordReset: async ({ user }) => {
+        await deps.pool.query('UPDATE users SET email_verified = true, updated_at = now() WHERE id = $1', [user.id]);
+      },
     },
     socialProviders: deps.google ? { google: deps.google } : {},
     user: {
@@ -59,6 +94,8 @@ export function createBetterAuth(deps: BetterAuthDeps) {
     },
     advanced: {
       database: { generateId: 'uuid' },
+      // Better Auth skips origin, callback and redirect checks under test by default; keep them on everywhere.
+      disableOriginCheck: false,
       useSecureCookies: deps.isProduction,
       crossSubDomainCookies: deps.cookieDomain ? { enabled: true, domain: deps.cookieDomain } : undefined,
     },

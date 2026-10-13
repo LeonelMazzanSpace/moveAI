@@ -1,4 +1,5 @@
-// Usage: pnpm --filter @move/api user:create-staff -- --email <e> --name <n> --password <p>
+// Usage: pnpm --filter @move/api user:create-staff -- --email <e> --name <n> [--password <p>]
+// The password can come from CREATE_STAFF_PASSWORD instead, so it stays out of shell history and pnpm's echo.
 // Creates the user (or reuses the one with that email) and promotes it to staff. Prints only the id.
 import { parseArgs } from 'node:util';
 import { NestFactory } from '@nestjs/core';
@@ -6,6 +7,7 @@ import { DataSource } from 'typeorm';
 import { AppModule } from '../app.module.js';
 import { BETTER_AUTH } from '../modules/auth/auth.constants.js';
 import type { BetterAuthInstance } from '../modules/auth/better-auth.factory.js';
+import { cleanText, NAME_LENGTH } from '../modules/users/dto/update-me.dto.js';
 import { UsersService } from '../modules/users/services/users.service.js';
 
 const { values } = parseArgs({
@@ -13,12 +15,16 @@ const { values } = parseArgs({
   options: { email: { type: 'string' }, name: { type: 'string' }, password: { type: 'string' } },
 });
 
-if (!values.email || !values.name || !values.password) {
-  console.error('Usage: user:create-staff -- --email <email> --name <name> --password <password>');
+const email = cleanText(values.email, { min: 3, max: 254 })?.toLowerCase();
+const name = cleanText(values.name, NAME_LENGTH);
+const password = values.password ?? process.env.CREATE_STAFF_PASSWORD;
+
+if (!email || !name || !password) {
+  console.error('Usage: user:create-staff -- --email <email> --name <name> [--password <password>]');
+  console.error('Name: 2-80 characters. The password can also be set with CREATE_STAFF_PASSWORD.');
   process.exit(1);
 }
 
-const { email, name, password } = values;
 const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error'] });
 
 try {

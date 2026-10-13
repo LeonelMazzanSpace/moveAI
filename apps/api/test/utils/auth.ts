@@ -5,7 +5,8 @@ import type { DataSource } from 'typeorm';
 
 export type TestAgent = ReturnType<typeof request.agent>;
 
-// Better Auth checks the Origin header against `trustedOrigins` (= WEB_URL).
+// Better Auth checks the Origin header against `trustedOrigins` (= WEB_URL). The factory sets
+// `advanced.disableOriginCheck: false`, so the check also runs under Vitest (Better Auth skips it in tests by default).
 export const TEST_ORIGIN = process.env.WEB_URL ?? 'http://localhost:3000';
 
 const DEFAULT_PASSWORD = 'Secreto123!';

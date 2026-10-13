@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import pg from 'pg';
 import { createBetterAuth } from './better-auth.factory.js';
 
@@ -48,6 +49,21 @@ describe('createBetterAuth', () => {
     expect(make().options.socialProviders).not.toHaveProperty('google');
     const google = { clientId: 'id', clientSecret: 'shh' };
     expect(make({ google }).options.socialProviders).toHaveProperty('google');
+  });
+
+  it('hardens the endpoints: no update-user, origin checks always on, sessions revoked on reset', () => {
+    const { options } = make();
+    expect(options.disabledPaths).toContain('/update-user');
+    expect(options.advanced.disableOriginCheck).toBe(false);
+    expect(options.emailAndPassword.revokeSessionsOnPasswordReset).toBe(true);
+    expect(options.emailAndPassword.onPasswordReset).toBeTypeOf('function');
+  });
+
+  it('forwards only the log message to Nest, never the extra arguments', () => {
+    const error = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    make().options.logger.log?.('error', 'Failed to create user', new Error('Key (email)=(a@x) already exists'));
+    expect(error).toHaveBeenCalledWith('Failed to create user');
+    error.mockRestore();
   });
 
   it('uses secure and cross-subdomain cookies when configured', () => {
