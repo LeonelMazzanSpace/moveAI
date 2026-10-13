@@ -97,4 +97,31 @@ describe('RecoveryBookingFlow', () => {
 
     expect(await screen.findByRole('button', { name: 'Paquete' })).toBeInTheDocument();
   });
+
+  it('lets a guest pick a single session and keeps the date and slot picker open', async () => {
+    // Un visitante: el primer GET /me falla de inmediato; el segundo (el del flujo de pago al montarse) tarda, como en la red real.
+    let meCalls = 0;
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path === '/me') {
+        meCalls += 1;
+        if (meCalls > 1) await new Promise((resolve) => setTimeout(resolve, 50));
+        throw new ApiError(401, 'UNAUTHENTICATED', 'x');
+      }
+      if (path === '/settings/public') return settings;
+      if (path === '/schedule/availability') return [{ date: today, available: 3 }];
+      if (path === '/schedule/time-slots') return [slot];
+      throw new Error(`unexpected request ${path}`);
+    });
+    renderFlow();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sesión individual' }));
+    await userEvent.click(await screen.findByRole('button', { name: String(Number(today.slice(8))) }));
+    await userEvent.click(await screen.findByRole('button', { name: '11:00' }));
+    await vi.waitFor(() => expect(meCalls).toBeGreaterThan(1));
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(screen.getByRole('button', { name: 'Sesión individual' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '11:00' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeEnabled();
+  });
 });

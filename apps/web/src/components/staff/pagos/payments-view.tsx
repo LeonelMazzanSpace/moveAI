@@ -33,14 +33,6 @@ const STATUS_OPTIONS: { value: PaymentStatusFilter; label: string }[] = [
 
 const METHODS = Object.keys(METHOD_LABEL) as PaymentMethod[];
 
-const MAX_PAGE = 10_000;
-
-export function clampPage(raw: string | undefined): number {
-  const page = Number(raw);
-  if (!Number.isInteger(page) || page < 1) return 1;
-  return Math.min(page, MAX_PAGE);
-}
-
 function findOption<T extends string>(values: readonly T[], raw: string): T | null {
   return values.find((value) => value === raw) ?? null;
 }
