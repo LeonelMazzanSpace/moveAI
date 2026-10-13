@@ -302,6 +302,25 @@ describe('FollowupView contact dialog', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
+  it('shows our copy under the channel and the outcome when the API rejects them, never the API text', async () => {
+    mockApi({
+      'POST /staff/alerts/a1/contacts': () =>
+        Promise.reject(
+          new ApiError(400, 'VALIDATION_FAILED', 'x', [
+            { field: 'channel', messages: ['channel must be one of the following values: whatsapp, phone'] },
+            { field: 'outcome', messages: ['outcome must be one of the following values: reached, no_answer'] },
+          ]),
+        ),
+    });
+    renderView();
+    const dialog = await openDialog();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar contacto' }));
+    expect(await within(dialog).findByText('Elegí un canal válido.')).toBeInTheDocument();
+    expect(within(dialog).getByText('Elegí un resultado válido.')).toBeInTheDocument();
+    expect(screen.queryByText(/must be/)).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
   it('shows the contract message for other API errors and keeps the dialog open', async () => {
     mockApi({ 'POST /staff/alerts/a1/contacts': () => Promise.reject(new ApiError(404, 'ALERT_NOT_FOUND', 'x')) });
     renderView();

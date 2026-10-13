@@ -2,8 +2,8 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { DisplayTitle } from '@/components/move/display-title';
 import { Eyebrow } from '@/components/move/eyebrow';
+import { moveButton } from '@/components/move/button-styles';
 import { PageContainer } from '@/components/move/page-container';
-import { cn } from '@/lib/utils';
 
 interface CtaLinkProps {
   href: string;
@@ -15,10 +15,7 @@ export function CtaLink({ href, variant = 'primary', children }: CtaLinkProps) {
   return (
     <Link
       href={href}
-      className={cn(
-        'inline-flex w-fit rounded px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em]',
-        variant === 'primary' ? 'bg-primary text-primary-foreground' : 'border border-border text-foreground hover:bg-card',
-      )}
+      className={moveButton({ variant: variant === 'primary' ? 'default' : 'outline', size: 'cta', className: 'w-fit' })}
     >
       {children}
     </Link>

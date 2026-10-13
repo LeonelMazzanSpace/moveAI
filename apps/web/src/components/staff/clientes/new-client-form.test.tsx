@@ -92,6 +92,7 @@ describe('NewClientForm', () => {
   it('sends the name, email and phone trimmed when they are typed with surrounding spaces', async () => {
     apiFetch.mockResolvedValue({ id: 'c1' });
     renderForm();
+    // The name and the phone are what pin the trimming: jsdom, like browsers, already strips the spaces of an <input type="email"> value.
     fireEvent.change(screen.getByLabelText('Nombre y apellido'), { target: { value: '  Ana Pérez  ' } });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: '  ana@test.move  ' } });
     fireEvent.change(screen.getByLabelText('Teléfono (opcional)'), { target: { value: '  099123456  ' } });

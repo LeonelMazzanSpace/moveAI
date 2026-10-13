@@ -26,7 +26,7 @@ export function ClientHeader({ user }: { user: Pick<MeDto, 'name'> }) {
             </div>
             <span className="text-xs font-medium">{user.name}</span>
           </div>
-          <LogoutButton className="hidden md:inline-block" />
+          <LogoutButton className="hidden md:inline-flex" />
           <MobileNav items={CLIENT_NAV_ITEMS} footer={<MobileNavAccount name={user.name} />} />
         </div>
       </PageContainer>

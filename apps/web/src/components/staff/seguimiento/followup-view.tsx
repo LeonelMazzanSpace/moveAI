@@ -7,6 +7,7 @@ import { useBusinessToday } from '@/components/booking/day-selector';
 import { EmptyState } from '@/components/move/empty-state';
 import { ErrorState } from '@/components/move/error-state';
 import { StaffPageHeader } from '@/components/move/staff-page-header';
+import { moveButtonSize } from '@/components/move/button-styles';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
@@ -24,7 +25,7 @@ function CountersError({ onRetry }: { onRetry: () => void }) {
   return (
     <div role="alert" className="mt-3 flex items-center gap-3 text-xs text-danger">
       <p>No pudimos cargar los contadores.</p>
-      <Button variant="outline" className="h-auto px-3 py-1 text-[10px]" onClick={onRetry}>
+      <Button variant="outline" size="sm" onClick={onRetry}>
         Reintentar
       </Button>
     </div>
@@ -94,7 +95,7 @@ export function FollowupView() {
         actions={
           <Button
             variant="outline"
-            className="h-auto px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em]"
+            className={moveButtonSize()}
             disabled={detection.isPending}
             onClick={() => detection.mutate()}
           >

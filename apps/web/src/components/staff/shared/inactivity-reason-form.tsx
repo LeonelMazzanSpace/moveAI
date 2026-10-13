@@ -1,16 +1,16 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Controller, useForm, type FieldValues, type Path, type UseFormSetError } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ApiError, errorMessage } from '@/lib/api/errors';
+import { applyFieldErrors } from '@/lib/api/field-errors';
 import type { InactivityReasonCode } from '@/lib/api/types';
 import { businessTodayWeb } from '@/lib/format';
-import { cn } from '@/lib/utils';
 import { INACTIVITY_REASON_CODES, INACTIVITY_REASON_LABEL } from './inactivity-reasons';
 
 export const NOTE_MAX_LENGTH = 1000;
@@ -22,27 +22,6 @@ const STALE_PAUSE_CODES: readonly string[] = ['NO_ACTIVE_PAUSE', 'PAUSE_ALREADY_
 /** The screen was out of date: the pause was ended or started somewhere else. */
 export function isStalePauseError(error: unknown): boolean {
   return error instanceof ApiError && STALE_PAUSE_CODES.includes(error.code);
-}
-
-/**
- * Puts the API's field errors in their fields with our own Spanish copy (the API text is English
- * class-validator output and is never shown); anything not tied to a known field goes to `root`.
- */
-export function applyApiError<T extends FieldValues>(
-  error: unknown,
-  setError: UseFormSetError<T>,
-  fieldMessages: Partial<Record<Path<T>, string>>,
-): void {
-  const details = error instanceof ApiError ? (error.details ?? []) : [];
-  let placed = false;
-  for (const { field } of details) {
-    if (!Object.hasOwn(fieldMessages, field)) continue;
-    const message = fieldMessages[field as Path<T>];
-    if (!message) continue;
-    setError(field as Path<T>, { message });
-    placed = true;
-  }
-  if (!placed) setError('root', { message: errorMessage(error) });
 }
 
 const NUL = '\u0000';
@@ -63,11 +42,13 @@ const inactivityReasonSchema = z.object({
 
 type InactivityReasonFormValues = z.infer<typeof inactivityReasonSchema>;
 
-const FIELD_MESSAGES: Partial<Record<Path<InactivityReasonFormValues>, string>> = {
+const FORM_FIELDS = ['reason', 'note', 'recontactOn'] as const;
+
+const FIELD_MESSAGES = {
   reason: 'Elegí un motivo válido.',
   note: 'La nota no es válida.',
   recontactOn: 'La fecha de re-contacto no es válida.',
-};
+} satisfies Partial<Record<(typeof FORM_FIELDS)[number], string>>;
 
 export interface InactivityReasonValues {
   reason: InactivityReasonCode;
@@ -97,7 +78,7 @@ export function InactivityReasonForm({ onSubmit, submitLabel = 'Registrar motivo
     try {
       await onSubmit(toPayload(values));
     } catch (error) {
-      applyApiError(error, setError, FIELD_MESSAGES);
+      if (!applyFieldErrors(error, FORM_FIELDS, setError, {}, FIELD_MESSAGES)) setError('root', { message: errorMessage(error) });
     }
   }
 
@@ -114,10 +95,7 @@ export function InactivityReasonForm({ onSubmit, submitLabel = 'Registrar motivo
                 type="button"
                 aria-pressed={code === field.value}
                 onClick={() => field.onChange(code)}
-                className={cn(
-                  'rounded px-3 py-1.5 text-[11px] font-semibold',
-                  code === field.value ? 'bg-primary text-primary-foreground' : 'border border-border hover:bg-soft',
-                )}
+                className={buttonVariants({ variant: code === field.value ? 'default' : 'outline', size: 'lg' })}
               >
                 {INACTIVITY_REASON_LABEL[code]}
               </button>

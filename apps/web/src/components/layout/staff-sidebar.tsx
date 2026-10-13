@@ -1,21 +1,10 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { apiFetch } from '@/lib/api/client';
-import type { AlertCountsDto } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
 import { isNavItemActive, STAFF_NAV_ITEMS } from './nav-items';
-
-export function useStaffAlertsTotal(): number {
-  const { data: counts } = useQuery({
-    queryKey: ['staff', 'alert-counts'],
-    queryFn: () => apiFetch<AlertCountsDto>('/staff/alerts/counts'),
-    refetchInterval: 60_000,
-  });
-  return counts?.total ?? 0;
-}
+import { useStaffAlertsTotal } from './use-staff-alerts-total';
 
 export function StaffSidebar() {
   const pathname = usePathname();

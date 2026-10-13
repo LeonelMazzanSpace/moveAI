@@ -5,18 +5,18 @@ import { useState } from 'react';
 import { useBookSlot } from '@/components/booking/use-book-slot';
 import { EmptyState } from '@/components/move/empty-state';
 import { ErrorState } from '@/components/move/error-state';
+import { moveButton, moveButtonSize } from '@/components/move/button-styles';
 import { PlanCard } from '@/components/move/plan-card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
 import type { MySubscriptionsDto, PackDto, PlanDto } from '@/lib/api/types';
-import { cn } from '@/lib/utils';
 import { SlotPicker } from './booking-summary';
 import { PaidBookingFlow } from './rehab-booking-flow';
 import { useMe, useSlotPicker } from './use-checkout';
 
 const RECOVERY_STEPS = ['Selección', 'Reserva', 'Pago', 'Confirmación'] as const;
-const BUTTON_CLASS = 'h-auto px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em]';
+const BUTTON_CLASS = moveButtonSize({ size: 'cta' });
 
 function sessionsLeftLabel(count: number): string {
   return count === 1 ? 'Te queda 1 sesión' : `Te quedan ${count} sesiones`;
@@ -59,10 +59,7 @@ function ModeButton({ active, onClick, children }: { active: boolean; onClick: (
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={cn(
-        'rounded border px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.2em]',
-        active ? 'border-transparent bg-primary text-primary-foreground' : 'border-border hover:bg-soft',
-      )}
+      className={moveButton({ variant: active ? 'default' : 'outline', size: 'cta' })}
     >
       {children}
     </button>

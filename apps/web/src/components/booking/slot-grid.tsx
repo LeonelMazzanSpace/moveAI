@@ -1,3 +1,4 @@
+import { moveButtonSize } from '@/components/move/button-styles';
 import { Button } from '@/components/ui/button';
 import type { TimeSlotDto } from '@/lib/api/types';
 import { formatTime } from '@/lib/format';
@@ -20,7 +21,7 @@ function SlotAction({ slot, onBook, pending }: { slot: TimeSlotDto; onBook: (slo
       size="sm"
       disabled={pending}
       onClick={() => onBook(slot)}
-      className="text-[10px] font-semibold uppercase tracking-[0.2em]"
+      className={moveButtonSize()}
     >
       Reservar
     </Button>

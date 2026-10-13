@@ -17,6 +17,9 @@ describe('resolvePostLogin', () => {
   it('rejects protocol-relative and backslash paths', () => {
     expect(resolvePostLogin(me('client'), '//evil.com')).toBe('/perfil');
     expect(resolvePostLogin(me('client'), '/\\evil.com')).toBe('/perfil');
+    // Encoded slashes are not a protocol-relative URL: the browser keeps them as one path segment.
+    expect(resolvePostLogin(me('client'), '/%2f%2fevil.com')).not.toMatch(/^\/\//);
+    expect(resolvePostLogin(me('client'), '/%2f%2fevil.com')).toBe('/%2f%2fevil.com');
   });
   it('keeps the query string of an allowed next', () => {
     expect(resolvePostLogin(me('client'), '/planes?service=recovery')).toBe('/planes?service=recovery');

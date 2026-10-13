@@ -3,8 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { moveButton } from '@/components/move/button-styles';
 import { authClient } from '@/lib/auth-client';
-import { cn } from '@/lib/utils';
 
 export function LogoutButton({ className }: { className?: string }) {
   const router = useRouter();
@@ -27,10 +27,7 @@ export function LogoutButton({ className }: { className?: string }) {
       type="button"
       onClick={handleLogout}
       disabled={pending}
-      className={cn(
-        'rounded border border-border px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-foreground hover:bg-card disabled:opacity-50',
-        className,
-      )}
+      className={moveButton({ variant: 'outline', className })}
     >
       Salir
     </button>

@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils';
+import { moveButton } from '@/components/move/button-styles';
 
 export const CLIENT_STATUS_FILTERS = [
   { value: 'all', label: 'Todos' },
@@ -30,12 +30,7 @@ export function StatusFilter({ value, onChange }: StatusFilterProps) {
           type="button"
           aria-pressed={filter.value === value}
           onClick={() => onChange(filter.value)}
-          className={cn(
-            'rounded px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.15em]',
-            filter.value === value
-              ? 'bg-primary text-primary-foreground'
-              : 'border border-border text-muted-foreground hover:text-foreground',
-          )}
+          className={moveButton({ variant: filter.value === value ? 'default' : 'outline' })}
         >
           {filter.label}
         </button>

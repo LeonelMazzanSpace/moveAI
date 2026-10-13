@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { moveButton } from '@/components/move/button-styles';
 import { PageContainer } from '@/components/move/page-container';
 import { Hero } from '@/components/public/hero';
 import { loadPlans } from '@/components/public/load-plans';
 import { FILTERS, parseFilter, servicesFor } from '@/components/public/plan-filter';
 import { PlansCatalog } from '@/components/public/plans-catalog';
 import { PlansSkeleton } from '@/components/public/plans-section';
-import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
   title: 'Planes',
@@ -25,10 +25,7 @@ async function PlanFilters({ searchParams }: { searchParams: SearchParams }) {
           key={filter.label}
           href={filter.value ? `/planes?service=${filter.value}` : '/planes'}
           aria-current={filter.value === active ? 'page' : undefined}
-          className={cn(
-            'flex h-8 items-center rounded px-3.5 text-[10px] font-semibold uppercase tracking-[0.2em]',
-            filter.value === active ? 'bg-primary text-primary-foreground' : 'border border-border text-foreground hover:bg-card',
-          )}
+          className={moveButton({ variant: filter.value === active ? 'default' : 'outline' })}
         >
           {filter.label}
         </Link>

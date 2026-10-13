@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
+import { moveButton } from '@/components/move/button-styles';
 
-const BUTTON_BASE = 'rounded px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] disabled:opacity-50';
-export const BUTTON_PRIMARY = cn(BUTTON_BASE, 'bg-primary text-primary-foreground hover:bg-primary/80');
-export const BUTTON_OUTLINE = cn(BUTTON_BASE, 'border border-border text-foreground hover:bg-card');
-export const BUTTON_DANGER = cn(BUTTON_BASE, 'border border-border text-danger hover:bg-danger-muted');
+export const BUTTON_PRIMARY = moveButton();
+export const BUTTON_OUTLINE = moveButton({ variant: 'outline' });
+export const BUTTON_DANGER = moveButton({ variant: 'destructive' });
 export const SELECT_CLASS =
   'h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20';
 export const CHECKBOX_CLASS = 'size-4 accent-primary';

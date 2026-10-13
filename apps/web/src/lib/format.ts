@@ -123,8 +123,10 @@ export function businessTodayWeb(now: Date = new Date()): string {
   return toIsoDate(instantParts(now));
 }
 
-export function businessDateOf(instant: string): string {
-  return businessTodayWeb(new Date(instant));
+// Null when `instant` is not a parseable instant.
+export function businessDateOf(instant: string): string | null {
+  const date = new Date(instant);
+  return Number.isNaN(date.getTime()) ? null : businessTodayWeb(date);
 }
 
 export function addDaysWeb(date: string, n: number): string {

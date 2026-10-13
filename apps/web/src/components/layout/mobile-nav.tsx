@@ -14,8 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { LogoutButton } from './logout-button';
-import { isNavItemActive, STAFF_NAV_ITEMS, type NavItem } from './nav-items';
-import { useStaffAlertsTotal } from './staff-sidebar';
+import { isNavItemActive, type NavItem } from './nav-items';
 
 interface MobileNavProps {
   items: NavItem[];
@@ -27,13 +26,15 @@ interface MobileNavProps {
 
 export function MobileNav({ items, alertsTotal = 0, actions = [], footer, className }: MobileNavProps) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
-  const close = () => setOpen(false);
+  // Open only on the page where it was opened, so a navigation from outside the menu (browser Back) closes it too.
+  const [openedOn, setOpenedOn] = useState<string | null>(null);
+  const open = openedOn === pathname;
+  const close = () => setOpenedOn(null);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(next) => setOpenedOn(next ? pathname : null)}>
       <DialogTrigger
-        render={<Button variant="outline" size="icon" aria-label="Abrir menú" className={cn('md:hidden', className)} />}
+        render={<Button variant="outline" size="icon-lg" aria-label="Abrir menú" className={cn('md:hidden', className)} />}
       >
         <Menu aria-hidden="true" />
       </DialogTrigger>
@@ -43,7 +44,7 @@ export function MobileNav({ items, alertsTotal = 0, actions = [], footer, classN
       >
         <div className="flex items-center justify-between">
           <DialogTitle className="text-xs font-semibold uppercase tracking-[0.2em]">Menú</DialogTitle>
-          <DialogClose render={<Button variant="ghost" size="sm" />}>Cerrar menú</DialogClose>
+          <DialogClose render={<Button variant="ghost" size="lg" />}>Cerrar menú</DialogClose>
         </div>
         <nav aria-label="Menú principal" className="space-y-1 text-sm font-medium text-muted-foreground">
           {items.map((item) => {
@@ -96,12 +97,5 @@ export function MobileNavAccount({ name }: { name: string }) {
       <span className="min-w-0 truncate text-xs font-medium">{name}</span>
       <LogoutButton />
     </div>
-  );
-}
-
-export function StaffMobileNav({ name }: { name: string }) {
-  const alertsTotal = useStaffAlertsTotal();
-  return (
-    <MobileNav items={STAFF_NAV_ITEMS} alertsTotal={alertsTotal} footer={<MobileNavAccount name={name} />} />
   );
 }

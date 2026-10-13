@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { EmptyState } from '@/components/move/empty-state';
 import { ErrorState } from '@/components/move/error-state';
+import { moveButtonSize } from '@/components/move/button-styles';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
@@ -91,7 +92,7 @@ function FollowupPicker({ today, bookingWindowDays }: { today: string; bookingWi
         onClick={() => {
           if (slotId) book(slotId, { onSuccess: () => setSlotId(null) });
         }}
-        className="text-[10px] font-semibold uppercase tracking-[0.2em]"
+        className={moveButtonSize()}
       >
         Reservar
       </Button>

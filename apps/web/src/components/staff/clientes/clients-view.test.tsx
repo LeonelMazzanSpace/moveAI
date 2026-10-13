@@ -148,6 +148,29 @@ describe('ClientsView search', () => {
     await waitFor(() => expect(replace).toHaveBeenLastCalledWith('/staff/clientes?q=anam'), { timeout: 1500 });
   });
 
+  it('keeps what is typed when the URL catches up with two searches one after the other', async () => {
+    mockApi();
+    renderView();
+    await screen.findByRole('row', { name: /Martina Suárez/ });
+    const landings: Record<string, () => void> = {};
+    const holdUrl = (url: string) => {
+      landings[url] = () => {
+        search = url.split('?')[1] ?? '';
+        rerenderView();
+      };
+    };
+    replace.mockImplementationOnce(holdUrl).mockImplementationOnce(holdUrl);
+    await userEvent.type(searchBox(), 'ana');
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/staff/clientes?q=ana'), { timeout: 1500 });
+    await userEvent.type(searchBox(), 'm');
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/staff/clientes?q=anam'), { timeout: 1500 });
+
+    act(() => landings['/staff/clientes?q=ana']());
+    expect(searchBox()).toHaveValue('anam');
+    act(() => landings['/staff/clientes?q=anam']());
+    expect(searchBox()).toHaveValue('anam');
+  });
+
   it('keeps a filter picked while the debounce is pending', async () => {
     mockApi();
     renderView();

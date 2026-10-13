@@ -4,7 +4,7 @@ import type { PlanDto } from '@/lib/api/types';
 import { PlansCatalog } from './plans-catalog';
 
 const plan = (over: Partial<PlanDto>): PlanDto => ({
-  id: over.slug ?? 'x', service: 'performance', kind: 'period_plan', slug: 'x', name: 'Plan', description: '',
+  id: `id-${over.slug ?? 'x'}`, service: 'performance', kind: 'period_plan', slug: 'x', name: 'Plan', description: '',
   features: [], price: 3900, currency: 'UYU', periodMonths: 1, periodDays: null, sessionsIncluded: null,
   durationMinutes: null, featured: false, active: true, sortOrder: 1, ...over,
 });

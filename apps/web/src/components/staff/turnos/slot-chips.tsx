@@ -1,3 +1,4 @@
+import { buttonVariants } from '@/components/ui/button';
 import type { StaffTimeSlotDto } from '@/lib/api/types';
 import { formatTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -19,11 +20,7 @@ export function SlotChips({ slots, selectedId, onSelect }: SlotChipsProps) {
             type="button"
             aria-pressed={selected}
             onClick={() => onSelect(slot.id)}
-            className={cn(
-              'rounded px-3.5 py-1.5 text-xs font-semibold',
-              selected ? 'bg-primary text-primary-foreground' : 'border border-border bg-card',
-              slot.cancelledAt && 'line-through opacity-60',
-            )}
+            className={cn(buttonVariants({ variant: selected ? 'default' : 'outline', size: 'lg' }), slot.cancelledAt && 'line-through opacity-60')}
           >
             {formatTime(slot.startsAt)}
           </button>

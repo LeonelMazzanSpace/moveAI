@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { EmptyState } from '@/components/move/empty-state';
+import { moveButton } from '@/components/move/button-styles';
 import { ErrorState } from '@/components/move/error-state';
 import { StaffPageHeader } from '@/components/move/staff-page-header';
 import { buttonVariants } from '@/components/ui/button';
@@ -13,7 +14,6 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
 import type { ClientKpisDto, ClientRowDto, Paginated } from '@/lib/api/types';
-import { cn } from '@/lib/utils';
 import { ClientKpis } from './client-kpis';
 import { ClientsTable } from './clients-table';
 import { parseStatusFilter, StatusFilter, type ClientStatusFilter } from './status-filter';
@@ -51,8 +51,9 @@ interface SearchBoxProps {
 function SearchBox({ q, onSearch }: SearchBoxProps) {
   const [value, setValue] = useState(q);
   const [syncedQ, setSyncedQ] = useState(q);
-  // Last (trimmed) value sent to the URL: a URL that merely catches up with it must not overwrite newer keystrokes.
-  const [lastSent, setLastSent] = useState(q);
+  // Trimmed values sent to the URL and not seen back in it yet, oldest first: a URL that merely catches up with any of them
+  // must not overwrite newer keystrokes.
+  const [unconfirmed, setUnconfirmed] = useState<string[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // The timer fires later: it must call the latest onSearch (with the latest filter and page), not the one from the keystroke.
   const latestOnSearch = useRef(onSearch);
@@ -64,9 +65,12 @@ function SearchBox({ q, onSearch }: SearchBoxProps) {
   // Follow the URL only when it changes from somewhere else (back/forward, cleared elsewhere), not when it echoes what was sent.
   if (q !== syncedQ) {
     setSyncedQ(q);
-    if (q !== lastSent) {
-      setLastSent(q);
+    const echoed = unconfirmed.indexOf(q);
+    if (echoed === -1) {
+      setUnconfirmed([]);
       setValue(q);
+    } else {
+      setUnconfirmed(unconfirmed.slice(echoed + 1));
     }
   }
 
@@ -75,7 +79,7 @@ function SearchBox({ q, onSearch }: SearchBoxProps) {
     clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       const trimmed = next.trim();
-      setLastSent(trimmed);
+      setUnconfirmed((current) => [...current, trimmed]);
       latestOnSearch.current(trimmed);
     }, SEARCH_DEBOUNCE_MS);
   }
@@ -104,7 +108,7 @@ interface PaginationProps {
 
 function Pagination({ shown, total, page, onPageChange }: PaginationProps) {
   const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const buttonClass = 'rounded border border-border px-3 py-1.5 disabled:opacity-50';
+  const buttonClass = buttonVariants({ variant: 'outline' });
   return (
     <div className="flex items-center justify-between border-t border-border px-5 py-3 text-xs text-muted-foreground">
       <span>
@@ -170,7 +174,7 @@ export function ClientsView() {
         actions={
           <>
             <SearchBox q={state.q} onSearch={(q) => navigate({ ...state, q, page: 1 })} />
-            <Link href="/staff/clientes/nuevo" className={cn(buttonVariants(), 'h-auto shrink-0 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em]')}>
+            <Link href="/staff/clientes/nuevo" className={moveButton({ className: 'shrink-0' })}>
               Nuevo cliente
             </Link>
           </>

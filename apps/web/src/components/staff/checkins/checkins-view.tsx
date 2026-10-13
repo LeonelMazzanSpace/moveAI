@@ -9,6 +9,7 @@ import { ErrorState } from '@/components/move/error-state';
 import { StaffPageHeader } from '@/components/move/staff-page-header';
 import { ContactDialog, type ContactTarget } from '@/components/staff/seguimiento/contact-dialog';
 import { useHandleAlert, useRefreshFollowup } from '@/components/staff/seguimiento/use-followup';
+import { moveButtonSize } from '@/components/move/button-styles';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
@@ -113,7 +114,7 @@ export function CheckinsView() {
         title="Check-in de clientes"
         actions={
           <Button
-            className="h-auto px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em]"
+            className={moveButtonSize()}
             disabled={send.isPending}
             onClick={() => send.mutate()}
           >
