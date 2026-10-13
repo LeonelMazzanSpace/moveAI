@@ -255,4 +255,15 @@ describe('MobileNav dismissal and focus', () => {
     rerender(<PublicHeader user={null} />);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
+
+  it('stays closed when the user comes back to the page where it was opened', async () => {
+    const { rerender } = render(<PublicHeader user={null} />);
+    await openMenu();
+    pathname = '/recovery';
+    rerender(<PublicHeader user={null} />);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    pathname = '/rehab';
+    rerender(<PublicHeader user={null} />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
 });

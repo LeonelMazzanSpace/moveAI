@@ -57,8 +57,10 @@ function SearchBox({ q, onSearch }: SearchBoxProps) {
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // The timer fires later: it must call the latest onSearch (with the latest filter and page), not the one from the keystroke.
   const latestOnSearch = useRef(onSearch);
+  const latestQ = useRef(q);
   useEffect(() => {
     latestOnSearch.current = onSearch;
+    latestQ.current = q;
   });
   useEffect(() => () => clearTimeout(timer.current), []);
 
@@ -79,7 +81,8 @@ function SearchBox({ q, onSearch }: SearchBoxProps) {
     clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       const trimmed = next.trim();
-      setUnconfirmed((current) => [...current, trimmed]);
+      // A value the URL already holds (or is about to hold) never comes back from the router: it would stay pending forever.
+      setUnconfirmed((current) => (trimmed === (current.at(-1) ?? latestQ.current) ? current : [...current, trimmed]));
       latestOnSearch.current(trimmed);
     }, SEARCH_DEBOUNCE_MS);
   }

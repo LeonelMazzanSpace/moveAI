@@ -171,6 +171,23 @@ describe('ClientsView search', () => {
     expect(searchBox()).toHaveValue('anam');
   });
 
+  it('sends a search equal to the current URL value and still follows the next change of the URL', async () => {
+    search = 'q=ana';
+    mockApi();
+    renderView();
+    await screen.findByRole('row', { name: /Martina Suárez/ });
+    // The trimmed value is the one already in the URL, so the router sends nothing back for it: it must not be kept as pending.
+    await userEvent.type(searchBox(), ' ');
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/staff/clientes?q=ana'), { timeout: 1500 });
+    expect(searchBox()).toHaveValue('ana ');
+    search = 'q=lucia';
+    rerenderView();
+    await waitFor(() => expect(searchBox()).toHaveValue('lucia'));
+    search = 'q=ana';
+    rerenderView();
+    await waitFor(() => expect(searchBox()).toHaveValue('ana'));
+  });
+
   it('keeps a filter picked while the debounce is pending', async () => {
     mockApi();
     renderView();

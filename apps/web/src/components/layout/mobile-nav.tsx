@@ -26,13 +26,18 @@ interface MobileNavProps {
 
 export function MobileNav({ items, alertsTotal = 0, actions = [], footer, className }: MobileNavProps) {
   const pathname = usePathname();
-  // Open only on the page where it was opened, so a navigation from outside the menu (browser Back) closes it too.
-  const [openedOn, setOpenedOn] = useState<string | null>(null);
-  const open = openedOn === pathname;
-  const close = () => setOpenedOn(null);
+  const [open, setOpen] = useState(false);
+  const [openedOn, setOpenedOn] = useState(pathname);
+  const close = () => setOpen(false);
+
+  // A navigation from outside the menu (browser Back) closes it, and it stays closed when that page is visited again.
+  if (openedOn !== pathname) {
+    setOpenedOn(pathname);
+    setOpen(false);
+  }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => setOpenedOn(next ? pathname : null)}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={<Button variant="outline" size="icon-lg" aria-label="Abrir menú" className={cn('md:hidden', className)} />}
       >
