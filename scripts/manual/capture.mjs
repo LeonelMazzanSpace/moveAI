@@ -9,11 +9,13 @@
 //   MANUAL_STAFF_EMAIL      (opcional) default staff@example.com
 //   WEB_URL                 (opcional) default http://localhost:3000
 //   API_URL                 (opcional) default http://localhost:3001/api
+//   (WEB_URL y API_URL tienen que ser locales: localhost, 127.0.0.1 o ::1; el script imprime el destino antes de empezar)
 //
 // Las capturas se toman primero en un directorio temporal. Solo si salieron todas (EXPECTED_IMAGE_COUNT) se arma una
 // carpeta nueva junto a docs/manual/img/ y se la renombra en su lugar (nombres estables; arquitectura.png y cualquier
-// otro archivo que no sea una captura se conservan). Si algo falla, las imágenes actuales quedan como estaban. La última parte recorre el checkout de un paquete Recovery con un cliente sin paquete
-// (Nicolás Acosta): crea una compra y la aprueba con el simulador de pagos.
+// otro archivo que no sea una captura se conservan). Si algo falla, las imágenes actuales quedan como estaban.
+// La última parte recorre el checkout de un paquete Recovery con un cliente sin paquete (Nicolás Acosta): crea una
+// compra y la aprueba con el simulador de pagos.
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
@@ -26,6 +28,7 @@ const STAFF_EMAIL = process.env.MANUAL_STAFF_EMAIL ?? 'staff@example.com';
 const IMG_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../docs/manual/img');
 const VIEWPORT = { width: 1440, height: 900 };
 const KEPT_IMAGES = new Set(['arquitectura.png']);
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 // Cantidad de capturas de este script (01–38): actualizarla al agregar o quitar una pantalla.
 const EXPECTED_IMAGE_COUNT = 38;
 
@@ -42,6 +45,19 @@ function requireEnv(name) {
   return value;
 }
 
+// Se niega a capturar si la API o la web no son locales: el recorrido final compra un paquete a través de API_URL.
+function assertLocalTarget(name, value) {
+  let host;
+  try {
+    host = new URL(value).hostname;
+  } catch {
+    throw new Error(`${name} no es una URL válida (por ejemplo http://localhost:3001/api).`);
+  }
+  if (!LOCAL_HOSTS.has(host.toLowerCase())) {
+    throw new Error(`${name} no es local: las capturas solo se toman contra una API y una web locales.`);
+  }
+}
+
 let outputDir;
 
 // Reemplaza las capturas anteriores por las nuevas sin dejar nunca un juego a medias: arma una carpeta hermana con todo
@@ -53,6 +69,8 @@ function publishImages() {
   }
   const staging = `${IMG_DIR}.new`;
   const previous = `${IMG_DIR}.old`;
+  // Si una corrida anterior murió entre los dos renombres, las imágenes viejas están en img.old: se recuperan antes de limpiar.
+  if (!existsSync(IMG_DIR) && existsSync(previous)) renameSync(previous, IMG_DIR);
   rmSync(staging, { recursive: true, force: true });
   rmSync(previous, { recursive: true, force: true });
   mkdirSync(staging, { recursive: true });
@@ -146,6 +164,9 @@ async function pickDayAndSlot(page, locator) {
 }
 
 async function main() {
+  assertLocalTarget('API_URL', API_URL);
+  assertLocalTarget('WEB_URL', WEB_URL);
+  console.log(`• Destino: API ${API_URL}; web ${WEB_URL}`);
   const staffPassword = requireEnv('MANUAL_STAFF_PASSWORD');
   const clientPassword = requireEnv('MANUAL_CLIENT_PASSWORD');
   outputDir = mkdtempSync(resolve(tmpdir(), 'move-manual-'));
