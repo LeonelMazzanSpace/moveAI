@@ -4,12 +4,13 @@ status: shipped
 updated: 2026-10-13
 source:
   - move/imagenes/htmls
+  - move/apps/web/src/app
 ---
 # MOC Pantallas
 
 Una nota por pantalla. Los HTML en `imagenes/htmls/` son la fuente exacta de cada PNG
-de `imagenes/finales/`: leer el HTML para textos y clases, y mirar el PNG para la
-composición. Sistema visual: [[Sistema visual MOVE]].
+de `imagenes/finales/`; el código de cada pantalla está en `apps/web/src/app/` y las
+capturas actuales en el [[Manual de usuario]]. Sistema visual: [[Sistema visual MOVE]].
 
 ## Pública ([[Area publica web]])
 - 01 [[Pantalla sitio publico]]

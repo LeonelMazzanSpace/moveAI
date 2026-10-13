@@ -11,8 +11,8 @@ source:
 
 Tablas, columnas, columnas FK, tablas y columnas de join se nombran en snake_case con
 un `SnakeNamingStrategy` propio, porque TypeORM 1.x no trae uno. Los nombres de
-restricciones e índices (PK, FK, IDX) siguen el default hasheado de TypeORM. Las
-entidades siguen en camelCase.
+restricciones e índices siguen el default de TypeORM salvo los que fija el esquema
+inicial. Las entidades siguen en camelCase.
 
 ## Structural
 - constrains → [[API NestJS]]

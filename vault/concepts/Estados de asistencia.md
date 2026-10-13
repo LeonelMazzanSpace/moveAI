@@ -1,18 +1,15 @@
 ---
 type: concept
-status: draft
+status: shipped
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p4
-  - move/MOVE.pdf#p11
-  - move/imagenes/htmls/04-reservas-asistencia.html
-  - move/imagenes/finales/04-reservas-asistencia.png
+  - move/apps/api/src/modules/bookings/dto/mark-attendance.dto.ts
+  - move/apps/web/src/components/staff/turnos/attendance-buttons.tsx
 ---
 # Estados de asistencia
 
-El PDF nombra presente, ausente y no show, pero el mockup solo tiene P y A. Falta
-definir si "ausente" es con aviso y "no show" sin aviso, y si el no show tiene alguna
-consecuencia.
+Resuelto (D5): tres estados, presente, ausente (avisó fuera de plazo) y no show (no
+avisó); sin marcar es "Pendiente". Ninguno tiene penalidad en el MVP.
 
 ## Structural
 - is part of → [[Asistencia]]

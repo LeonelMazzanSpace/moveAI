@@ -1,19 +1,17 @@
 ---
 type: constraint
-status: todo
+status: shipped
 semana: 3
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p5
-  - move/imagenes/htmls/05-rehab.html
-  - move/imagenes/finales/05-rehab.png
+  - move/apps/web/src/components/checkout/rehab-booking-flow.tsx
+  - move/apps/api/src/modules/bookings/domain/booking-rules.ts
 ---
 # Rehab no vende tratamientos online
 
-Los tratamientos posteriores a la evaluación no se comercializan automáticamente
-desde la web: el equipo define después de evaluar si corresponde entrenamiento
-terapéutico, consultorio o ambos. El seguimiento fisioterapéutico sí puede
-reservarse, con frecuencia definida por el equipo.
+La web solo vende la Evaluación y Diagnóstico. El tratamiento posterior lo define el
+equipo; el seguimiento fisioterapéutico se reserva sin cobro online y solo si el staff
+lo habilitó para ese cliente (D6).
 
 ## Structural
 - constrains → [[Servicio Rehab]]

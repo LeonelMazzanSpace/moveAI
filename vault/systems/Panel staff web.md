@@ -1,18 +1,17 @@
 ---
 type: system
-status: todo
+status: shipped
 semana: 1
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p6
-  - move/MOVE.pdf#p8
-  - move/MOVE.pdf#p16
+  - move/apps/web/src/app/staff/layout.tsx
+  - move/apps/web/src/components/layout/staff-sidebar.tsx
 ---
 # Panel staff web
 
-Rutas del equipo MOVE con sidebar (Dashboard, Clientes, Turnos y asistencia,
-Pagos, Seguimiento, Configuración). Sirve para operar el día a día y ver el estado de
-cada cliente.
+Rutas `/staff` con sidebar: Dashboard, Clientes (lista, alta y detalle), Turnos y
+asistencia, Pagos, Seguimiento (bandeja y check-ins) y Configuración. El layout exige
+rol staff; un cliente nunca llega a estas rutas.
 
 ## Structural
 - is part of → [[App web Next]]

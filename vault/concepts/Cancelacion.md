@@ -1,17 +1,18 @@
 ---
 type: concept
-status: todo
+status: shipped
 updated: 2026-10-13
 source:
   - move/MOVE.pdf#p4
-  - move/MOVE.pdf#p11
-  - move/imagenes/htmls/04-reservas-asistencia.html
-  - move/imagenes/finales/04-reservas-asistencia.png
+  - move/apps/api/src/modules/bookings/domain/booking-rules.ts
+  - move/apps/api/src/modules/bookings/services/bookings.service.ts
 ---
 # Cancelacion
 
-Baja de una reserva por el cliente, registrada con fecha y hora. Solo se permite
-dentro del límite configurado y alimenta las métricas de cancelaciones.
+Baja de una reserva, registrada con fecha y hora. El cliente cancela online solo
+reservas de plan Performance, de paquete Recovery o de seguimiento, dentro del límite;
+las pagas de forma individual las cancela el staff, sin reembolso automático (D20).
+Alimenta las métricas de cancelaciones.
 
 ## Structural
 - depends on → [[Reserva]]

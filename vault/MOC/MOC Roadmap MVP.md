@@ -4,56 +4,47 @@ status: shipped
 updated: 2026-10-13
 source:
   - move/MOVE.pdf#p16
-  - move/MOVE.pdf#p17
-  - move/MOVE.pdf#p18
   - move/MOVE.pdf#p19
+  - move/docs/superpowers/plans/2026-10-13-move-mvp.md
 ---
 # MOC Roadmap MVP
 
-Plan de 4 semanas de la propuesta (12/10/2026–06/11/2026), con dos Full Stack: FS1
-enfocado en la web y los flujos (Next, pantallas, calendario, panel) y FS2 en lógica de
-negocio, datos, integraciones e infraestructura. Es un foco, no una división rígida. Al 2026-10-13 está en
-curso la semana 1. Para cada nota de trabajo, construir antes lo que ella `depends on`
-y cubrir con tests las fallas que previenen sus restricciones entrantes (ver
-`_meta/edges.md`). Orden sugerido dentro de cada semana.
+Plan de 4 semanas de la propuesta (12/10/2026–06/11/2026), con dos Full Stack. Al
+2026-10-13 el contenido de las cuatro semanas está construido y verificado en local
+(tareas T-000 a T-037 de `feature/move-mvp`); falta todo lo que necesita accesos:
+deploy, credenciales de proveedores y definiciones de MOVE. Para cada nota de trabajo,
+construir antes lo que ella `depends on` y cubrir con tests las fallas que previenen
+sus restricciones entrantes (ver `_meta/edges.md`).
 
-## Semana 1 — Base y experiencia pública (12–16/10)
-1. [[Monorepo MOVE]], [[App web Next]], [[API NestJS]], [[Postgres local Docker]] (hechos)
-2. Desbloquear: [[ADR ubicacion de Better Auth]], [[Accesos y definiciones operativas al inicio]]
-3. [[Modulo usuarios]], luego [[Modulo auth]] con [[Better Auth]] y [[Google OAuth]]
-4. Modelo inicial: [[Modulo catalogo]] (servicios, planes), entidades base de [[Modulo agenda]] y [[Modulo reservas]]
-5. [[Area publica web]]: [[Pantalla sitio publico]], [[Pantalla acceso]], páginas informativas de Performance, Rehab y Recovery
-6. Base de [[Panel staff web]] con guard de rol; [[Pantalla dashboard staff]] es draft (sin mockup)
-7. Ambientes: [[Vercel]], [[AWS Elastic Beanstalk]], [[Neon Postgres]], ver [[Ambientes dev y produccion separados]]
+## Semana 1 — Base y experiencia pública
+1. [[Monorepo MOVE]], [[App web Next]], [[API NestJS]], [[Postgres local Docker]]
+2. Desbloqueado: [[ADR ubicacion de Better Auth]] (en Nest); [[Accesos y definiciones operativas al inicio]] sigue pendiente, sin bloquear
+3. [[Modulo usuarios]], [[Modulo auth]] con [[Better Auth]]; [[Google OAuth]] apagado hasta tener credenciales
+4. [[Modulo configuracion]], [[Modulo catalogo]], [[Modulo agenda]], [[Modulo reservas]]
+5. [[Area publica web]]: [[Pantalla sitio publico]], [[Pantalla acceso]], Performance, Rehab y Recovery
+6. [[Panel staff web]] con guard de rol y [[Pantalla dashboard staff]]
+7. Ambientes: [[Vercel]], [[AWS Elastic Beanstalk]], [[Neon Postgres]] siguen sin configurar ([[ADR sin deploy en el run del MVP]])
 
-Demo: navegación general, Performance, Rehab y Recovery, registro y login, Google,
-acceso diferenciado de Cliente y Staff.
+## Semana 2 — Performance: planes, pagos y reservas
+1. [[Modulo suscripciones]] y [[Pantalla configuracion staff]]
+2. [[Modulo pagos]] contra el [[Simulador de pagos de desarrollo]] ([[Mercado Pago]] apagado sin credenciales), [[Pantalla checkout de pago]] y [[NestJS Scheduler]]
+3. Reservar y cancelar en [[Modulo reservas]]
+4. [[Pantalla Performance]] y [[Pantalla perfil cliente]]
+5. Asistencia, ver [[Reserva distinta de asistencia]]
 
-## Semana 2 — Performance: planes, pagos y reservas (19–23/10)
-1. [[Modulo suscripciones]] y [[Pantalla configuracion staff]] (draft: no hay mockup; definir con diseño)
-2. [[Modulo pagos]] con [[Mercado Pago]] y [[Pantalla checkout de pago]] (proposed); si se confirma la conciliación, arranca [[NestJS Scheduler]]
-3. [[Modulo agenda]] (horarios y cupos) y [[Modulo reservas]] (reservar y cancelar)
-4. [[Pantalla Performance]] completa y [[Pantalla perfil cliente]] (plan, vencimiento, próximas reservas)
-5. Base de asistencia, ver [[Reserva distinta de asistencia]]
+## Semana 3 — Rehab, Recovery y gestión operativa
+1. [[Modulo notificaciones]] con [[Brevo]] en dry-run, [[Pantalla Rehab]] y [[Pantalla Recovery]]
+2. [[Modulo clientes]], [[Pantalla clientes staff]], [[Pantalla turnos y asistencia]], [[Pantalla pagos staff]]
+3. [[Modulo seguimiento]] con [[Motivo de inactividad]]
 
-Demo: plan → contratación → pago → activación → horarios → reserva, más el bloqueo sin
-plan vigente.
+## Semana 4 — Seguimiento, automatizaciones y producción
+1. [[Pantalla seguimiento]] y [[Pantalla check-in]]
+2. [[Modulo automatizaciones]] sobre [[NestJS Scheduler]]
+3. Review transversal y fixes: [[ADR limite de retenciones y de checkout por IP]], [[ADR IP real detras del proxy y ventana horaria]], [[ADR simulador registrado con ConditionalModule]], [[ADR conciliacion re-consulta compras vencidas]]
+4. [[Manual de usuario]] y [[Pipeline CI Bitbucket]]
+5. Pendiente: despliegue productivo, ver [[MOC Plataforma y entrega]]
 
-## Semana 3 — Rehab, Recovery y gestión operativa (26–30/10)
-1. [[Modulo notificaciones]] con [[Brevo]] (emails de confirmación), luego [[Pantalla Rehab]]: disponibilidad, pago y confirmación
-2. [[Pantalla Recovery]]: sesiones y paquetes
-3. [[Pantalla clientes staff]], [[Pantalla turnos y asistencia]], [[Pantalla pagos staff]] (draft)
-4. Historial de asistencias y cancelaciones; arranca [[Modulo seguimiento]] con [[Motivo de inactividad]]
-
-Demo: reserva Rehab, reserva Recovery, panel staff con clientes, reservas y asistencia
-(presente, ausente, no show).
-
-## Semana 4 — Seguimiento, automatizaciones y producción (02–06/11)
-1. [[Modulo seguimiento]] completo (alertas, contactos, check-ins) y [[Pantalla seguimiento]]
-2. [[Modulo automatizaciones]] con [[NestJS Scheduler]]
-3. Emails de seguimiento, avisos y check-ins sobre [[Modulo notificaciones]]
-4. [[Pantalla check-in]]
-5. Pruebas integrales de auth, pagos y reservas; permisos; responsive; despliegue productivo; documentación
-
-Demo: punta a punta cliente → plan → pago → reserva → asistencia → seguimiento, con al
-menos una automatización activa y un email enviado por Brevo.
+## Lo que falta para producción
+- Accesos y dominio: [[Accesos y definiciones operativas al inicio]], [[Web y API bajo el mismo dominio raiz]], [[Ambiente dev en dominio registrable propio]]
+- Deploy: [[PORT explicito en Elastic Beanstalk]], [[IP real del cliente detras del proxy]], [[Rama dev de Neon sin expiracion]], [[Conexion SSL a la base en produccion]]
+- Decisiones abiertas: [[ADR notificaciones de Mercado Pago por ambiente]], [[Bloqueo de IPs de Brevo resuelto antes de produccion]], [[ADR push a GitHub y merge por PR]], [[Prioridad de horarios Recovery]]

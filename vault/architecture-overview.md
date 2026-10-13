@@ -1,9 +1,9 @@
 # MOVE: arquitectura
 
 Punto de entrada para cualquiera que trabaje en MOVE. La fuente de cada afirmación es
-`MOVE.pdf`, los mockups de `imagenes/` o el código de `apps/`. La de cada decisión es
-su nota en `decisions/`. Este documento solo las conecta. Para la mecánica del vault,
-ver [[00-START-HERE]].
+`MOVE.pdf`, los mockups de `imagenes/`, el plan en `docs/superpowers/plans/` o el código
+de `apps/`. La de cada decisión es su nota en `decisions/`. Este documento solo las
+conecta. Para la mecánica del vault, ver [[00-START-HERE]].
 
 ## Qué es MOVE
 
@@ -23,126 +23,131 @@ Brevo, Better Auth, Google) quedan encapsulados en un service por proveedor.
 
 ```mermaid
 flowchart LR
-  subgraph web["apps/web · Next.js → Vercel"]
+  subgraph web["apps/web · Next.js → Vercel (sin desplegar)"]
     PUB[Área pública] --- CLI[Área cliente] --- STF[Panel staff]
   end
-  subgraph api["apps/api · NestJS → Elastic Beanstalk"]
-    AUTH[auth] --> USR[usuarios]
+  subgraph api["apps/api · NestJS → Elastic Beanstalk (sin desplegar)"]
+    SET[configuración]
+    NOT[notificaciones] --> SET
+    USR[usuarios]
+    AUTH[auth + guard global] --> USR & NOT
     CAT[catálogo]
-    AGE[agenda] --> CAT
-    SUS[suscripciones] --> CAT
-    RES[reservas + asistencia] --> AGE & SUS
-    PAG[pagos] --> SUS & RES
+    AGE[agenda] --> CAT & SET
+    SUS[suscripciones] --> SET
+    RES[reservas + asistencia] --> AGE & SUS & NOT
+    PAG[pagos + throttler checkout] --> SUS & RES
+    SIM[simulador de pagos · solo fuera de production] --> PAG
     SEG[seguimiento] --> RES & SUS
-    AUT[automatizaciones] --> SEG
-    NOT[notificaciones]
-    SEG & AUT --> NOT
+    CLT[clientes] --> SEG & PAG
+    AUT[automatizaciones] --> SEG & NOT
   end
-  web -->|HTTPS /api| api
+  web -->|HTTPS /api · cookie de sesión| api
   api --> DB[(PostgreSQL<br/>Docker dev · Neon prod)]
-  AUTH --> BA[Better Auth + Google OAuth]
-  PAG --> MP[Mercado Pago]
-  NOT --> BR[Brevo]
-  AUT --> SCH[NestJS Scheduler]
+  AUTH --> BA[Better Auth en /api/auth · Google opcional]
+  PAG --> MP[Mercado Pago · apagado sin token]
+  NOT --> BR[Brevo · dry-run sin clave]
+  AUT --> SCH[NestJS Scheduler + JobRunner con advisory lock]
 ```
 
-- [[Monorepo MOVE]]: pnpm workspaces, el contenedor de todo. Ya construido.
-- [[App web Next]]: una sola app con [[Area publica web]], [[Area cliente web]] y [[Panel staff web]]. Hoy es el scaffold.
-- [[API NestJS]]: módulos simples por dominio en `src/modules/` (controller → service → repositorio). Hoy tiene la base (config, DB, validación, CORS) y ningún módulo de dominio.
-- Módulos: [[Modulo usuarios]], [[Modulo auth]], [[Modulo catalogo]], [[Modulo agenda]], [[Modulo suscripciones]], [[Modulo reservas]], [[Modulo pagos]], [[Modulo seguimiento]], [[Modulo automatizaciones]], [[Modulo notificaciones]].
-- Datos: [[Postgres local Docker]] en desarrollo, [[Neon Postgres]] en producción.
+- [[Monorepo MOVE]]: pnpm workspaces, con [[Pipeline CI Bitbucket]] y los scripts del [[Manual de usuario]].
+- [[App web Next]]: una sola app con [[Area publica web]], [[Area cliente web]] y [[Panel staff web]]; `proxy.ts` reenvía la ruta para volver a ella al ingresar.
+- [[API NestJS]]: doce módulos simples por dominio en `src/modules/`, en un orden de dependencias fijo. `app.setup.ts` arma `trust proxy` ([[IP real del cliente detras del proxy]]), CORS, Better Auth, validación y el filtro de errores.
+- Módulos: [[Modulo configuracion]], [[Modulo notificaciones]], [[Modulo usuarios]], [[Modulo auth]], [[Modulo catalogo]], [[Modulo agenda]], [[Modulo suscripciones]], [[Modulo reservas]], [[Modulo pagos]] (con el [[Simulador de pagos de desarrollo]]), [[Modulo seguimiento]], [[Modulo clientes]], [[Modulo automatizaciones]].
+- Datos: [[Postgres local Docker]] en desarrollo, [[Neon Postgres]] en producción (sin configurar).
 - Externos: [[Better Auth]], [[Google OAuth]], [[Mercado Pago]], [[Brevo]], [[NestJS Scheduler]], [[Vercel]], [[AWS Elastic Beanstalk]].
 
 ## Vocabulario
 
 | Término | Significado exacto en este proyecto |
 | --- | --- |
-| Plan | Producto del catálogo con precio y período ([[Plan]]). No es lo que tiene el cliente. |
-| Suscripción | Plan contratado por un cliente, con inicio y vencimiento ([[Suscripcion]]). "Plan vigente" = suscripción no vencida. |
-| Compra / Pago | Intención de pagar algo / operación de Mercado Pago con estado ([[Compra]], [[Pago]]). |
-| Horario / turno | Franja de agenda con cupo ([[Horario]]). En Rehab es la franja de un profesional ([[Disponibilidad profesional]]). |
-| Cupo | Capacidad máxima de un horario ([[Cupo maximo por horario]]). |
-| Reserva | Lugar tomado en un horario ([[Reserva]]). **No** implica asistencia. |
-| Asistencia | Resultado cargado por el staff: presente, ausente o no show ([[Asistencia]], [[Estados de asistencia]]). |
-| Evaluación | Evaluación y Diagnóstico, puerta de entrada a Rehab y lo único de Rehab que se compra directo en la web ([[Evaluacion y diagnostico]]). Después puede seguir un [[Seguimiento fisioterapeutico]]. |
-| Paquete | Plan Recovery mensual de N sesiones ([[Paquete de sesiones Recovery]]). |
+| Plan | Producto del catálogo con precio y período o sesiones ([[Plan]]). No es lo que tiene el cliente. |
+| Suscripción | Plan contratado por un cliente, con inicio y fin ([[Suscripcion]]). "Plan vigente" = suscripción no vencida a la fecha del turno. |
+| Compra / Pago | Intención de pagar algo / operación con estado, de Mercado Pago o manual ([[Compra]], [[Pago]]). |
+| Retención | Reserva paga en `pending_payment` que vence si no llega el pago ([[Reserva pendiente de pago expira]]). |
+| Horario / turno | Fila de `time_slots` con cupo ([[Horario]]). En Rehab es el turno de un profesional ([[Disponibilidad profesional]]). |
+| Cupo | Capacidad máxima de un turno ([[Cupo maximo por horario]]). |
+| Reserva | Lugar tomado en un turno ([[Reserva]]). **No** implica asistencia. |
+| Asistencia | Presente, ausente o no show, cargado por el staff ([[Asistencia]], [[Estados de asistencia]]). |
+| Evaluación | Evaluación y Diagnóstico, lo único de Rehab que se compra en la web ([[Evaluacion y diagnostico]]). Después puede seguir un [[Seguimiento fisioterapeutico]] habilitado por el staff. |
+| Paquete | Plan Recovery de N sesiones por 30 días ([[Paquete de sesiones Recovery]]). |
 | Alerta | Situación detectada que pide acción del staff ([[Alerta de seguimiento]]). |
-| Motivo | Razón registrada de una inactividad ([[Motivo de inactividad]]). |
+| Pausa / motivo | Razón registrada de una inactividad ([[Motivo de inactividad]]). |
 | Check-in | Encuesta breve a alumnos activos ([[Check-in]]). |
-| Estado del cliente | Activo, por vencer, vencido, inactivo o en pausa. Es derivado, no se carga ([[Estado del cliente]]). |
+| Estado del cliente | Activo, por vencer, vencido, inactivo o en pausa. Es derivado ([[Estado del cliente]]). |
+| Needs attention | Compra aprobada que el staff resuelve a mano ([[ADR pago tardio sin lugar queda para el staff]]). |
 
 ## Las decisiones, conectadas
 
-**Plataforma, ya aplicada.** [[ADR monorepo pnpm sin Turborepo]] ·
-[[ADR NestJS 12 en ESM]] → [[Imports relativos con extension js]] ·
-[[ADR TypeORM con migraciones por CLI]] → [[Esquema solo via migraciones]] →
-previene [[Drift de esquema entre ambientes]] ·
-[[ADR Next App Router en lugar de Vite]] → [[Paginas publicas renderizadas en servidor]] ·
-[[ADR shadcn base-nova sobre Base UI]] → [[Estilos via tokens del tema]].
-Acordada, se aplica con el primer módulo: [[ADR modulos simples por dominio]]
-(reemplaza a [[ADR arquitectura hexagonal por modulo]]) → [[Entidades ORM no salen del servicio]],
+**Plataforma.** [[ADR monorepo pnpm sin Turborepo]] · [[ADR NestJS 12 en ESM]] →
+[[Imports relativos con extension js]] · [[ADR TypeORM con migraciones por CLI]] →
+[[Esquema solo via migraciones]] · [[ADR Next App Router en lugar de Vite]] →
+[[Paginas publicas renderizadas en servidor]] · [[ADR shadcn base-nova sobre Base UI]] →
+[[Estilos via tokens del tema]] · [[ADR capa de datos del frontend]] ·
+[[ADR modulos simples por dominio]] → [[Entidades ORM no salen del servicio]],
 [[Integraciones externas encapsuladas en un servicio]] y [[Dependencias entre modulos aciclicas]].
+Configuración y errores: [[ADR errores 4xx fuera de contrato como validacion]],
+[[ADR un parser por variable de entorno]] → [[Variable de entorno parseada una sola vez]].
 
-**Identidad.** [[ADR tres perfiles de usuario]] → [[Roles persistidos cliente y staff]]
-y [[Cuenta se crea durante la reserva]]. [[ADR Better Auth con Google OAuth]] →
-[[Autorizacion validada en la API]] (previene [[Cliente accede a funciones de staff]])
-y [[Una cuenta por email]] (previene [[Cuentas duplicadas por email]]).
-[[ADR ubicacion de Better Auth]] está **abierta** → [[Web y API bajo el mismo dominio raiz]]
-(previene [[Sesion no viaja entre web y API]]).
+**Desarrollo sin accesos.** [[ADR desarrollo sin accesos a proveedores]] y
+[[ADR simulador registrado con ConditionalModule]] → [[Simulador de pagos solo fuera de produccion]],
+que previene [[Simulador de pagos montado en produccion]] (la falla que había causado
+[[Config leida al importar antes de cargar el entorno]]). [[ADR sin deploy en el run del MVP]]
+deja Vercel, Elastic Beanstalk y Neon en `todo`.
+
+**Identidad.** [[ADR Better Auth con Google OAuth]] y [[ADR ubicacion de Better Auth]]
+(en Nest) → [[Autorizacion validada en la API]], [[Una cuenta por email]] y
+[[Web y API bajo el mismo dominio raiz]]. [[ADR Better Auth endurecido]],
+[[ADR volver a la pagina exacta tras ingresar]] y [[ADR create-staff exige promote-existing]].
 
 **Agenda y reservas.** [[ADR calendario propio]] → [[Cupo maximo por horario]] y
-[[Reserva con bloqueo transaccional]] (previenen [[Sobreventa de cupos]]), y
-[[Configuracion operativa administrada por staff]].
+[[Reserva con bloqueo transaccional]] (previenen [[Sobreventa de cupos]]).
+[[ADR limite de retenciones y de checkout por IP]] y
+[[ADR IP real detras del proxy y ventana horaria]] → [[Retenciones de pago limitadas por usuario]],
+[[Checkout publico limitado por IP]] e [[IP real del cliente detras del proxy]] (contra
+[[Retenciones masivas de invitados]] y [[Throttling por IP ve la IP del proxy]]).
 
 **Pagos.** [[ADR Mercado Pago como procesador de pagos]] →
-[[Pago confirmado solo por webhook validado]] (previene [[Webhook falsificado]] →
-[[Plan activado sin pago confirmado]]), [[Operaciones de pago idempotentes]] (previene
-[[Webhook duplicado procesado dos veces]] → [[Vigencia extendida dos veces]]),
-[[Activacion en la misma transaccion que el pago]] (previene
-[[Pago aprobado sin activar plan]]) y [[Logica de negocio fuera de Mercado Pago]].
+[[Pago confirmado solo por webhook validado]], [[Operaciones de pago idempotentes]]
+(requiere [[Queries crudas con RETURNING via CTE]]), [[Activacion en la misma transaccion que el pago]]
+y [[Conciliacion periodica de pagos pendientes]]. Pagos tardíos: [[ADR pago tardio sin lugar queda para el staff]],
+[[ADR retencion vencida sin lugar no se reconfirma]] y [[ADR conciliacion re-consulta compras vencidas]].
+Planes rechazados: [[ADR pago de plan rechazado deja la compra pendiente]] →
+[[ADR reintento visible para plan rechazado]].
 
 **Seguimiento.** [[ADR automatizaciones con NestJS Scheduler]] →
 [[Reglas de automatizacion en Postgres]], [[Jobs programados idempotentes]] y
-[[Scheduler corre en una sola instancia]]. Esta última previene
-[[Job ejecutado en varias instancias]], que habilita
-[[ADR Elastic Beanstalk para la API]] y que causa [[Alertas o emails duplicados]].
+[[Scheduler corre en una sola instancia]] (advisory lock). [[ADR renovacion programada no cuenta como por vencer]].
 
-**Alcance.** [[ADR alcance MVP en cuatro semanas]] → [[IA y planificaciones fuera del MVP]],
-[[Demo semanal de flujo visible]] y [[Accesos y definiciones operativas al inicio]].
+**Alcance y entrega.** [[ADR alcance MVP en cuatro semanas]] · [[ADR sin E2E web de demos]] ·
+[[ADR sin archivos env nuevos]] · [[ADR manual de usuario con capturas]] ·
+[[ADR manual con guia de proveedores]] · [[ADR push a GitHub y merge por PR]].
 
-## Lo diseñado que todavía no existe
+## Lo que todavía no existe
 
-Al 2026-10-13, en el repo solo existen el monorepo, el scaffold web, la base de la API
-y Postgres en Docker. **Todo módulo, pantalla y regla de negocio está en `todo`.**
+Al 2026-10-13 (`feature/move-mvp`, commit be89bc5) el MVP completo corre en local y
+está cubierto por tests unitarios y e2e de la API y tests de componentes de la web. El
+[[Manual de usuario]] documenta el estado frente al PDF, cómo levantar todo y la guía
+por proveedor. Falta:
 
-Propuesto por el vault, no por MOVE (`proposed`, confirmar antes de implementar):
-- [[Reservas concurrentes al ultimo cupo]] (mecanismo), [[Reserva con bloqueo transaccional]], [[Cancelacion libera el cupo]] y [[Asistencia pendiente visible para staff]]
-- [[Reserva pendiente de pago expira]] y [[Sesiones Recovery no exceden el paquete]]
-- [[Operaciones de pago idempotentes]], [[Activacion en la misma transaccion que el pago]], [[Conciliacion periodica de pagos pendientes]] y [[Renovacion extiende desde el vencimiento]]
-- [[Jobs programados idempotentes]], [[Scheduler corre en una sola instancia]] y [[Clientes en pausa excluidos de alertas]]
-- [[Una cuenta por email]] y [[Web y API bajo el mismo dominio raiz]]
-- [[ADR zona horaria de negocio]] / [[Fechas en zona horaria de Uruguay]] y [[Paridad de version Postgres dev y prod]]
-- [[ADR capa de datos del frontend]], [[Formularios validados con Zod]], [[Estilos via tokens del tema]] y [[Pantalla checkout de pago]]
+- Deploy (`todo`): [[Vercel]], [[AWS Elastic Beanstalk]], [[Neon Postgres]], [[Ambientes dev y produccion separados]], [[Web y API bajo el mismo dominio raiz]].
+- Apagado hasta tener credenciales o configuración (`built-off-by-default`): [[Google OAuth]], [[Mercado Pago]], [[Brevo]], [[Conexion SSL a la base en produccion]], [[IP real del cliente detras del proxy]].
+- Documentado en el runbook y el manual, sin aplicar (`proposed`): [[PORT explicito en Elastic Beanstalk]], [[Rama dev de Neon sin expiracion]], [[Ambiente dev en dominio registrable propio]], [[Paridad de version Postgres dev y prod]].
+- CI configurado pero nunca ejecutado: [[Pipeline CI Bitbucket]].
+- Deuda conocida (`todo`): [[Variable de entorno parseada una sola vez]] para `PORT`, `DB_PORT` y `DB_SSL`; [[Build de Next falla con NODE_ENV development]] sin defensa en scripts.
 
-Apagado por configuración: [[Conexion SSL a la base en produccion]].
-
-Abierto (`draft`, bloquea; preguntar a MOVE o al equipo):
-- [[ADR ubicacion de Better Auth]]: ¿Next o Nest? Define dominios y cookies.
-- [[Accesos y definiciones operativas al inicio]]: accesos a proveedores, planes, horarios, cupos y límite de cancelación.
-- [[Estados de asistencia]]: ¿ausente vs no show?
-- [[Umbrales de seguimiento]]: inactividad prolongada y baja de frecuencia.
-- [[Pantalla dashboard staff]], [[Pantalla pagos staff]] (¿pagos manuales?) y [[Pantalla configuracion staff]]: no tienen mockup.
-- [[Seguimiento fisioterapeutico]]: cómo se habilita, paga y agenda.
-- [[Sesiones Recovery no usadas]] y [[Prioridad de horarios Recovery]]: reglas del paquete.
-- [[Envio de check-ins]]: manual, programado o ambos; canal.
-- [[Alta manual de clientes]]: botón "Nuevo cliente" sin flujo definido.
+Abierto (`draft`, preguntar al usuario o a MOVE):
+- [[ADR notificaciones de Mercado Pago por ambiente]] (D68): IPN sin firma o URL del panel por ambiente.
+- [[Bloqueo de IPs de Brevo resuelto antes de produccion]].
+- [[Prioridad de horarios Recovery]]: quitada de los textos hasta que MOVE la defina.
+- [[ADR push a GitHub y merge por PR]] está aprobada pero sin remoto, y deja abierto dónde corre [[Pipeline CI Bitbucket]].
+- Dominio final y dominio registrable de desarrollo; valores provisorios a confirmar con MOVE: [[Accesos y definiciones operativas al inicio]], [[Umbrales de seguimiento]], precios y horarios de la semilla.
 
 ## Para profundizar
 
 Las espinas: [[MOC Circuito Performance]], [[MOC Pagos y activacion]],
 [[MOC Seguimiento y retencion]] y [[MOC Identidad y acceso]]. Además
-[[MOC Rehab y Recovery]], [[MOC Plataforma y entrega]] y [[MOC Pantallas]]. El plan de
-construcción está en [[MOC Roadmap MVP]].
+[[MOC Rehab y Recovery]], [[MOC Plataforma y entrega]] y [[MOC Pantallas]]. El estado
+de construcción está en [[MOC Roadmap MVP]].
 
 Disciplina de cambio: una decisión nunca se edita para decir lo contrario. Se crea un
 ADR nuevo que la `supersedes` y la vieja pasa a `status: superseded`.

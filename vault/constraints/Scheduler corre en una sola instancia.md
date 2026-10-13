@@ -1,17 +1,19 @@
 ---
 type: constraint
-status: proposed
+status: shipped
 semana: 2
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p9
-  - move/MOVE.pdf#p12
+  - move/apps/api/src/common/scheduling/job-runner.service.ts
+  - move/apps/api/src/config/scheduler.config.ts
+  - move/apps/api/test/job-runner.e2e-spec.ts
 ---
 # Scheduler corre en una sola instancia
 
-Si Elastic Beanstalk escala a más de una instancia, solo una ejecuta los cron:
-con un advisory lock de Postgres, un flag de entorno en una sola instancia o un
-worker environment.
+Cada job toma un advisory lock de Postgres por nombre y se saltea si otro ya lo tiene,
+aun entre instancias. Además `SCHEDULER_ENABLED=false` apaga los cron en una
+instancia; el runbook pide dejarlos activos en una sola. Confirmada por el equipo
+(D11).
 
 ## Structural
 - constrains → [[NestJS Scheduler]]

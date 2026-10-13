@@ -1,17 +1,19 @@
 ---
 type: constraint
-status: proposed
+status: todo
 semana: 1
 updated: 2026-10-13
 source:
   - move/MOVE.pdf#p8
   - move/MOVE.pdf#p13
+  - move/apps/api/src/config/auth.config.ts
+  - move/docs/deploy.md
 ---
 # Web y API bajo el mismo dominio raiz
 
-Web (Vercel) y API (Elastic Beanstalk) se publican bajo el mismo dominio raíz
-(por ejemplo `move.uy` y `api.move.uy`) para que la cookie de sesión sea first-party.
-Depende de dónde corra Better Auth.
+Con Better Auth en la API, web y API se publican bajo el mismo dominio raíz (por
+ejemplo `<dominio>` y `api.<dominio>`) con `COOKIE_DOMAIN` para que la cookie de
+sesión llegue a ambas. El código ya lo soporta; falta el dominio final y el deploy.
 
 ## Structural
 - constrains → [[AWS Elastic Beanstalk]]

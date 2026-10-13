@@ -1,20 +1,18 @@
 ---
 type: constraint
-status: todo
+status: shipped
 semana: 2
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p4
-  - move/MOVE.pdf#p11
-  - move/MOVE.pdf#p17
-  - move/imagenes/htmls/03-performance.html
-  - move/imagenes/finales/03-performance.png
+  - move/apps/api/src/modules/bookings/services/bookings.service.ts
+  - move/apps/api/src/modules/bookings/domain/booking-rules.ts
+  - move/apps/web/src/components/booking/plan-required-notice.tsx
 ---
 # Reserva Performance requiere plan vigente
 
-Solo se reserva un horario de Performance con una suscripción vigente a la fecha
-del turno. Con el plan vencido se bloquean las reservas nuevas y se lleva al usuario a
-renovar; se valida en la API, no en el front.
+Solo se reserva un turno de Performance con una suscripción vigente a la fecha del
+turno; si no, la API responde `PLAN_REQUIRED` y la web lleva a renovar. Se valida en
+la API, dentro de la transacción de la reserva.
 
 ## Structural
 - constrains → [[Reserva]]

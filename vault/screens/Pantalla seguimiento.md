@@ -1,20 +1,17 @@
 ---
 type: screen
-status: todo
+status: shipped
 semana: 4
 updated: 2026-10-13
 source:
   - move/imagenes/htmls/09-seguimiento-retencion.html
-  - move/imagenes/finales/09-seguimiento-retencion.png
-  - move/MOVE.pdf#p6
-  - move/MOVE.pdf#p7
+  - move/apps/web/src/app/staff/seguimiento/page.tsx
+  - move/apps/web/src/components/staff/seguimiento/followup-view.tsx
 ---
 # Pantalla seguimiento
 
-Bandeja de alertas con contadores por tipo (por vencer, vencidos sin renovar,
-una semana sin asistir, inactividad prolongada, baja de frecuencia, re-contactar).
-Cada alerta permite Contactar, Marcar gestionado o Registrar motivo con nota
-interna.
+Bandeja de alertas con contadores por tipo. Cada alerta permite Contactar, Marcar
+gestionado o Registrar motivo con nota interna y fecha de re-contacto.
 
 ## Structural
 - is part of → [[Panel staff web]]

@@ -1,17 +1,17 @@
 ---
 type: constraint
-status: proposed
+status: shipped
 semana: 3
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p5
-  - move/MOVE.pdf#p11
+  - move/apps/api/src/modules/bookings/jobs/expire-holds.job.ts
+  - move/apps/api/src/modules/settings/settings.defaults.ts
 ---
 # Reserva pendiente de pago expira
 
-Una reserva paga (Rehab, Recovery individual) que bloquea horario sin pago
-aprobado vence a los N minutos y libera la franja. El PDF pide bloqueo y pago pero no
-dice qué pasa con un pago abandonado.
+Una retención de reserva paga que no recibe pago aprobado vence a los
+`pending_payment_minutes` (15 provisorio) y libera la franja; su compra pendiente
+también expira. Un job la revisa cada minuto. Confirmada por el equipo (D11).
 
 ## Structural
 - constrains → [[Reserva]]

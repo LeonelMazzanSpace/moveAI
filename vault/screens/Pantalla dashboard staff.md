@@ -1,17 +1,17 @@
 ---
 type: screen
-status: draft
+status: shipped
 semana: 1
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p6
-  - move/imagenes/htmls/08-panel-gestion.html
+  - move/apps/web/src/app/staff/page.tsx
+  - move/apps/web/src/components/staff/dashboard/dashboard-view.tsx
 ---
 # Pantalla dashboard staff
 
-Primer ítem del sidebar staff, sin mockup. Su contenido no está definido; los KPIs
-de la pantalla de clientes son el candidato natural. Confirmar con diseño antes de
-construirla.
+Primer ítem del sidebar staff, sin mockup. Resuelto (D12): KPIs de clientes,
+contadores de alertas y turnos de hoy.
 
 ## Structural
 - is part of → [[Panel staff web]]
+- depends on → [[Modulo clientes]]

@@ -1,16 +1,18 @@
 ---
 type: system
-status: todo
+status: shipped
 semana: 2
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p12
+  - move/apps/api/src/app.module.ts
+  - move/apps/api/src/config/scheduler.config.ts
+  - move/apps/api/src/common/scheduling/job-runner.service.ts
 ---
 # NestJS Scheduler
 
-`@nestjs/schedule` dentro de la API: tareas cron que consultan PostgreSQL
-periódicamente y generan acciones de seguimiento. Para el volumen del MVP no hay
-colas ni workers separados.
+`@nestjs/schedule` dentro de la API, sin colas ni workers. Todos los cron (turnos,
+retenciones, conciliación, seguimiento) pasan por el `JobRunner` común, que respeta
+`SCHEDULER_ENABLED` y toma un advisory lock de Postgres por job.
 
 ## Structural
 - is part of → [[API NestJS]]

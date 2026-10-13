@@ -1,16 +1,16 @@
 ---
 type: concept
-status: todo
+status: shipped
 updated: 2026-10-13
 source:
   - move/MOVE.pdf#p11
-  - move/imagenes/htmls/05-rehab.html
-  - move/imagenes/finales/05-rehab.png
+  - move/apps/api/src/modules/schedule/entities/professional.entity.ts
+  - move/apps/api/src/modules/schedule/entities/time-slot.entity.ts
 ---
 # Disponibilidad profesional
 
-Franjas en que un profesional de Rehab atiende. Cada franja admite una sola
-consulta y se bloquea automáticamente al reservarla. La administra el staff.
+Turnos en que un profesional de Rehab atiende: cada uno admite una sola consulta y
+se bloquea al reservarlo. La administra el staff con plantillas o turnos sueltos.
 
 ## Structural
 - is a case of → [[Horario]]

@@ -1,19 +1,18 @@
 ---
 type: system
-status: todo
+status: shipped
 semana: 1
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p3
-  - move/MOVE.pdf#p4
-  - move/MOVE.pdf#p5
-  - move/MOVE.pdf#p9
+  - move/apps/api/src/modules/catalog/catalog.module.ts
+  - move/apps/api/src/modules/catalog/services/catalog.service.ts
+  - move/apps/api/src/modules/catalog/domain/plan-rules.ts
 ---
 # Modulo catalogo
 
-Módulo de servicios (Performance, Rehab, Recovery) y de los planes y paquetes que
-se venden: precio, duración del período, sesiones incluidas. El staff lo administra;
-el sitio público lo lee.
+Planes y paquetes vendibles de los tres servicios: precio, período, sesiones
+incluidas y si están activos. El staff los administra y el sitio público los lee; los
+de la semilla son provisorios.
 
 ## Structural
 - is part of → [[API NestJS]]

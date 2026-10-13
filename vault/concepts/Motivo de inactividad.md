@@ -1,17 +1,16 @@
 ---
 type: concept
-status: todo
+status: shipped
 updated: 2026-10-13
 source:
   - move/MOVE.pdf#p7
-  - move/imagenes/htmls/09-seguimiento-retencion.html
-  - move/imagenes/finales/09-seguimiento-retencion.png
+  - move/apps/api/src/modules/followup/entities/inactivity-reason.entity.ts
 ---
 # Motivo de inactividad
 
-Razón que registra el staff para la inactividad de un cliente: lesión,
-vacaciones, pausa temporal, falta de tiempo, mudanza o quiere volver más adelante.
-Lleva una nota interna y una fecha de re-contacto opcionales.
+Razón que registra el staff para la inactividad de un cliente (lesión, vacaciones,
+pausa, falta de tiempo, mudanza, volver más adelante), con nota interna y fecha de
+re-contacto opcionales. Mientras está activo, el cliente figura en pausa.
 
 ## Structural
 - is part of → [[Modulo seguimiento]]

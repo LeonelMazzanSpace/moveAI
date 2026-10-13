@@ -1,16 +1,18 @@
 ---
 type: constraint
-status: todo
+status: shipped
 semana: 4
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p12
+  - move/apps/api/src/modules/settings/settings.defaults.ts
+  - move/apps/api/src/modules/followup/domain/alert-rules.ts
 ---
 # Reglas de automatizacion en Postgres
 
-Las reglas y fechas que evalúan los jobs (umbrales, re-contactos, check-ins
-programados) se guardan en PostgreSQL. Los jobs las leen; no hay reglas en
-código.
+Los umbrales y fechas que evalúan los jobs (días por vencer, días sin asistir,
+inactividad prolongada, baja de frecuencia, re-contactos) se guardan en PostgreSQL y
+los edita el staff. La forma de cada regla sí vive en código, como funciones puras del
+módulo de seguimiento.
 
 ## Structural
 - constrains → [[Modulo automatizaciones]]

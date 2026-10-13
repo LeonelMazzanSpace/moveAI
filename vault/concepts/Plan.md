@@ -1,18 +1,17 @@
 ---
 type: concept
-status: todo
+status: shipped
 updated: 2026-10-13
 source:
   - move/MOVE.pdf#p4
-  - move/MOVE.pdf#p9
-  - move/imagenes/htmls/03-performance.html
-  - move/imagenes/finales/03-performance.png
+  - move/apps/api/src/modules/catalog/entities/plan.entity.ts
+  - move/apps/api/src/database/seed-data.ts
 ---
 # Plan
 
-Producto vendible del catálogo con precio y período: Mensual, Trimestral o
-Semestral en Performance, y paquetes mensuales en Recovery. Los valores del mockup
-($3.900, $10.500, $19.800) son ilustrativos.
+Producto vendible del catálogo con precio y período o sesiones: planes de período en
+Performance, paquetes y sesión individual en Recovery, evaluación en Rehab. Los
+precios de la semilla salen del mockup y son provisorios.
 
 ## Structural
 - is part of → [[Modulo catalogo]]

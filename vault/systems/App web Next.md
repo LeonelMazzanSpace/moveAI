@@ -5,15 +5,17 @@ semana: 1
 updated: 2026-10-13
 source:
   - move/apps/web/package.json
-  - move/apps/web/components.json
-  - move/apps/web/src/app/globals.css
+  - move/apps/web/src/app/layout.tsx
+  - move/apps/web/src/proxy.ts
+  - move/apps/web/src/lib/api/client.ts
+  - move/apps/web/src/lib/api/server.ts
 ---
 # App web Next
 
-`@move/web`: Next.js 16 App Router con `src/`, React 19, Tailwind v4 y shadcn
-(preset base-nova sobre `@base-ui/react`). Concentra sitio público, área de cliente y
-panel staff en una sola app (puerto 3000). Hoy es solo el scaffold: un `Button` de
-shadcn y la página por defecto.
+`@move/web`: Next.js 16 App Router con React 19, Tailwind v4 y shadcn base-nova.
+Una sola app (puerto 3000) con área pública, área de cliente y panel staff. Llama a
+la API solo con `apiFetch` (cliente) y `serverApiFetch` (servidor); `proxy.ts`
+reenvía la ruta actual para volver a ella después de ingresar.
 
 ## Structural
 - is part of → [[Monorepo MOVE]]

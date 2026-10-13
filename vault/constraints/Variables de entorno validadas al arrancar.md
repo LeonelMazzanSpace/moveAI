@@ -9,12 +9,13 @@ source:
 ---
 # Variables de entorno validadas al arrancar
 
-La API valida con class-validator todas las env vars al iniciar y no arranca si
-falta o está mal alguna. La config se inyecta por namespace (`appConfig.KEY`,
-`databaseConfig.KEY` con `ConfigType`), nunca con `process.env` en servicios.
-Excepción: el CLI de migraciones (`data-source.ts`) lee `process.env` sin esa
+La API valida con class-validator todas las env vars al iniciar y no arranca si falta
+o está mal alguna; en producción exige además las credenciales de Mercado Pago y
+Brevo. La config se inyecta por namespace, nunca con `process.env` en services ni al
+importar un módulo. Excepción: el CLI de migraciones lee `process.env` sin esa
 validación.
 
 ## Structural
 - constrains → [[API NestJS]]
 - prevents → [[Arranque con configuracion invalida]]
+- mitigates → [[Config leida al importar antes de cargar el entorno]]

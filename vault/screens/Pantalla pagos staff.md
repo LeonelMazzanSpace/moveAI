@@ -1,17 +1,17 @@
 ---
 type: screen
-status: draft
+status: shipped
 semana: 3
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p6
-  - move/MOVE.pdf#p11
-  - move/imagenes/htmls/08-panel-gestion.html
+  - move/apps/web/src/app/staff/pagos/page.tsx
+  - move/apps/web/src/components/staff/pagos/manual-payment-dialog.tsx
 ---
 # Pantalla pagos staff
 
-Ítem "Pagos" del sidebar staff, sin mockup. Falta definir si solo lista pagos de
-Mercado Pago o si el staff también registra pagos manuales.
+Pagos del panel, sin mockup. Resuelto (D7): lista las operaciones, marca las compras
+que necesitan atención y permite registrar pagos manuales (efectivo o transferencia)
+que activan el plan en la misma transacción.
 
 ## Structural
 - is part of → [[Panel staff web]]

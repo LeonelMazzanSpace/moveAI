@@ -1,18 +1,18 @@
 ---
 type: screen
-status: todo
+status: shipped
 semana: 3
 updated: 2026-10-13
 source:
   - move/imagenes/htmls/06-recovery.html
-  - move/imagenes/finales/06-recovery.png
-  - move/MOVE.pdf#p5
+  - move/apps/web/src/app/(public)/recovery/page.tsx
+  - move/apps/web/src/components/checkout/recovery-booking-flow.tsx
 ---
 # Pantalla Recovery
 
-Recovery Room: sesión individual (45 min) y paquetes mensuales de 4 y 8
-sesiones, más el flujo Selección → Reserva → Pago → Confirmación. Abierto a público
-general sin plan previo.
+Recovery Room: sesión individual y paquetes de sesiones, más el flujo selección →
+reserva → pago → confirmación. Abierta al público general sin plan previo; con
+paquete vigente la reserva consume una sesión sin pago.
 
 ## Structural
 - is part of → [[Area publica web]]

@@ -1,14 +1,14 @@
 ---
 type: system
-status: todo
+status: built-off-by-default
 semana: 2
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p11
-  - move/MOVE.pdf#p12
+  - move/apps/api/src/modules/payments/services/mercado-pago.service.ts
+  - move/apps/api/src/config/mercado-pago.config.ts
 ---
 # Mercado Pago
 
-Cuenta e integración de Mercado Pago existentes de MOVE. Se usa solo como
-procesador de pagos: crea la operación, cobra y notifica el resultado. Las
-credenciales y el entorno de prueba se validan antes de usarlas.
+Procesador de pagos de MOVE, integrado por su API REST desde un único service. Está
+apagado hasta tener credenciales: sin `MP_ACCESS_TOKEN` el checkout usa el simulador
+de desarrollo. En producción la API no arranca sin token ni secreto de webhook.

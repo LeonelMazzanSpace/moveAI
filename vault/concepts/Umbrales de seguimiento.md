@@ -1,18 +1,17 @@
 ---
 type: concept
-status: draft
+status: shipped
 updated: 2026-10-13
 source:
-  - move/MOVE.pdf#p6
-  - move/MOVE.pdf#p7
-  - move/imagenes/htmls/08-panel-gestion.html
-  - move/imagenes/finales/08-panel-gestion.png
+  - move/apps/api/src/modules/settings/settings.defaults.ts
+  - move/apps/web/src/components/staff/config/rules-tab.tsx
 ---
 # Umbrales de seguimiento
 
-Valores de cada regla. El PDF fija "aproximadamente una semana sin asistir" y el
-mockup sugiere 7 días para "por vencer"; "inactividad prolongada" y "baja de
-frecuencia" no tienen valor. Los tiene que definir MOVE.
+Valores provisorios de cada regla (D10), editables en Configuración: por vencer 7
+días, sin asistir 7 días, inactividad prolongada 21 días, y baja de frecuencia cuando
+el promedio de las últimas 2 semanas cae por debajo de la mitad del de las 8 previas.
+MOVE todavía tiene que confirmarlos.
 
 ## Structural
 - is part of → [[Regla de automatizacion]]

@@ -1,16 +1,16 @@
 ---
 type: concept
-status: todo
+status: shipped
 updated: 2026-10-13
 source:
   - move/MOVE.pdf#p9
-  - move/MOVE.pdf#p10
+  - move/apps/api/src/modules/users/entities/user.entity.ts
 ---
 # Usuario
 
-Persona con cuenta en MOVE, sea cliente o staff. Su identidad (email, password,
-Google) la maneja Better Auth; el resto del dominio (perfil, rol, historial) cuelga
-del usuario.
+Persona con cuenta en MOVE, cliente o staff. Su identidad (email, contraseña,
+Google) la maneja Better Auth sobre la misma tabla; el resto del dominio (perfil, rol,
+historial) cuelga del usuario.
 
 ## Structural
 - is part of → [[Modulo usuarios]]
