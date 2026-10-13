@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOVE — Performance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: { bg:'#000000', soft:'#0c0c0c', card:'#121212', line:'#262626', muted:'#9a9a9a' },
+    fontFamily: { display:['Archivo','sans-serif'], sans:['Inter','sans-serif'] },
+  }}
+}
+</script>
+<style>body{background:#000;color:#fff;font-family:Inter,sans-serif}</style>
+</head>
+<body class="antialiased">
+
+<!-- Navbar -->
+<header class="sticky top-0 z-50 border-b border-line bg-bg/90 backdrop-blur">
+  <div class="mx-auto flex h-16 max-w-[1160px] items-center justify-between px-6">
+    <span class="font-display text-xl font-black tracking-tight">MOVE<span class="align-super text-[10px]">®</span></span>
+    <nav class="hidden items-center gap-7 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted md:flex">
+      <a class="hover:text-white" href="#">Inicio</a>
+      <a class="text-white" href="#">Performance</a>
+      <a class="hover:text-white" href="#">Rehab</a>
+      <a class="hover:text-white" href="#">Recovery</a>
+      <a class="hover:text-white" href="#">Planes</a>
+    </nav>
+    <div class="flex items-center gap-3">
+      <a href="#" class="rounded border border-line px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white hover:bg-card">Ingresar</a>
+      <a href="#" class="rounded bg-white px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-black hover:bg-neutral-200">Reservar</a>
+    </div>
+  </div>
+</header>
+
+<!-- Hero -->
+<section class="mx-auto max-w-[1160px] px-6 pb-16 pt-20">
+  <p class="text-[11px] font-medium uppercase tracking-[0.35em] text-muted">01 — Performance</p>
+  <h1 class="mt-5 font-display text-5xl font-black uppercase leading-[0.95] tracking-tight md:text-6xl">
+    Entrenamiento<br>semi personalizado.
+  </h1>
+  <p class="mt-6 max-w-lg text-sm leading-relaxed text-muted">
+    Todos los planes incluyen acceso mediante reserva previa, sin límite semanal de
+    asistencias. Cada horario tiene una capacidad máxima y solo puede reservarse
+    con un plan vigente.
+  </p>
+  <div class="mt-8 flex flex-wrap gap-6 text-xs text-muted">
+    <div class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-white"></span>Reserva previa obligatoria</div>
+    <div class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-white"></span>Sin límite semanal</div>
+    <div class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-white"></span>Capacidad máxima por horario</div>
+  </div>
+</section>
+
+<!-- Planes -->
+<section class="border-t border-line bg-soft">
+  <div class="mx-auto max-w-[1160px] px-6 py-16">
+    <h2 class="font-display text-3xl font-black uppercase tracking-tight">Planes disponibles.</h2>
+    <p class="mt-3 text-sm text-muted">Seleccioná un plan y avanzá hacia la contratación. El pago se procesa online.</p>
+    <div class="mt-10 grid gap-6 md:grid-cols-3">
+      <div class="flex flex-col rounded border border-line bg-card p-7">
+        <p class="text-[11px] uppercase tracking-[0.3em] text-muted">Plan Mensual</p>
+        <p class="mt-3 font-display text-4xl font-black">$ 3.900<span class="text-sm font-semibold text-muted"> /mes</span></p>
+        <ul class="mt-6 flex-1 space-y-3 text-sm text-muted">
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Asistencias ilimitadas con reserva</li>
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Reserva y cancelación online</li>
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Historial de entrenamiento</li>
+        </ul>
+        <button class="mt-7 rounded border border-line py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] hover:bg-soft">Contratar</button>
+      </div>
+      <div class="relative flex flex-col rounded border border-white bg-card p-7">
+        <span class="absolute -top-3 left-6 rounded bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-black">Más elegido</span>
+        <p class="text-[11px] uppercase tracking-[0.3em] text-muted">Plan Trimestral</p>
+        <p class="mt-3 font-display text-4xl font-black">$ 10.500<span class="text-sm font-semibold text-muted"> /trim</span></p>
+        <ul class="mt-6 flex-1 space-y-3 text-sm text-muted">
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Asistencias ilimitadas con reserva</li>
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Reserva y cancelación online</li>
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Historial de entrenamiento</li>
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Ahorrás un 10% vs. mensual</li>
+        </ul>
+        <button class="mt-7 rounded bg-white py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-black hover:bg-neutral-200">Contratar</button>
+      </div>
+      <div class="flex flex-col rounded border border-line bg-card p-7">
+        <p class="text-[11px] uppercase tracking-[0.3em] text-muted">Plan Semestral</p>
+        <p class="mt-3 font-display text-4xl font-black">$ 19.800<span class="text-sm font-semibold text-muted"> /sem</span></p>
+        <ul class="mt-6 flex-1 space-y-3 text-sm text-muted">
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Asistencias ilimitadas con reserva</li>
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Reserva y cancelación online</li>
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Historial de entrenamiento</li>
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Ahorrás un 15% vs. mensual</li>
+        </ul>
+        <button class="mt-7 rounded border border-line py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] hover:bg-soft">Contratar</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Horarios -->
+<section class="border-t border-line">
+  <div class="mx-auto max-w-[1160px] px-6 py-16">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h2 class="font-display text-3xl font-black uppercase tracking-tight">Horarios y cupos.</h2>
+        <p class="mt-3 text-sm text-muted">Reservá tu turno con un plan vigente. Cupos en tiempo real.</p>
+      </div>
+      <div class="flex items-center gap-2 rounded border border-line bg-card px-3.5 py-2 text-xs font-medium">
+        <span class="text-muted">Día:</span> Lunes 12/10
+        <svg class="ml-1 h-3 w-3 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+    </div>
+    <div class="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="flex items-center justify-between rounded border border-line bg-card px-5 py-4">
+        <div><p class="font-display text-lg font-extrabold">07:00</p><p class="mt-0.5 text-xs text-muted">9 / 14 cupos</p></div>
+        <button class="rounded bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-black">Reservar</button>
+      </div>
+      <div class="flex items-center justify-between rounded border border-line bg-card px-5 py-4">
+        <div><p class="font-display text-lg font-extrabold">08:00</p><p class="mt-0.5 text-xs text-muted">11 / 14 cupos</p></div>
+        <button class="rounded bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-black">Reservar</button>
+      </div>
+      <div class="flex items-center justify-between rounded border border-line bg-soft px-5 py-4 opacity-60">
+        <div><p class="font-display text-lg font-extrabold">09:00</p><p class="mt-0.5 text-xs text-muted">14 / 14 cupos</p></div>
+        <span class="rounded border border-line px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">Completo</span>
+      </div>
+      <div class="flex items-center justify-between rounded border border-line bg-card px-5 py-4">
+        <div><p class="font-display text-lg font-extrabold">17:00</p><p class="mt-0.5 text-xs text-muted">6 / 14 cupos</p></div>
+        <button class="rounded bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-black">Reservar</button>
+      </div>
+      <div class="flex items-center justify-between rounded border border-line bg-card px-5 py-4">
+        <div><p class="font-display text-lg font-extrabold">18:00</p><p class="mt-0.5 text-xs text-muted">12 / 14 cupos</p></div>
+        <button class="rounded bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-black">Reservar</button>
+      </div>
+      <div class="flex items-center justify-between rounded border border-line bg-card px-5 py-4">
+        <div><p class="font-display text-lg font-extrabold">19:00</p><p class="mt-0.5 text-xs text-muted">13 / 14 cupos</p></div>
+        <button class="rounded bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-black">Reservar</button>
+      </div>
+      <div class="flex items-center justify-between rounded border border-line bg-card px-5 py-4">
+        <div><p class="font-display text-lg font-extrabold">20:00</p><p class="mt-0.5 text-xs text-muted">8 / 14 cupos</p></div>
+        <button class="rounded bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-black">Reservar</button>
+      </div>
+      <div class="flex items-center justify-between rounded border border-line bg-card px-5 py-4">
+        <div><p class="font-display text-lg font-extrabold">21:00</p><p class="mt-0.5 text-xs text-muted">4 / 14 cupos</p></div>
+        <button class="rounded bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-black">Reservar</button>
+      </div>
+    </div>
+    <div class="mt-8 rounded border border-line bg-soft px-5 py-4 text-xs leading-relaxed text-muted">
+      <span class="font-semibold text-white">Plan vencido:</span> la plataforma bloquea nuevas reservas y te orienta hacia el proceso de renovación.
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

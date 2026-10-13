@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOVE — Rehab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: { bg:'#000000', soft:'#0c0c0c', card:'#121212', line:'#262626', muted:'#9a9a9a' },
+    fontFamily: { display:['Archivo','sans-serif'], sans:['Inter','sans-serif'] },
+  }}
+}
+</script>
+<style>body{background:#000;color:#fff;font-family:Inter,sans-serif}</style>
+</head>
+<body class="antialiased">
+
+<!-- Navbar -->
+<header class="sticky top-0 z-50 border-b border-line bg-bg/90 backdrop-blur">
+  <div class="mx-auto flex h-16 max-w-[1160px] items-center justify-between px-6">
+    <span class="font-display text-xl font-black tracking-tight">MOVE<span class="align-super text-[10px]">®</span></span>
+    <nav class="hidden items-center gap-7 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted md:flex">
+      <a class="hover:text-white" href="#">Inicio</a>
+      <a class="hover:text-white" href="#">Performance</a>
+      <a class="text-white" href="#">Rehab</a>
+      <a class="hover:text-white" href="#">Recovery</a>
+      <a class="hover:text-white" href="#">Planes</a>
+    </nav>
+    <div class="flex items-center gap-3">
+      <a href="#" class="rounded border border-line px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white hover:bg-card">Ingresar</a>
+      <a href="#" class="rounded bg-white px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-black hover:bg-neutral-200">Reservar</a>
+    </div>
+  </div>
+</header>
+
+<!-- Hero -->
+<section class="mx-auto max-w-[1160px] px-6 pb-14 pt-20">
+  <p class="text-[11px] font-medium uppercase tracking-[0.35em] text-muted">02 — Rehab</p>
+  <h1 class="mt-5 font-display text-5xl font-black uppercase leading-[0.95] tracking-tight md:text-6xl">
+    Evaluación y<br>diagnóstico.
+  </h1>
+  <p class="mt-6 max-w-lg text-sm leading-relaxed text-muted">
+    La Evaluación y Diagnóstico es la puerta de entrada a los servicios de fisioterapia
+    de MOVE. Abierta a alumnos y a personas externas — si todavía no tenés cuenta,
+    se genera durante el proceso.
+  </p>
+</section>
+
+<!-- Flujo de reserva -->
+<section class="border-t border-line bg-soft">
+  <div class="mx-auto max-w-[1160px] px-6 py-14">
+    <!-- Stepper -->
+    <ol class="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em]">
+      <li class="flex items-center gap-2 rounded border border-line px-3 py-1.5 text-muted"><span class="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] text-emerald-400">✓</span>Evaluación</li>
+      <li class="text-muted">→</li>
+      <li class="flex items-center gap-2 rounded bg-white px-3 py-1.5 text-black"><span class="flex h-5 w-5 items-center justify-center rounded-full bg-black text-[10px] text-white">2</span>Fecha y horario</li>
+      <li class="text-muted">→</li>
+      <li class="flex items-center gap-2 rounded border border-line px-3 py-1.5 text-muted"><span class="flex h-5 w-5 items-center justify-center rounded-full border border-line text-[10px]">3</span>Pago</li>
+      <li class="text-muted">→</li>
+      <li class="flex items-center gap-2 rounded border border-line px-3 py-1.5 text-muted"><span class="flex h-5 w-5 items-center justify-center rounded-full border border-line text-[10px]">4</span>Confirmación</li>
+    </ol>
+
+    <div class="mt-10 grid gap-6 lg:grid-cols-[1fr_360px]">
+      <!-- Selección de fecha y horario -->
+      <div class="rounded border border-line bg-card p-7">
+        <h2 class="text-sm font-semibold">Elegí fecha y horario</h2>
+        <!-- Semana -->
+        <div class="mt-6 grid grid-cols-7 gap-2 text-center">
+          <div class="text-[10px] uppercase tracking-[0.2em] text-muted">Lun</div>
+          <div class="text-[10px] uppercase tracking-[0.2em] text-muted">Mar</div>
+          <div class="text-[10px] uppercase tracking-[0.2em] text-muted">Mié</div>
+          <div class="text-[10px] uppercase tracking-[0.2em] text-muted">Jue</div>
+          <div class="text-[10px] uppercase tracking-[0.2em] text-muted">Vie</div>
+          <div class="text-[10px] uppercase tracking-[0.2em] text-muted">Sáb</div>
+          <div class="text-[10px] uppercase tracking-[0.2em] text-muted">Dom</div>
+          <button class="rounded border border-line py-3 text-sm hover:bg-soft">12</button>
+          <button class="rounded bg-white py-3 text-sm font-bold text-black">13</button>
+          <button class="rounded border border-line py-3 text-sm hover:bg-soft">14</button>
+          <button class="rounded border border-line py-3 text-sm hover:bg-soft">15</button>
+          <button class="rounded border border-line py-3 text-sm hover:bg-soft">16</button>
+          <button class="rounded border border-line py-3 text-sm hover:bg-soft">17</button>
+          <span class="rounded border border-line/50 py-3 text-sm text-muted/40">18</span>
+        </div>
+        <!-- Horarios -->
+        <p class="mt-7 text-[10px] uppercase tracking-[0.25em] text-muted">Horarios disponibles — Martes 13/10</p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button class="rounded border border-line px-3.5 py-1.5 text-xs font-medium hover:bg-soft">09:00</button>
+          <button class="rounded border border-line px-3.5 py-1.5 text-xs font-medium hover:bg-soft">10:00</button>
+          <button class="rounded bg-white px-3.5 py-1.5 text-xs font-bold text-black">11:00</button>
+          <span class="rounded border border-line/50 px-3.5 py-1.5 text-xs text-muted/40 line-through">14:00</span>
+          <button class="rounded border border-line px-3.5 py-1.5 text-xs font-medium hover:bg-soft">15:00</button>
+          <button class="rounded border border-line px-3.5 py-1.5 text-xs font-medium hover:bg-soft">16:00</button>
+        </div>
+      </div>
+
+      <!-- Resumen -->
+      <div class="flex flex-col rounded border border-line bg-card p-7">
+        <h2 class="text-sm font-semibold">Tu reserva</h2>
+        <dl class="mt-6 space-y-4 text-sm">
+          <div class="flex justify-between"><dt class="text-muted">Servicio</dt><dd class="font-medium">Evaluación y Diagnóstico</dd></div>
+          <div class="flex justify-between"><dt class="text-muted">Fecha</dt><dd class="font-medium">Martes 13/10/2026</dd></div>
+          <div class="flex justify-between"><dt class="text-muted">Horario</dt><dd class="font-medium">11:00</dd></div>
+          <div class="flex justify-between"><dt class="text-muted">Duración</dt><dd class="font-medium">60 min</dd></div>
+          <div class="flex justify-between border-t border-line pt-4"><dt class="text-muted">Total</dt><dd class="font-display text-xl font-black">$ 1.800</dd></div>
+        </dl>
+        <button class="mt-auto w-full rounded bg-white py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-black hover:bg-neutral-200">Continuar al pago</button>
+        <p class="mt-4 text-center text-[11px] text-muted">Pago online · confirmación inmediata por email</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Después de la evaluación -->
+<section class="border-t border-line">
+  <div class="mx-auto max-w-[1160px] px-6 py-14">
+    <h2 class="font-display text-2xl font-black uppercase tracking-tight">¿Qué pasa después de la evaluación?</h2>
+    <div class="mt-8 grid gap-6 md:grid-cols-3">
+      <div class="rounded border border-line bg-card p-6">
+        <p class="text-base font-semibold">Entrenamiento terapéutico</p>
+        <p class="mt-3 text-sm leading-relaxed text-muted">El equipo define si corresponde readaptación mediante entrenamiento dentro de MOVE.</p>
+      </div>
+      <div class="rounded border border-line bg-card p-6">
+        <p class="text-base font-semibold">Tratamiento en consultorio</p>
+        <p class="mt-3 text-sm leading-relaxed text-muted">Sesiones de fisioterapia en consultorio, o una combinación con entrenamiento.</p>
+      </div>
+      <div class="rounded border border-line bg-card p-6">
+        <p class="text-base font-semibold">Seguimiento fisioterapéutico</p>
+        <p class="mt-3 text-sm leading-relaxed text-muted">Frecuencia y modalidad definidas individualmente luego del contacto o evaluación inicial.</p>
+      </div>
+    </div>
+    <p class="mt-6 text-xs text-muted">Los tratamientos posteriores no se comercializan automáticamente desde la web — el equipo de MOVE define el camino luego de la evaluación.</p>
+  </div>
+</section>
+
+</body>
+</html>

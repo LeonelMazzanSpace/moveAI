@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+.DS_Store
+
+# Obsidian (per-user UI state)
+vault/.obsidian/workspace*.json
+vault/.obsidian/plugins/
+
+# Claude Code runtime
+.claude/scheduled_tasks.lock

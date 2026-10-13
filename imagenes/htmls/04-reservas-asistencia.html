@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOVE — Reservas y asistencia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: { bg:'#000000', soft:'#0c0c0c', card:'#121212', line:'#262626', muted:'#9a9a9a' },
+    fontFamily: { display:['Archivo','sans-serif'], sans:['Inter','sans-serif'] },
+  }}
+}
+</script>
+<style>body{background:#000;color:#fff;font-family:Inter,sans-serif}</style>
+</head>
+<body class="antialiased">
+
+<div class="flex">
+  <!-- Sidebar -->
+  <aside class="hidden w-60 shrink-0 border-r border-line bg-soft md:block">
+    <div class="flex h-16 items-center border-b border-line px-6">
+      <span class="font-display text-lg font-black tracking-tight">MOVE<span class="align-super text-[9px]">®</span></span>
+      <span class="ml-2 rounded border border-line bg-card px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-muted">Staff</span>
+    </div>
+    <nav class="space-y-1 p-4 text-xs font-medium text-muted">
+      <a href="#" class="block rounded px-3 py-2.5 hover:bg-card hover:text-white">Dashboard</a>
+      <a href="#" class="block rounded px-3 py-2.5 hover:bg-card hover:text-white">Clientes</a>
+      <a href="#" class="block rounded bg-card px-3 py-2.5 text-white">Turnos y asistencia</a>
+      <a href="#" class="block rounded px-3 py-2.5 hover:bg-card hover:text-white">Pagos</a>
+      <a href="#" class="block rounded px-3 py-2.5 hover:bg-card hover:text-white">Seguimiento</a>
+      <a href="#" class="block rounded px-3 py-2.5 hover:bg-card hover:text-white">Configuración</a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1">
+    <header class="flex h-16 items-center justify-between border-b border-line px-8">
+      <h1 class="font-display text-xl font-extrabold uppercase tracking-tight">Turnos y asistencia</h1>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 rounded border border-line bg-card px-3.5 py-1.5 text-xs font-medium">
+          Lunes 12/10/2026
+          <svg class="h-3 w-3 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-card text-xs font-semibold">JP</div>
+      </div>
+    </header>
+
+    <div class="p-8">
+      <!-- Turno selector -->
+      <div class="flex flex-wrap gap-2">
+        <button class="rounded border border-line bg-card px-3.5 py-1.5 text-xs font-semibold">07:00</button>
+        <button class="rounded border border-line bg-card px-3.5 py-1.5 text-xs font-semibold">08:00</button>
+        <button class="rounded border border-line bg-card px-3.5 py-1.5 text-xs font-semibold">09:00</button>
+        <button class="rounded bg-white px-3.5 py-1.5 text-xs font-semibold text-black">18:00</button>
+        <button class="rounded border border-line bg-card px-3.5 py-1.5 text-xs font-semibold">19:00</button>
+        <button class="rounded border border-line bg-card px-3.5 py-1.5 text-xs font-semibold">20:00</button>
+      </div>
+
+      <!-- Resumen -->
+      <div class="mt-6 grid gap-4 sm:grid-cols-4">
+        <div class="rounded border border-line bg-card p-5">
+          <p class="text-[10px] uppercase tracking-[0.25em] text-muted">Reservas</p>
+          <p class="mt-2 font-display text-3xl font-black">12<span class="text-base text-muted">/14</span></p>
+        </div>
+        <div class="rounded border border-line bg-card p-5">
+          <p class="text-[10px] uppercase tracking-[0.25em] text-muted">Presentes</p>
+          <p class="mt-2 font-display text-3xl font-black text-emerald-400">8</p>
+        </div>
+        <div class="rounded border border-line bg-card p-5">
+          <p class="text-[10px] uppercase tracking-[0.25em] text-muted">Ausentes</p>
+          <p class="mt-2 font-display text-3xl font-black text-red-400">2</p>
+        </div>
+        <div class="rounded border border-line bg-card p-5">
+          <p class="text-[10px] uppercase tracking-[0.25em] text-muted">Cancelaciones</p>
+          <p class="mt-2 font-display text-3xl font-black text-muted">1</p>
+        </div>
+      </div>
+
+      <!-- Lista de alumnos -->
+      <div class="mt-6 overflow-hidden rounded border border-line bg-card">
+        <div class="flex items-center justify-between border-b border-line px-6 py-4">
+          <h2 class="text-sm font-semibold">Turno 18:00 — Performance</h2>
+          <span class="text-xs text-muted">Marcá el resultado de cada alumno</span>
+        </div>
+        <table class="w-full text-left text-sm">
+          <thead>
+            <tr class="border-b border-line text-[10px] uppercase tracking-[0.2em] text-muted">
+              <th class="px-6 py-3 font-medium">Alumno</th>
+              <th class="px-6 py-3 font-medium">Plan</th>
+              <th class="px-6 py-3 font-medium">Última asistencia</th>
+              <th class="px-6 py-3 font-medium">Estado</th>
+              <th class="px-6 py-3 text-right font-medium">Registrar</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-line">
+            <tr>
+              <td class="px-6 py-3.5 font-medium">Martina Suárez</td>
+              <td class="px-6 py-3.5 text-muted">Trimestral</td>
+              <td class="px-6 py-3.5 text-muted">10/10</td>
+              <td class="px-6 py-3.5"><span class="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Presente</span></td>
+              <td class="px-6 py-3.5 text-right">
+                <button class="rounded bg-emerald-500/20 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400">P</button>
+                <button class="ml-1 rounded border border-line px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">A</button>
+              </td>
+            </tr>
+            <tr>
+              <td class="px-6 py-3.5 font-medium">Federico Álvez</td>
+              <td class="px-6 py-3.5 text-muted">Mensual</td>
+              <td class="px-6 py-3.5 text-muted">08/10</td>
+              <td class="px-6 py-3.5"><span class="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Presente</span></td>
+              <td class="px-6 py-3.5 text-right">
+                <button class="rounded bg-emerald-500/20 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400">P</button>
+                <button class="ml-1 rounded border border-line px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">A</button>
+              </td>
+            </tr>
+            <tr>
+              <td class="px-6 py-3.5 font-medium">Valentina García</td>
+              <td class="px-6 py-3.5 text-muted">Trimestral</td>
+              <td class="px-6 py-3.5 text-muted">05/10</td>
+              <td class="px-6 py-3.5"><span class="rounded border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-red-400">Ausente</span></td>
+              <td class="px-6 py-3.5 text-right">
+                <button class="rounded border border-line px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">P</button>
+                <button class="ml-1 rounded bg-red-500/20 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-red-400">A</button>
+              </td>
+            </tr>
+            <tr>
+              <td class="px-6 py-3.5 font-medium">Diego Núñez</td>
+              <td class="px-6 py-3.5 text-muted">Semestral</td>
+              <td class="px-6 py-3.5 text-muted">11/10</td>
+              <td class="px-6 py-3.5"><span class="rounded border border-line bg-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Pendiente</span></td>
+              <td class="px-6 py-3.5 text-right">
+                <button class="rounded border border-line px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted hover:bg-emerald-500/20 hover:text-emerald-400">P</button>
+                <button class="ml-1 rounded border border-line px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted hover:bg-red-500/20 hover:text-red-400">A</button>
+              </td>
+            </tr>
+            <tr>
+              <td class="px-6 py-3.5 font-medium">Camila Rodríguez</td>
+              <td class="px-6 py-3.5 text-muted">Mensual</td>
+              <td class="px-6 py-3.5 text-muted">09/10</td>
+              <td class="px-6 py-3.5"><span class="rounded border border-line bg-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Pendiente</span></td>
+              <td class="px-6 py-3.5 text-right">
+                <button class="rounded border border-line px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted hover:bg-emerald-500/20 hover:text-emerald-400">P</button>
+                <button class="ml-1 rounded border border-line px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted hover:bg-red-500/20 hover:text-red-400">A</button>
+              </td>
+            </tr>
+            <tr class="opacity-50">
+              <td class="px-6 py-3.5 font-medium line-through">Rodrigo Silva</td>
+              <td class="px-6 py-3.5 text-muted">Mensual</td>
+              <td class="px-6 py-3.5 text-muted">07/10</td>
+              <td class="px-6 py-3.5"><span class="rounded border border-line bg-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Cancelada</span></td>
+              <td class="px-6 py-3.5 text-right text-xs text-muted">Canceló 11/10 — 21:14</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="flex items-center justify-between border-t border-line px-6 py-3 text-xs text-muted">
+          <span>Mostrando 6 de 13 registros del turno</span>
+          <div class="flex gap-1">
+            <button class="rounded border border-line px-3 py-1.5">←</button>
+            <button class="rounded border border-line px-3 py-1.5">→</button>
+          </div>
+        </div>
+      </div>
+
+      <p class="mt-5 text-xs leading-relaxed text-muted">
+        La plataforma diferencia <span class="font-semibold text-white">reserva</span> de
+        <span class="font-semibold text-white">asistencia efectiva</span>. De cada registro quedan disponibles última
+        asistencia, frecuencia de entrenamiento, cancelaciones y ausencias sin aviso — la base para acciones de seguimiento y retención.
+      </p>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

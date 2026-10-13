@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOVE — Recovery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: { bg:'#000000', soft:'#0c0c0c', card:'#121212', line:'#262626', muted:'#9a9a9a' },
+    fontFamily: { display:['Archivo','sans-serif'], sans:['Inter','sans-serif'] },
+  }}
+}
+</script>
+<style>body{background:#000;color:#fff;font-family:Inter,sans-serif}</style>
+</head>
+<body class="antialiased">
+
+<!-- Navbar -->
+<header class="sticky top-0 z-50 border-b border-line bg-bg/90 backdrop-blur">
+  <div class="mx-auto flex h-16 max-w-[1160px] items-center justify-between px-6">
+    <span class="font-display text-xl font-black tracking-tight">MOVE<span class="align-super text-[10px]">®</span></span>
+    <nav class="hidden items-center gap-7 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted md:flex">
+      <a class="hover:text-white" href="#">Inicio</a>
+      <a class="hover:text-white" href="#">Performance</a>
+      <a class="hover:text-white" href="#">Rehab</a>
+      <a class="text-white" href="#">Recovery</a>
+      <a class="hover:text-white" href="#">Planes</a>
+    </nav>
+    <div class="flex items-center gap-3">
+      <a href="#" class="rounded border border-line px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white hover:bg-card">Ingresar</a>
+      <a href="#" class="rounded bg-white px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-black hover:bg-neutral-200">Reservar</a>
+    </div>
+  </div>
+</header>
+
+<!-- Hero -->
+<section class="mx-auto max-w-[1160px] px-6 pb-14 pt-20">
+  <p class="text-[11px] font-medium uppercase tracking-[0.35em] text-muted">03 — Recovery Room by MOVE</p>
+  <h1 class="mt-5 font-display text-5xl font-black uppercase leading-[0.95] tracking-tight md:text-6xl">
+    Recuperá<br>más rápido.
+  </h1>
+  <p class="mt-6 max-w-lg text-sm leading-relaxed text-muted">
+    Recovery está disponible tanto para clientes de MOVE como para público general.
+    Elegí una sesión individual o un paquete mensual, reservá y pagá online.
+  </p>
+  <div class="mt-7 flex items-center gap-2">
+    <span class="rounded border border-line bg-card px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">Abierto a público general</span>
+    <span class="rounded border border-line bg-card px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">Sin plan previo</span>
+  </div>
+</section>
+
+<!-- Modalidades -->
+<section class="border-t border-line bg-soft">
+  <div class="mx-auto max-w-[1160px] px-6 py-16">
+    <h2 class="font-display text-3xl font-black uppercase tracking-tight">Modalidades y planes.</h2>
+    <div class="mt-10 grid gap-6 md:grid-cols-3">
+      <div class="flex flex-col rounded border border-line bg-card p-7">
+        <p class="text-[11px] uppercase tracking-[0.3em] text-muted">Sesión individual</p>
+        <p class="mt-3 font-display text-4xl font-black">$ 900<span class="text-sm font-semibold text-muted"> /sesión</span></p>
+        <ul class="mt-6 flex-1 space-y-3 text-sm text-muted">
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Sesión de 45 minutos</li>
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Reserva online con pago inmediato</li>
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Sin compromiso mensual</li>
+        </ul>
+        <button class="mt-7 rounded border border-line py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] hover:bg-soft">Reservar sesión</button>
+      </div>
+      <div class="relative flex flex-col rounded border border-white bg-card p-7">
+        <span class="absolute -top-3 left-6 rounded bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-black">Recomendado</span>
+        <p class="text-[11px] uppercase tracking-[0.3em] text-muted">Paquete 4 sesiones</p>
+        <p class="mt-3 font-display text-4xl font-black">$ 3.200<span class="text-sm font-semibold text-muted"> /mes</span></p>
+        <ul class="mt-6 flex-1 space-y-3 text-sm text-muted">
+          <li class="flex gap-2.5"><span class="text-white">✓</span>4 sesiones por mes</li>
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Reservá los horarios que quieras</li>
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Ahorrás un 11% vs. individual</li>
+        </ul>
+        <button class="mt-7 rounded bg-white py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-black hover:bg-neutral-200">Contratar paquete</button>
+      </div>
+      <div class="flex flex-col rounded border border-line bg-card p-7">
+        <p class="text-[11px] uppercase tracking-[0.3em] text-muted">Paquete 8 sesiones</p>
+        <p class="mt-3 font-display text-4xl font-black">$ 5.900<span class="text-sm font-semibold text-muted"> /mes</span></p>
+        <ul class="mt-6 flex-1 space-y-3 text-sm text-muted">
+          <li class="flex gap-2.5"><span class="text-white">✓</span>8 sesiones por mes</li>
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Prioridad de horarios</li>
+          <li class="flex gap-2.5"><span class="text-white">✓</span>Ahorrás un 18% vs. individual</li>
+        </ul>
+        <button class="mt-7 rounded border border-line py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] hover:bg-soft">Contratar paquete</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Flujo -->
+<section class="border-t border-line">
+  <div class="mx-auto max-w-[1160px] px-6 py-16">
+    <h2 class="font-display text-2xl font-black uppercase tracking-tight">Así funciona la reserva.</h2>
+    <ol class="mt-10 grid gap-6 md:grid-cols-4">
+      <li class="rounded border border-line bg-card p-6">
+        <span class="font-display text-3xl font-black text-muted">01</span>
+        <p class="mt-3 font-semibold">Selección</p>
+        <p class="mt-2 text-sm leading-relaxed text-muted">Elegí sesión individual o paquete mensual.</p>
+      </li>
+      <li class="rounded border border-line bg-card p-6">
+        <span class="font-display text-3xl font-black text-muted">02</span>
+        <p class="mt-3 font-semibold">Reserva</p>
+        <p class="mt-2 text-sm leading-relaxed text-muted">Elegí fecha y horario disponibles en el calendario.</p>
+      </li>
+      <li class="rounded border border-line bg-card p-6">
+        <span class="font-display text-3xl font-black text-muted">03</span>
+        <p class="mt-3 font-semibold">Pago</p>
+        <p class="mt-2 text-sm leading-relaxed text-muted">Pagá online de forma segura con Mercado Pago.</p>
+      </li>
+      <li class="rounded border border-line bg-card p-6">
+        <span class="font-display text-3xl font-black text-muted">04</span>
+        <p class="mt-3 font-semibold">Confirmación</p>
+        <p class="mt-2 text-sm leading-relaxed text-muted">Recibís la confirmación y queda asociada a tu perfil.</p>
+      </li>
+    </ol>
+    <div class="mt-8 rounded border border-line bg-soft px-5 py-4 text-xs leading-relaxed text-muted">
+      ¿Todavía no tenés cuenta? Se genera un usuario durante el proceso para empezar a consolidar tu historial dentro de MOVE.
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

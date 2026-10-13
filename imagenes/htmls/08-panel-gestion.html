@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOVE — Panel de Gestión</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: { bg:'#000000', soft:'#0c0c0c', card:'#121212', line:'#262626', muted:'#9a9a9a' },
+    fontFamily: { display:['Archivo','sans-serif'], sans:['Inter','sans-serif'] },
+  }}
+}
+</script>
+<style>body{background:#000;color:#fff;font-family:Inter,sans-serif}</style>
+</head>
+<body class="antialiased">
+
+<div class="flex">
+  <!-- Sidebar -->
+  <aside class="hidden w-60 shrink-0 border-r border-line bg-soft md:block">
+    <div class="flex h-16 items-center border-b border-line px-6">
+      <span class="font-display text-lg font-black tracking-tight">MOVE<span class="align-super text-[9px]">®</span></span>
+      <span class="ml-2 rounded border border-line bg-card px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-muted">Staff</span>
+    </div>
+    <nav class="space-y-1 p-4 text-xs font-medium text-muted">
+      <a href="#" class="block rounded px-3 py-2.5 hover:bg-card hover:text-white">Dashboard</a>
+      <a href="#" class="block rounded bg-card px-3 py-2.5 text-white">Clientes</a>
+      <a href="#" class="block rounded px-3 py-2.5 hover:bg-card hover:text-white">Turnos y asistencia</a>
+      <a href="#" class="block rounded px-3 py-2.5 hover:bg-card hover:text-white">Pagos</a>
+      <a href="#" class="block rounded px-3 py-2.5 hover:bg-card hover:text-white">Seguimiento</a>
+      <a href="#" class="block rounded px-3 py-2.5 hover:bg-card hover:text-white">Configuración</a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <main class="min-w-0 flex-1">
+    <header class="flex h-16 items-center justify-between border-b border-line px-8">
+      <h1 class="font-display text-xl font-extrabold uppercase tracking-tight">Clientes</h1>
+      <div class="flex items-center gap-3">
+        <div class="flex w-72 items-center gap-2 rounded border border-line bg-card px-3.5 py-2">
+          <svg class="h-3.5 w-3.5 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <span class="text-xs text-muted">Buscar por nombre, email o plan…</span>
+        </div>
+        <button class="rounded bg-white px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-black">Nuevo cliente</button>
+        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-card text-xs font-semibold">JP</div>
+      </div>
+    </header>
+
+    <div class="p-8">
+      <!-- KPIs -->
+      <div class="grid gap-4 sm:grid-cols-4">
+        <div class="rounded border border-line bg-card p-5">
+          <p class="text-[10px] uppercase tracking-[0.25em] text-muted">Clientes activos</p>
+          <p class="mt-2 font-display text-3xl font-black">182</p>
+          <p class="mt-1 text-xs text-emerald-400">+6 este mes</p>
+        </div>
+        <div class="rounded border border-line bg-card p-5">
+          <p class="text-[10px] uppercase tracking-[0.25em] text-muted">Planes por vencer</p>
+          <p class="mt-2 font-display text-3xl font-black text-amber-400">12</p>
+          <p class="mt-1 text-xs text-muted">próximos 7 días</p>
+        </div>
+        <div class="rounded border border-line bg-card p-5">
+          <p class="text-[10px] uppercase tracking-[0.25em] text-muted">Inactivos</p>
+          <p class="mt-2 font-display text-3xl font-black text-red-400">5</p>
+          <p class="mt-1 text-xs text-muted">+1 semana sin asistir</p>
+        </div>
+        <div class="rounded border border-line bg-card p-5">
+          <p class="text-[10px] uppercase tracking-[0.25em] text-muted">Asistencias hoy</p>
+          <p class="mt-2 font-display text-3xl font-black">64</p>
+          <p class="mt-1 text-xs text-muted">en 8 turnos</p>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="mt-6 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.15em]">
+        <button class="rounded bg-white px-3 py-1.5 text-black">Todos</button>
+        <button class="rounded border border-line px-3 py-1.5 text-muted hover:text-white">Activos</button>
+        <button class="rounded border border-line px-3 py-1.5 text-muted hover:text-white">Inactivos</button>
+        <button class="rounded border border-line px-3 py-1.5 text-muted hover:text-white">Por vencer</button>
+        <button class="rounded border border-line px-3 py-1.5 text-muted hover:text-white">Vencidos</button>
+      </div>
+
+      <!-- Tabla clientes -->
+      <div class="mt-4 overflow-hidden rounded border border-line bg-card">
+        <table class="w-full text-left text-sm">
+          <thead>
+            <tr class="border-b border-line text-[10px] uppercase tracking-[0.2em] text-muted">
+              <th class="px-4 py-3 font-medium">Cliente</th>
+              <th class="px-4 py-3 font-medium">Estado</th>
+              <th class="px-4 py-3 font-medium">Plan</th>
+              <th class="whitespace-nowrap px-4 py-3 font-medium">Vencimiento</th>
+              <th class="px-4 py-3 font-medium">Pagos</th>
+              <th class="whitespace-nowrap px-4 py-3 font-medium">Últ. asistencia</th>
+              <th class="px-4 py-3 font-medium">Frecuencia</th>
+              <th class="whitespace-nowrap px-4 py-3 font-medium">Rehab / Recovery</th>
+              <th class="px-4 py-3 font-medium"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-line">
+            <tr class="hover:bg-soft">
+              <td class="px-4 py-3.5"><p class="font-medium">Martina Suárez</p><p class="text-xs text-muted">martina@gmail.com</p></td>
+              <td class="px-4 py-3.5"><span class="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Activa</span></td>
+              <td class="px-4 py-3.5 text-muted">Trimestral</td>
+              <td class="px-4 py-3.5 text-muted">15/11/2026</td>
+              <td class="px-4 py-3.5"><span class="text-emerald-400">Al día</span></td>
+              <td class="px-4 py-3.5 text-muted">10/10</td>
+              <td class="px-4 py-3.5 text-muted">3.2 /sem</td>
+              <td class="px-4 py-3.5 text-muted">Recovery ×4</td>
+              <td class="px-4 py-3.5 text-right text-muted">⋯</td>
+            </tr>
+            <tr class="hover:bg-soft">
+              <td class="px-4 py-3.5"><p class="font-medium">Federico Álvez</p><p class="text-xs text-muted">falvez@hotmail.com</p></td>
+              <td class="px-4 py-3.5"><span class="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Activo</span></td>
+              <td class="px-4 py-3.5 text-muted">Mensual</td>
+              <td class="px-4 py-3.5 text-amber-400">18/10/2026</td>
+              <td class="px-4 py-3.5"><span class="text-emerald-400">Al día</span></td>
+              <td class="px-4 py-3.5 text-muted">08/10</td>
+              <td class="px-4 py-3.5 text-muted">2.5 /sem</td>
+              <td class="px-4 py-3.5 text-muted">—</td>
+              <td class="px-4 py-3.5 text-right text-muted">⋯</td>
+            </tr>
+            <tr class="hover:bg-soft">
+              <td class="px-4 py-3.5"><p class="font-medium">Lucía Pereira</p><p class="text-xs text-muted">lu.pereira@gmail.com</p></td>
+              <td class="px-4 py-3.5"><span class="rounded border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-red-400">Inactiva</span></td>
+              <td class="px-4 py-3.5 text-muted">Mensual</td>
+              <td class="px-4 py-3.5 text-red-400">02/10/2026</td>
+              <td class="px-4 py-3.5"><span class="text-red-400">Vencido</span></td>
+              <td class="px-4 py-3.5 text-muted">28/09</td>
+              <td class="px-4 py-3.5 text-muted">0.5 /sem</td>
+              <td class="px-4 py-3.5 text-muted">Rehab ×2</td>
+              <td class="px-4 py-3.5 text-right text-muted">⋯</td>
+            </tr>
+            <tr class="hover:bg-soft">
+              <td class="px-4 py-3.5"><p class="font-medium">Diego Núñez</p><p class="text-xs text-muted">dnunez@gmail.com</p></td>
+              <td class="px-4 py-3.5"><span class="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Activo</span></td>
+              <td class="px-4 py-3.5 text-muted">Semestral</td>
+              <td class="px-4 py-3.5 text-muted">20/01/2027</td>
+              <td class="px-4 py-3.5"><span class="text-emerald-400">Al día</span></td>
+              <td class="px-4 py-3.5 text-muted">11/10</td>
+              <td class="px-4 py-3.5 text-muted">4.1 /sem</td>
+              <td class="px-4 py-3.5 text-muted">Recovery ×8</td>
+              <td class="px-4 py-3.5 text-right text-muted">⋯</td>
+            </tr>
+            <tr class="hover:bg-soft">
+              <td class="px-4 py-3.5"><p class="font-medium">Camila Rodríguez</p><p class="text-xs text-muted">camir@gmail.com</p></td>
+              <td class="px-4 py-3.5"><span class="rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-400">Por vencer</span></td>
+              <td class="px-4 py-3.5 text-muted">Mensual</td>
+              <td class="px-4 py-3.5 text-amber-400">14/10/2026</td>
+              <td class="px-4 py-3.5"><span class="text-emerald-400">Al día</span></td>
+              <td class="px-4 py-3.5 text-muted">09/10</td>
+              <td class="px-4 py-3.5 text-muted">2.8 /sem</td>
+              <td class="px-4 py-3.5 text-muted">—</td>
+              <td class="px-4 py-3.5 text-right text-muted">⋯</td>
+            </tr>
+            <tr class="hover:bg-soft">
+              <td class="px-4 py-3.5"><p class="font-medium">Sofía Techera</p><p class="text-xs text-muted">sote@gmail.com</p></td>
+              <td class="px-4 py-3.5"><span class="whitespace-nowrap rounded border border-line bg-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Pausa — lesión</span></td>
+              <td class="px-4 py-3.5 text-muted">Trimestral</td>
+              <td class="px-4 py-3.5 text-muted">30/11/2026</td>
+              <td class="px-4 py-3.5"><span class="text-emerald-400">Al día</span></td>
+              <td class="px-4 py-3.5 text-muted">22/09</td>
+              <td class="px-4 py-3.5 text-muted">—</td>
+              <td class="px-4 py-3.5 text-muted">Rehab ×5</td>
+              <td class="px-4 py-3.5 text-right text-muted">⋯</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="flex items-center justify-between border-t border-line px-5 py-3 text-xs text-muted">
+          <span>Mostrando 6 de 214 clientes</span>
+          <div class="flex gap-1">
+            <button class="rounded border border-line px-3 py-1.5">←</button>
+            <button class="rounded border border-line px-3 py-1.5">→</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

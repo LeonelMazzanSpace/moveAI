@@ -1,0 +1,19 @@
+{
+  "name": "move",
+  "private": true,
+  "packageManager": "pnpm@10.34.6",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @move/web --filter @move/api run dev",
+    "dev:web": "pnpm --filter @move/web dev",
+    "dev:api": "pnpm --filter @move/api dev",
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "test": "pnpm -r run test",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres"
+  }
+}

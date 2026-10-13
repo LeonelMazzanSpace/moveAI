@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOVE — Sitio público</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: { bg:'#000000', soft:'#0c0c0c', card:'#121212', line:'#262626', muted:'#9a9a9a' },
+    fontFamily: { display:['Archivo','sans-serif'], sans:['Inter','sans-serif'] },
+  }}
+}
+</script>
+<style>body{background:#000;color:#fff;font-family:Inter,sans-serif}</style>
+</head>
+<body class="antialiased">
+
+<!-- Navbar -->
+<header class="sticky top-0 z-50 border-b border-line bg-bg/90 backdrop-blur">
+  <div class="mx-auto flex h-16 max-w-[1160px] items-center justify-between px-6">
+    <span class="font-display text-xl font-black tracking-tight">MOVE<span class="align-super text-[10px]">®</span></span>
+    <nav class="hidden items-center gap-7 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted md:flex">
+      <a class="text-white" href="#">Inicio</a>
+      <a class="hover:text-white" href="#">Performance</a>
+      <a class="hover:text-white" href="#">Rehab</a>
+      <a class="hover:text-white" href="#">Recovery</a>
+      <a class="hover:text-white" href="#">Planes</a>
+    </nav>
+    <div class="flex items-center gap-3">
+      <a href="#" class="rounded border border-line px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white hover:bg-card">Ingresar</a>
+      <a href="#" class="rounded bg-white px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-black hover:bg-neutral-200">Reservar</a>
+    </div>
+  </div>
+</header>
+
+<!-- Hero -->
+<section class="mx-auto max-w-[1160px] px-6 pb-20 pt-24">
+  <p class="text-[11px] font-medium uppercase tracking-[0.35em] text-muted">Performance &amp; Rehab · Uruguay</p>
+  <h1 class="mt-6 font-display text-6xl font-black uppercase leading-[0.95] tracking-tight md:text-7xl">
+    Movete mejor.<br>Recuperá<br>más rápido.
+  </h1>
+  <p class="mt-7 max-w-md text-sm leading-relaxed text-muted">
+    Entrenamiento y recuperación basados en evidencia. Conocé nuestros servicios,
+    contratá tu plan y reservá online — todo desde una misma plataforma.
+  </p>
+  <div class="mt-9 flex flex-wrap gap-3">
+    <a href="#" class="rounded bg-white px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-black hover:bg-neutral-200">Ver planes</a>
+    <a href="#" class="rounded border border-line px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white hover:bg-card">Reservar Recovery</a>
+  </div>
+</section>
+
+<!-- Servicios -->
+<section class="border-t border-line bg-soft">
+  <div class="mx-auto max-w-[1160px] px-6 py-20">
+    <p class="text-[11px] font-medium uppercase tracking-[0.35em] text-muted">01 — Servicios</p>
+    <h2 class="mt-4 font-display text-4xl font-black uppercase tracking-tight">Tres áreas. Una experiencia.</h2>
+    <div class="mt-12 grid gap-6 md:grid-cols-3">
+      <!-- Performance -->
+      <div class="flex flex-col rounded border border-line bg-card p-7">
+        <span class="text-[11px] font-medium uppercase tracking-[0.3em] text-muted">Performance</span>
+        <h3 class="mt-4 font-display text-2xl font-extrabold uppercase leading-tight">Entrenamiento semi personalizado.</h3>
+        <p class="mt-4 flex-1 text-sm leading-relaxed text-muted">
+          Planes con acceso por reserva, sin límite semanal de asistencias.
+          Cada horario con capacidad máxima controlada.
+        </p>
+        <a href="#" class="mt-7 inline-flex w-fit rounded bg-white px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-black">Ver planes</a>
+      </div>
+      <!-- Rehab -->
+      <div class="flex flex-col rounded border border-line bg-card p-7">
+        <span class="text-[11px] font-medium uppercase tracking-[0.3em] text-muted">Rehab</span>
+        <h3 class="mt-4 font-display text-2xl font-extrabold uppercase leading-tight">Fisioterapia y readaptación.</h3>
+        <p class="mt-4 flex-1 text-sm leading-relaxed text-muted">
+          Evaluación y Diagnóstico como puerta de entrada. Reservá tu evaluación
+          online, seas o no alumno de MOVE.
+        </p>
+        <a href="#" class="mt-7 inline-flex w-fit rounded border border-line px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white hover:bg-soft">Agendar evaluación</a>
+      </div>
+      <!-- Recovery -->
+      <div class="flex flex-col rounded border border-line bg-card p-7">
+        <span class="text-[11px] font-medium uppercase tracking-[0.3em] text-muted">Recovery</span>
+        <h3 class="mt-4 font-display text-2xl font-extrabold uppercase leading-tight">Recovery Room by MOVE.</h3>
+        <p class="mt-4 flex-1 text-sm leading-relaxed text-muted">
+          Sesiones individuales y paquetes mensuales, abiertos a clientes y
+          público general. Reservá y pagá online.
+        </p>
+        <a href="#" class="mt-7 inline-flex w-fit rounded border border-line px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white hover:bg-soft">Reservar sesión</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Planes -->
+<section class="border-t border-line">
+  <div class="mx-auto max-w-[1160px] px-6 py-20">
+    <div class="flex flex-wrap items-end justify-between gap-6">
+      <div>
+        <p class="text-[11px] font-medium uppercase tracking-[0.35em] text-muted">02 — Planes</p>
+        <h2 class="mt-4 font-display text-4xl font-black uppercase tracking-tight">Elegí tu plan.</h2>
+      </div>
+      <a href="#" class="rounded border border-line px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white hover:bg-card">Ver todos los planes</a>
+    </div>
+    <div class="mt-12 grid gap-6 md:grid-cols-3">
+      <div class="rounded border border-line bg-card p-7">
+        <p class="text-[11px] uppercase tracking-[0.3em] text-muted">Mensual</p>
+        <p class="mt-3 font-display text-4xl font-black">$ 3.900<span class="text-sm font-semibold text-muted"> /mes</span></p>
+        <p class="mt-4 text-sm text-muted">Acceso por reserva · sin límite semanal</p>
+        <a href="#" class="mt-6 block rounded border border-line py-2 text-center text-[10px] font-semibold uppercase tracking-[0.2em]">Contratar</a>
+      </div>
+      <div class="relative rounded border border-white bg-card p-7">
+        <span class="absolute -top-3 left-6 rounded bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-black">Más elegido</span>
+        <p class="text-[11px] uppercase tracking-[0.3em] text-muted">Trimestral</p>
+        <p class="mt-3 font-display text-4xl font-black">$ 10.500<span class="text-sm font-semibold text-muted"> /trim</span></p>
+        <p class="mt-4 text-sm text-muted">Acceso por reserva · sin límite semanal</p>
+        <a href="#" class="mt-6 block rounded bg-white py-2 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-black">Contratar</a>
+      </div>
+      <div class="rounded border border-line bg-card p-7">
+        <p class="text-[11px] uppercase tracking-[0.3em] text-muted">Semestral</p>
+        <p class="mt-3 font-display text-4xl font-black">$ 19.800<span class="text-sm font-semibold text-muted"> /sem</span></p>
+        <p class="mt-4 text-sm text-muted">Acceso por reserva · sin límite semanal</p>
+        <a href="#" class="mt-6 block rounded border border-line py-2 text-center text-[10px] font-semibold uppercase tracking-[0.2em]">Contratar</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA perfil -->
+<section class="border-t border-line bg-soft">
+  <div class="mx-auto flex max-w-[1160px] flex-wrap items-center justify-between gap-6 px-6 py-14">
+    <div>
+      <p class="text-[11px] font-medium uppercase tracking-[0.35em] text-muted">03 — Tu cuenta</p>
+      <h2 class="mt-4 font-display text-3xl font-black uppercase tracking-tight">¿Ya sos parte de MOVE?</h2>
+      <p class="mt-3 max-w-md text-sm text-muted">Accedé a tu perfil para ver tu plan, renovar, reservar y consultar tu historial.</p>
+    </div>
+    <div class="flex gap-3">
+      <a href="#" class="rounded bg-white px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-black">Ir a mi perfil</a>
+      <a href="#" class="rounded border border-line px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white">Crear cuenta</a>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="border-t border-line">
+  <div class="mx-auto flex max-w-[1160px] flex-wrap items-center justify-between gap-4 px-6 py-10 text-[11px] uppercase tracking-[0.25em] text-muted">
+    <span class="font-display text-base font-black normal-case tracking-tight text-white">MOVE<span class="align-super text-[9px]">®</span></span>
+    <div class="flex gap-7">
+      <a href="#">Performance</a><a href="#">Rehab</a><a href="#">Recovery</a><a href="#">Ubicación</a>
+    </div>
+    <span>© 2026 MOVE Strength &amp; Conditioning</span>
+  </div>
+</footer>
+
+</body>
+</html>

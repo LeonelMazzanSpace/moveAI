@@ -1,0 +1,23 @@
+name: move
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: move-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-move}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-move}
+      POSTGRES_DB: ${DB_NAME:-move}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
