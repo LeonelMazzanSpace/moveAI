@@ -15,6 +15,13 @@
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",
-    "test:e2e": "pnpm --filter @move/api test:e2e"
+    "test:e2e": "pnpm --filter @move/api test:e2e",
+    "manual:demo-data": "node scripts/manual/demo-data.mjs",
+    "manual:screenshots": "node scripts/manual/capture.mjs",
+    "manual:pdf": "node scripts/manual/build-pdf.mjs"
+  },
+  "devDependencies": {
+    "marked": "18.1.1",
+    "playwright": "1.64.0"
   }
 }
