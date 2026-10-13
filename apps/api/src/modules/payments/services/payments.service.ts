@@ -144,8 +144,9 @@ export class PaymentsService {
   }
 
   // Mercado Pago purchases from the last 7 days take their real state from Mercado Pago: pending ones older than
-  // `reconcileAfterMinutes`, and expired plan purchases, whose preference can still be paid late (D45). Then stale
-  // purchases expire: bookings whose hold expired and plans pending for more than 24 h.
+  // `reconcileAfterMinutes`, and expired ones of any kind, whose preference can still be paid late (D45, D60; a
+  // late booking payment whose hold is gone ends approved and flagged, D23). Then stale purchases expire: bookings
+  // whose hold expired or was cancelled, and plans pending for more than 24 h.
   async reconcilePending(now: Date): Promise<{ applied: number; expired: number }> {
     let applied = 0;
     if (!this.config.simulatorEnabled) {
@@ -153,7 +154,7 @@ export class PaymentsService {
       const pending: { externalReference: string }[] = await this.dataSource.query(
         `SELECT external_reference AS "externalReference" FROM purchases
          WHERE method = 'mercadopago' AND deleted_at IS NULL AND created_at > $2
-           AND ((status = 'pending' AND created_at < $1) OR (status = 'expired' AND kind = 'plan'))
+           AND ((status = 'pending' AND created_at < $1) OR status = 'expired')
          ORDER BY created_at`,
         [new Date(now.getTime() - minutes * MINUTE_MS), new Date(now.getTime() - RECONCILE_LOOKBACK_MS)],
       );
@@ -305,12 +306,18 @@ export class PaymentsService {
       await this.flag(manager, purchase.id);
       return null;
     }
+    // A bare UPDATE … RETURNING resolves to [rows, rowCount]; the CTE returns the moved rows only.
     const moved: { id: string }[] = await manager.query(
-      `UPDATE purchases SET status = 'approved', approved_at = now(), updated_at = now()
-       WHERE id = $1 AND status IN ('pending','expired') RETURNING id`,
+      `WITH moved AS (
+         UPDATE purchases SET status = 'approved', approved_at = now(), updated_at = now()
+         WHERE id = $1 AND status IN ('pending','expired') RETURNING id
+       ) SELECT id FROM moved`,
       [purchase.id],
     );
-    if (moved.length === 0) return null;
+    if (moved.length === 0) {
+      await this.flag(manager, purchase.id);
+      return null;
+    }
 
     const approval: Approval = {
       purchaseId: purchase.id,
@@ -400,12 +407,15 @@ export class PaymentsService {
     }
   }
 
+  // Booking purchases expire once their hold is gone: expired, or cancelled by staff or the system.
   private async expireStale(now: Date): Promise<number> {
     const [{ count }]: { count: number }[] = await this.dataSource.query(
       `WITH expired AS (
          UPDATE purchases pu SET status = 'expired', updated_at = now()
          WHERE pu.status = 'pending' AND pu.deleted_at IS NULL AND (
-           (pu.kind = 'booking' AND EXISTS (SELECT 1 FROM bookings b WHERE b.id = pu.booking_id AND b.status = 'expired'))
+           (pu.kind = 'booking' AND EXISTS (
+             SELECT 1 FROM bookings b WHERE b.id = pu.booking_id AND b.status IN ('expired','cancelled')
+           ))
            OR (pu.kind = 'plan' AND pu.created_at < $1)
          )
          RETURNING pu.id

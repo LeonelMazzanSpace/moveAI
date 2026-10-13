@@ -3,7 +3,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import { getOptionsToken } from '@nestjs/throttler';
 import request from 'supertest';
-import { DataSource } from 'typeorm';
+import { DataSource, type EntityManager } from 'typeorm';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 import { addDays, businessDateTime, businessToday } from '../src/common/time/business-time.js';
@@ -13,7 +13,7 @@ import { MercadoPagoService } from '../src/modules/payments/services/mercado-pag
 import { PaymentsService } from '../src/modules/payments/services/payments.service.js';
 import { SubscriptionsService } from '../src/modules/subscriptions/services/subscriptions.service.js';
 import { raisedCheckoutLimit } from './utils/app.js';
-import { signUpClient } from './utils/auth.js';
+import { signUpClient, signUpStaff } from './utils/auth.js';
 import { resetDb } from './utils/db.js';
 import { createProfessional, createSlot, planIdBySlug } from './utils/fixtures.js';
 
@@ -189,6 +189,37 @@ describe('Mercado Pago webhook (e2e)', () => {
     expect(await purchaseOf(ref)).toEqual({ status: 'approved', needs_attention: true });
   });
 
+  it('applies nothing and flags the purchase when it was approved after it was read (guarded UPDATE, R16 step 3)', async () => {
+    const { ref } = await buyQuarterly();
+    providerPayments.set('230', approved('230', ref, 10500));
+    await notify('230').expect(200);
+    const approvedAt = async (): Promise<Date> =>
+      (await ds.query(`SELECT approved_at FROM purchases WHERE external_reference = $1`, [ref]))[0].approved_at;
+    const firstApprovedAt = await approvedAt();
+
+    // Simulates a purchase read outside the lock: the second payment still sees it pending.
+    const service = app.get(PaymentsService) as unknown as {
+      lockPurchase: (manager: EntityManager, ref: string) => Promise<{ status: string } | null>;
+    };
+    const lockPurchase = service.lockPurchase.bind(service);
+    const stale = vi.spyOn(service, 'lockPurchase').mockImplementationOnce(async (manager, reference) => {
+      const purchase = await lockPurchase(manager, reference);
+      return purchase && { ...purchase, status: 'pending' };
+    });
+    providerPayments.set('231', approved('231', ref, 10500));
+    await notify('231').expect(200);
+    expect(stale).toHaveBeenCalledOnce();
+    stale.mockRestore();
+
+    const [second] = await ds.query(`SELECT status, applied_at FROM payments WHERE mp_payment_id = '231'`);
+    expect(second).toEqual({ status: 'approved', applied_at: null });
+    expect(await purchaseOf(ref)).toEqual({ status: 'approved', needs_attention: true });
+    expect(await approvedAt()).toEqual(firstApprovedAt);
+    expect(await count(`payments WHERE applied_at IS NOT NULL`)).toBe(1);
+    expect(await count('subscriptions')).toBe(1);
+    expect(await count(`email_logs WHERE template = 'purchase-approved'`)).toBe(1);
+  });
+
   it('flags amount mismatches without activating', async () => {
     const { ref } = await buyQuarterly();
     providerPayments.set('333', { id: '333', status: 'approved', statusDetail: 'accredited', externalReference: ref, transactionAmount: 1 });
@@ -353,7 +384,55 @@ describe('Mercado Pago webhook (e2e)', () => {
       expect((await purchaseOf(plan.ref)).status).toBe('approved');
     });
 
-    it('rechecks expired plan purchases from the last 7 days and applies a late approval (D45)', async () => {
+    it('expires the purchase of a hold cancelled by staff and flags a later approved payment (D23)', async () => {
+      const { agent } = await signUpClient(app);
+      const booking = await rehabCheckout(agent);
+      const staff = await signUpStaff(app, ds);
+      await staff.agent.post(`/api/staff/bookings/${booking.bookingId}/cancel`).expect(200);
+
+      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 1 });
+      expect(await purchaseOf(booking.ref)).toEqual({ status: 'expired', needs_attention: false });
+
+      providerPayments.set('809', approved('809', booking.ref, 1800));
+      await notify('809').expect(200);
+      expect(await purchaseOf(booking.ref)).toEqual({ status: 'approved', needs_attention: true });
+      const [row] = await ds.query(`SELECT status, cancelled_by FROM bookings WHERE id = $1`, [booking.bookingId]);
+      expect(row).toEqual({ status: 'cancelled', cancelled_by: 'staff' });
+      expect(await count(`email_logs WHERE template = 'booking-confirmed'`)).toBe(0);
+    });
+
+    it('expires the purchase of a hold cancelled by the system', async () => {
+      const { agent } = await signUpClient(app);
+      const booking = await rehabCheckout(agent);
+      await ds.query(`UPDATE bookings SET status = 'cancelled', cancelled_by = 'system', cancelled_at = now() WHERE id = $1`, [booking.bookingId]);
+      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 1 });
+      expect((await purchaseOf(booking.ref)).status).toBe('expired');
+    });
+
+    it('records a late approval of a staff-cancelled hold found only by reconciliation and flags it (D23, D60)', async () => {
+      const { agent } = await signUpClient(app);
+      const booking = await rehabCheckout(agent);
+      const staff = await signUpStaff(app, ds);
+      await staff.agent.post(`/api/staff/bookings/${booking.bookingId}/cancel`).expect(200);
+      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 1 });
+      expect(await purchaseOf(booking.ref)).toEqual({ status: 'expired', needs_attention: false });
+
+      // The client pays anyway and the webhook is lost: only Mercado Pago's search knows about it.
+      providerPayments.set('810', approved('810', booking.ref, 1800));
+      fake.searchByExternalReference.mockClear();
+      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 1, expired: 0 });
+      expect(fake.searchByExternalReference.mock.calls).toEqual([[booking.ref]]);
+      expect(fake.getPayment).not.toHaveBeenCalled();
+      expect(await purchaseOf(booking.ref)).toEqual({ status: 'approved', needs_attention: true });
+      const [payment] = await ds.query(`SELECT status, applied_at FROM payments WHERE mp_payment_id = '810'`);
+      expect(payment.status).toBe('approved');
+      expect(payment.applied_at).not.toBeNull();
+      const [row] = await ds.query(`SELECT status, cancelled_by FROM bookings WHERE id = $1`, [booking.bookingId]);
+      expect(row).toEqual({ status: 'cancelled', cancelled_by: 'staff' });
+      expect(await count(`email_logs WHERE template = 'booking-confirmed'`)).toBe(0);
+    });
+
+    it('rechecks expired purchases from the last 7 days and applies a late approval (D45, D60)', async () => {
       const { agent, ref } = await buyQuarterly();
       await backdate(ref, '25 hours');
       await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 1 });
@@ -370,18 +449,22 @@ describe('Mercado Pago webhook (e2e)', () => {
       providerPayments.set('808', approved('808', booking.ref, 1800));
       fake.searchByExternalReference.mockClear();
 
-      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 1, expired: 0 });
-      expect(fake.searchByExternalReference.mock.calls).toEqual([[ref]]);
+      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 2, expired: 0 });
+      expect(fake.searchByExternalReference.mock.calls).toEqual([[ref], [booking.ref]]);
       expect(await purchaseOf(ref)).toEqual({ status: 'approved', needs_attention: false });
       const subs = await agent.get('/api/me/subscriptions').expect(200);
       expect(subs.body.performance).toMatchObject({ planName: 'Plan Trimestral' });
       expect((await purchaseOf(old.ref)).status).toBe('expired');
-      expect((await purchaseOf(booking.ref)).status).toBe('expired');
+      // The booking purchase expired while its hold was still live: the late approval confirms the booking.
+      expect(await purchaseOf(booking.ref)).toEqual({ status: 'approved', needs_attention: false });
+      const [held] = await ds.query(`SELECT status FROM bookings WHERE id = $1`, [booking.bookingId]);
+      expect(held.status).toBe('confirmed');
 
       // Idempotent: a further run finds nothing left to apply.
       await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 0 });
       expect(await count('subscriptions')).toBe(1);
-      expect(await count(`email_logs WHERE template = 'purchase-approved'`)).toBe(1);
+      expect(await count(`email_logs WHERE template = 'purchase-approved'`)).toBe(2);
+      expect(await count(`email_logs WHERE idempotency_key = $1`, [`booking-confirmed:${booking.bookingId}`])).toBe(1);
     });
 
     it('keeps going when Mercado Pago fails for one purchase', async () => {
