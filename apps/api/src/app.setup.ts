@@ -7,6 +7,7 @@ import { mountAuth } from './modules/auth/mount-auth.js';
 
 export function configureApp(app: NestExpressApplication): void {
   const config = app.get<ConfigType<typeof appConfig>>(appConfig.KEY);
+  if (config.trustProxyHops > 0) app.set('trust proxy', config.trustProxyHops);
   app.setGlobalPrefix('api');
   app.enableCors({ origin: config.webUrl, credentials: true });
   // Body parsers go after any raw handlers: Better Auth reads its own body.

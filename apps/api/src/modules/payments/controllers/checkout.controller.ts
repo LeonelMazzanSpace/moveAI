@@ -1,5 +1,8 @@
-import { Body, Controller, Get, Injectable, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import {
+  Body, Controller, type ExecutionContext, Get, Injectable, Param, ParseUUIDPipe, Post, UseGuards,
+} from '@nestjs/common';
+import { SkipThrottle, ThrottlerGuard, type ThrottlerLimitDetail } from '@nestjs/throttler';
+import type { Response } from 'express';
 import type { AuthUser } from '../../../common/auth/auth-user.js';
 import { CurrentUser } from '../../../common/auth/current-user.decorator.js';
 import { Public } from '../../../common/auth/public.decorator.js';
@@ -14,11 +17,13 @@ import { PaymentsService } from '../services/payments.service.js';
 // A malformed reference can never match a purchase, so it is a plain "not found".
 const externalReference = new ParseUUIDPipe({ exceptionFactory: () => new AppError('PURCHASE_NOT_FOUND') });
 
-// D53: starting a checkout is limited per IP (ThrottlerModule options in AppModule); over the limit it answers the
-// contract's RATE_LIMITED instead of the throttler's own exception.
+// D53/D58: starting a checkout is limited per IP (ThrottlerModule options in AppModule: a `minute` window for both
+// routes and an `hour` window for bookings only); over a limit it answers the contract's RATE_LIMITED instead of the
+// throttler's own exception. Named windows only get a `Retry-After-<name>` header, so the standard one is set here.
 @Injectable()
 class CheckoutThrottlerGuard extends ThrottlerGuard {
-  protected override throwThrottlingException(): Promise<void> {
+  protected override throwThrottlingException(context: ExecutionContext, detail: ThrottlerLimitDetail): Promise<void> {
+    context.switchToHttp().getResponse<Response>().header('Retry-After', String(detail.timeToBlockExpire));
     throw new AppError('RATE_LIMITED');
   }
 }
@@ -32,6 +37,7 @@ export class CheckoutController {
 
   @Roles('client')
   @UseGuards(CheckoutThrottlerGuard)
+  @SkipThrottle({ hour: true })
   @Post('plan')
   checkoutPlan(@CurrentUser() user: AuthUser, @Body() dto: CheckoutPlanDto): Promise<CheckoutResponseDto> {
     return this.checkout.checkoutPlan(user.id, dto.planId);

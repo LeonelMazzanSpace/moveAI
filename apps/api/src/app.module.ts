@@ -34,8 +34,11 @@ import { UsersModule } from './modules/users/users.module.js';
       load: [appConfig, databaseConfig, authConfig, mercadoPagoConfig, schedulerConfig],
     }),
     ScheduleModule.forRoot(),
-    // D53: only the checkout controller applies it (no global guard).
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 10 }]),
+    // D53/D58: only the checkout controller applies it (no global guard); /checkout/plan skips the hourly window.
+    ThrottlerModule.forRoot([
+      { name: 'minute', ttl: 60_000, limit: 10 },
+      { name: 'hour', ttl: 3_600_000, limit: 20 },
+    ]),
     DatabaseModule,
     CommonModule,
     HealthModule,

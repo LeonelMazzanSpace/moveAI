@@ -1,3 +1,4 @@
+import { appConfig } from './app.config.js';
 import { validate } from './env.validation.js';
 
 const base = {
@@ -47,5 +48,44 @@ describe('env validation', () => {
     expect(() => validate({ ...base, SCHEDULER_ENABLED: 'false' })).not.toThrow();
     expect(() => validate({ ...base, SCHEDULER_ENABLED: 'true' })).not.toThrow();
     expect(() => validate({ ...base, SCHEDULER_ENABLED: '0' })).toThrow();
+  });
+
+  describe('TRUST_PROXY_HOPS', () => {
+    it('defaults to 0 when absent or empty', () => {
+      expect(validate(base).TRUST_PROXY_HOPS).toBe(0);
+      expect(validate({ ...base, TRUST_PROXY_HOPS: '' }).TRUST_PROXY_HOPS).toBe(0);
+    });
+
+    it.each([['0', 0], ['2', 2], ['5', 5]])('accepts %s', (value, expected) => {
+      expect(validate({ ...base, TRUST_PROXY_HOPS: value }).TRUST_PROXY_HOPS).toBe(expected);
+    });
+
+    it.each(['-1', '6', '1.5', 'abc', 'true', '50e-1', '0x2', ' 2', '+2', '2.0'])('rejects %j', (value) => {
+      expect(() => validate({ ...base, TRUST_PROXY_HOPS: value })).toThrow();
+    });
+
+    describe('appConfig', () => {
+      const original = process.env.TRUST_PROXY_HOPS;
+      afterEach(() => {
+        if (original === undefined) delete process.env.TRUST_PROXY_HOPS;
+        else process.env.TRUST_PROXY_HOPS = original;
+      });
+
+      it('exposes the validated value', () => {
+        process.env.TRUST_PROXY_HOPS = '2';
+        expect(appConfig().trustProxyHops).toBe(validate({ ...base, TRUST_PROXY_HOPS: '2' }).TRUST_PROXY_HOPS);
+      });
+
+      it.each(['', '0', '5', '50e-1', '0x2', ' 2', '+2', '2.0'])('never differs from a validated %j', (value) => {
+        process.env.TRUST_PROXY_HOPS = value;
+        let validated: number;
+        try {
+          validated = validate({ ...base, TRUST_PROXY_HOPS: value }).TRUST_PROXY_HOPS;
+        } catch {
+          return;
+        }
+        expect(appConfig().trustProxyHops).toBe(validated);
+      });
+    });
   });
 });

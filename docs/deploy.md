@@ -42,6 +42,7 @@ Se definen y validan en `apps/api/src/config/env.validation.ts`; si falta una ob
 | `BREVO_SENDER_EMAIL` | Obligatoria | Remitente verificado en Brevo (debe ser un email válido) |
 | `BREVO_SENDER_NAME` | Opcional | Nombre del remitente (default `MOVE`) |
 | `SCHEDULER_ENABLED` | Opcional | Solo `true` o `false`; cualquier otro valor impide el arranque. Default `true`. Ver [Scheduler](#scheduler-una-sola-instancia) |
+| `TRUST_PROXY_HOPS` | Obligatoria en la práctica (`2`) | Cantidad de proxies delante de la API cuya entrada de `X-Forwarded-For` se acepta para obtener la IP real del cliente (un solo dígito de 0 a 5; cualquier otro valor, como `-1`, `6`, `2.0` o `0x2`, impide el arranque). Default `0`: se ignora el header y todas las requests parecen venir del proxy, así que el límite de checkout por IP se comparte entre todos los clientes. Detrás del ALB + Nginx de Beanstalk va `2`. No existe la opción `true`: confiaría en todo el header, que el cliente puede escribir, y cualquiera podría saltar el límite cambiando su IP. Ver [Proxy e IP del cliente](#proxy-ip-del-cliente-y-límites-de-checkout) |
 
 Variables que **no** van a producción: `E2E_DATABASE_NAME` (solo tests) y `CREATE_STAFF_PASSWORD` (solo se pasa al comando `user:create-staff`, ver [paso 7](#7-crear-el-primer-staff)).
 
@@ -95,6 +96,14 @@ La API corre jobs con cron dentro del proceso (`@nestjs/schedule`): vencimiento 
 - Si se escala a varias, poner `SCHEDULER_ENABLED=true` en **una** y `SCHEDULER_ENABLED=false` en todas las demás (solo se aceptan esos dos valores).
 
 `SCHEDULER_ENABLED=false` solo apaga los crons; los endpoints y la corrida manual (`POST /api/staff/automations/run/:job`) siguen funcionando.
+
+### Proxy, IP del cliente y límites de checkout
+
+Iniciar un checkout está limitado por IP: `POST /api/checkout/booking` y `POST /api/checkout/plan` aceptan 10 requests por minuto, y `POST /api/checkout/booking` (el único que admite invitados) además 20 por hora. Al pasarse responden 429 `RATE_LIMITED`.
+
+- **IP real.** En Beanstalk la request pasa por el ALB y por el Nginx de la instancia, así que la API la recibe desde `127.0.0.1` con `X-Forwarded-For: <cliente>, <IP del ALB>`. Con `TRUST_PROXY_HOPS=2` la API toma la IP del cliente y descarta lo que el cliente haya agregado antes en el header. Si se cambia la topología (por ejemplo, se quita Nginx o se agrega CloudFront), ajustar el valor a la cantidad de proxies propios delante de la API. Un valor mayor que la cantidad real de proxies deja que el cliente elija su IP (igual que `true`); uno menor hace que todos los clientes compartan un mismo contador. Después de cualquier cambio de topología, repetir el ítem "IP real detrás del proxy" del [checklist](#8-checklist-de-verificación-posterior-al-deploy). Nunca usar `true`.
+- **Contadores en memoria por instancia.** El throttler guarda los contadores en la memoria del proceso: se pierden al reiniciar y no se comparten entre instancias. Con N instancias detrás del balanceador, el límite efectivo por IP es hasta N × el límite (con 2 instancias, hasta 20 por minuto y 40 por hora). Para un límite global hay que mover el storage del throttler a un almacén compartido (por ejemplo Redis), que el MVP no tiene.
+- Clientes que salen a internet con la misma IP pública (por ejemplo, el wifi del gimnasio) comparten los contadores.
 
 ## 3. Dominios
 
@@ -159,7 +168,14 @@ MP_ACCESS_TOKEN=… MP_WEBHOOK_SECRET=… BREVO_API_KEY=… BREVO_SENDER_EMAIL=�
 unset CREATE_STAFF_PASSWORD
 ```
 
-El comando arranca el contexto de la aplicación, por eso necesita el mismo conjunto de variables que la API (con `SCHEDULER_ENABLED=false` para que no corran jobs). Imprime solo el id (`staff <id>`). Si el email ya existe, esa cuenta pasa a ser staff. Después, entrar a la web con ese usuario y cambiar la contraseña si se usó una temporal.
+El comando arranca el contexto de la aplicación, por eso necesita el mismo conjunto de variables que la API (con `SCHEDULER_ENABLED=false` para que no corran jobs). Imprime solo el id (`staff <id>`). Después, entrar a la web con ese usuario y cambiar la contraseña si se usó una temporal.
+
+Si ya existe una cuenta con ese email, el comando la rechaza y termina con error. Para convertir esa cuenta en staff hay que repetirlo agregando `--promote-existing`: la cuenta queda con la contraseña dada, se cierran todas sus sesiones, el email queda verificado y el comando avisa que reutilizó la cuenta existente. `--name` sigue siendo obligatorio, pero solo se usa al crear una cuenta nueva: con `--promote-existing` el nombre de la cuenta existente no cambia.
+
+```bash
+# mismas variables que arriba
+  node dist/cli/create-staff.js --email <email> --name "<Nombre Apellido>" --promote-existing
+```
 
 ## 8. Checklist de verificación posterior al deploy
 
@@ -168,6 +184,7 @@ El comando arranca el contexto de la aplicación, por eso necesita el mismo conj
 - [ ] Registro de un cliente nuevo y login: la cookie de sesión queda con `Secure` y dominio `.move.uy`; recargar mantiene la sesión.
 - [ ] `POST /api/auth/sign-in/email` con un body JSON normal no responde 413 (el proxy reenvía `content-length`).
 - [ ] `GET /api/staff/dashboard` responde 401 sin sesión y 403 con la sesión de un cliente.
+- [ ] IP real detrás del proxy (`TRUST_PROXY_HOPS=2`): desde una red, 11 `POST /api/checkout/booking` seguidos con ids inexistentes (`{"planId":"<uuid>","timeSlotId":"<uuid>","guest":{…}}`): los primeros 10 dan 404 y el 11.º 429; agregar `-H 'X-Forwarded-For: 1.2.3.4'` no lo evita; y en el mismo minuto, desde otra red (por ejemplo datos móviles) la primera request da 404, no 429.
 - [ ] Ingreso del staff y apertura de Dashboard, Clientes y Configuración.
 - [ ] Pago de prueba: compra de un plan con credenciales de prueba de Mercado Pago hasta ver la suscripción activa.
 - [ ] Webhook recibido: en el log de la API aparece `webhook payment=<id>` y la compra pasa a aprobada; reenviar la notificación desde el panel de Mercado Pago no duplica nada.
