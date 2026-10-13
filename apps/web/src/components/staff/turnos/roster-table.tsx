@@ -96,30 +96,34 @@ function Pagination({ total, page, pageSize, onPageChange, shown }: RosterPagina
 export function RosterTable({ rows, canMark, markHint, onMark, onCancel, pagination }: RosterTableProps) {
   return (
     <>
-      <Table className={MOBILE_TABLE}>
-        <TableHeader className={MOBILE_TABLE_HEAD}>
-          <TableRow className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            <TableHead className="px-6">Alumno</TableHead>
-            <TableHead className="px-6">Plan</TableHead>
-            <TableHead className="px-6">Última asistencia</TableHead>
-            <TableHead className="px-6">Estado</TableHead>
-            <TableHead className="px-6 text-right">Registrar</TableHead>
+      <Table role="table" className={MOBILE_TABLE}>
+        <TableHeader role="rowgroup" className={MOBILE_TABLE_HEAD}>
+          <TableRow role="row" className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <TableHead role="columnheader" className="px-6">Alumno</TableHead>
+            <TableHead role="columnheader" className="px-6">Plan</TableHead>
+            <TableHead role="columnheader" className="px-6">Última asistencia</TableHead>
+            <TableHead role="columnheader" className="px-6">Estado</TableHead>
+            <TableHead role="columnheader" className="px-6 text-right">Registrar</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody className={MOBILE_TABLE_BODY}>
+        <TableBody role="rowgroup" className={MOBILE_TABLE_BODY}>
           {rows.map((row) => {
             const state = rowState(row);
             return (
-              <TableRow key={row.bookingId} className={cn(MOBILE_ROW, isInactive(row) && 'opacity-50')}>
-                <TableCell className={cn('px-6 py-3.5 font-medium', MOBILE_CELL, isInactive(row) && 'line-through')}>{row.client.name}</TableCell>
-                <TableCell data-label="Plan" className={cn('px-6 py-3.5 text-muted-foreground', MOBILE_LABELLED_CELL, 'max-md:col-span-2')}>{row.planName ?? '—'}</TableCell>
-                <TableCell data-label="Última asistencia" className={cn('px-6 py-3.5 text-muted-foreground', MOBILE_LABELLED_CELL, 'max-md:col-span-2')}>
+              <TableRow role="row" key={row.bookingId} className={cn(MOBILE_ROW, isInactive(row) && 'opacity-50')}>
+                <TableCell role="cell" className={cn('px-6 py-3.5 font-medium', MOBILE_CELL, 'max-md:col-span-2', isInactive(row) && 'line-through')}>
+                  <span className="sr-only">Alumno: </span>
+                  {row.client.name}
+                </TableCell>
+                <TableCell role="cell" data-label="Plan" className={cn('px-6 py-3.5 text-muted-foreground', MOBILE_LABELLED_CELL)}>{row.planName ?? '—'}</TableCell>
+                <TableCell role="cell" data-label="Última asistencia" className={cn('px-6 py-3.5 text-muted-foreground', MOBILE_LABELLED_CELL)}>
                   {row.lastAttendanceOn ? formatDayMonth(row.lastAttendanceOn) : '—'}
                 </TableCell>
-                <TableCell className={cn('px-6 py-3.5', MOBILE_CELL, 'max-md:col-start-2 max-md:row-start-1 max-md:justify-self-end')}>
+                <TableCell role="cell" className={cn('px-6 py-3.5', MOBILE_CELL, 'max-md:col-span-2')}>
+                  <span className="sr-only">Estado: </span>
                   <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
                 </TableCell>
-                <TableCell className={cn('px-6 py-3.5 text-right', MOBILE_CELL, 'max-md:col-span-2 max-md:text-left')}>
+                <TableCell role="cell" className={cn('px-6 py-3.5 text-right', MOBILE_CELL, 'max-md:col-span-2 max-md:text-left')}>
                   <RowActions row={row} canMark={canMark} markHint={markHint} onMark={onMark} onCancel={onCancel} />
                 </TableCell>
               </TableRow>

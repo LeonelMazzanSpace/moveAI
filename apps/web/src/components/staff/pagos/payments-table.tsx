@@ -22,38 +22,39 @@ const STATUS_BADGE: Record<PurchaseStatus, { label: string; tone: StatusTone }> 
 export function PaymentsTable({ payments }: { payments: StaffPaymentDto[] }) {
   return (
     <div className="rounded border border-border">
-      <Table className={MOBILE_TABLE}>
-        <TableHeader className={MOBILE_TABLE_HEAD}>
-          <TableRow>
-            <TableHead>Fecha</TableHead>
-            <TableHead>Cliente</TableHead>
-            <TableHead>Ítem</TableHead>
-            <TableHead>Servicio</TableHead>
-            <TableHead>Monto</TableHead>
-            <TableHead>Método</TableHead>
-            <TableHead>Estado</TableHead>
+      <Table role="table" className={MOBILE_TABLE}>
+        <TableHeader role="rowgroup" className={MOBILE_TABLE_HEAD}>
+          <TableRow role="row">
+            <TableHead role="columnheader">Fecha</TableHead>
+            <TableHead role="columnheader">Cliente</TableHead>
+            <TableHead role="columnheader">Ítem</TableHead>
+            <TableHead role="columnheader">Servicio</TableHead>
+            <TableHead role="columnheader">Monto</TableHead>
+            <TableHead role="columnheader">Método</TableHead>
+            <TableHead role="columnheader">Estado</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody className={MOBILE_TABLE_BODY}>
+        <TableBody role="rowgroup" className={MOBILE_TABLE_BODY}>
           {payments.map((payment) => {
             const badge = STATUS_BADGE[payment.status];
             return (
-              <TableRow key={payment.purchaseId} className={cn(MOBILE_ROW, payment.needsAttention && 'bg-warning-muted/40')}>
-                <TableCell data-label="Fecha" className={cn('whitespace-nowrap', MOBILE_LABELLED_CELL, 'max-md:order-4')}>
+              <TableRow role="row" key={payment.purchaseId} className={cn(MOBILE_ROW, payment.needsAttention && 'bg-warning-muted/40')}>
+                <TableCell role="cell" data-label="Fecha" className={cn('whitespace-nowrap', MOBILE_LABELLED_CELL, 'max-md:col-span-2')}>
                   {formatDate(payment.createdAt)} <span className="text-muted-foreground">{formatTime(payment.createdAt)}</span>
                 </TableCell>
-                <TableCell className={cn(MOBILE_CELL, 'max-md:order-1 max-md:col-span-2')}>
+                <TableCell role="cell" className={cn(MOBILE_CELL, 'max-md:col-span-2')}>
+                  <span className="sr-only">Cliente: </span>
                   <div className="font-medium">{payment.client.name}</div>
                   <div className="text-xs text-muted-foreground">{payment.client.email}</div>
                 </TableCell>
-                <TableCell data-label="Ítem" className={cn(MOBILE_LABELLED_CELL, 'max-md:order-3 max-md:col-span-2')}>
+                <TableCell role="cell" data-label="Ítem" className={cn(MOBILE_LABELLED_CELL, 'max-md:col-span-2')}>
                   <div>{payment.itemName}</div>
                   {payment.note ? <div className="text-xs text-muted-foreground">{payment.note}</div> : null}
                 </TableCell>
-                <TableCell data-label="Servicio" className={cn(MOBILE_LABELLED_CELL, 'max-md:order-5')}>{SERVICE_LABEL[payment.service]}</TableCell>
-                <TableCell data-label="Monto" className={cn('whitespace-nowrap', MOBILE_LABELLED_CELL, 'max-md:order-6')}>{formatUYU(payment.amount)}</TableCell>
-                <TableCell data-label="Método" className={cn(MOBILE_LABELLED_CELL, 'max-md:order-7')}>{METHOD_LABEL[payment.method]}</TableCell>
-                <TableCell data-label="Estado" className={cn(MOBILE_LABELLED_CELL, 'max-md:order-2 max-md:col-span-2')}>
+                <TableCell role="cell" data-label="Servicio" className={MOBILE_LABELLED_CELL}>{SERVICE_LABEL[payment.service]}</TableCell>
+                <TableCell role="cell" data-label="Monto" className={cn('whitespace-nowrap', MOBILE_LABELLED_CELL)}>{formatUYU(payment.amount)}</TableCell>
+                <TableCell role="cell" data-label="Método" className={MOBILE_LABELLED_CELL}>{METHOD_LABEL[payment.method]}</TableCell>
+                <TableCell role="cell" data-label="Estado" className={MOBILE_LABELLED_CELL}>
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
                     {payment.needsAttention ? <StatusBadge tone="warning">Revisar</StatusBadge> : null}

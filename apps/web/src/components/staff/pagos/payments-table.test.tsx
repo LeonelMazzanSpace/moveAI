@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StaffPaymentDto } from '@/lib/api/types';
@@ -51,7 +51,7 @@ describe('PaymentsTable', () => {
     const row = screen.getByText('Martina Suárez').closest('tr');
     expect(row).toHaveClass('max-md:grid');
     expect(row?.closest('table')).toHaveClass('max-md:block');
-    expect(screen.getByRole('columnheader', { name: 'Estado' }).closest('thead')).toHaveClass('max-md:hidden');
+    expect(screen.getByRole('columnheader', { name: 'Estado' }).closest('thead')).toHaveClass('max-md:sr-only');
     const labels = Array.from(row?.querySelectorAll('td') ?? []).map((cell) => cell.getAttribute('data-label'));
     expect(labels).toEqual(['Fecha', null, 'Ítem', 'Servicio', 'Monto', 'Método', 'Estado']);
   });
@@ -103,5 +103,38 @@ describe('PaymentsView filters', () => {
     expect(await screen.findByText('Sin pagos')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Anterior' }));
     expect(replace).toHaveBeenLastCalledWith('/staff/pagos?pagina=3', { scroll: false });
+  });
+});
+
+describe('PaymentsTable semantics below md', () => {
+  it('spells the table roles so they survive display block/grid', () => {
+    render(<PaymentsTable payments={[base, { ...base, purchaseId: 'pu2' }]} />);
+    const table = screen.getByRole('table');
+    expect(screen.getAllByRole('rowgroup')).toHaveLength(2);
+    expect(screen.getAllByRole('row')).toHaveLength(3);
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+      'Fecha',
+      'Cliente',
+      'Ítem',
+      'Servicio',
+      'Monto',
+      'Método',
+      'Estado',
+    ]);
+    for (const element of table.querySelectorAll('thead, tbody, tr, th, td')) expect(element).toHaveAttribute('role');
+  });
+
+  it('labels the client cell and keeps the status readable as a cell', () => {
+    render(<PaymentsTable payments={[{ ...base, needsAttention: true }]} />);
+    const row = screen.getAllByRole('row')[1];
+    expect(within(row).getByRole('cell', { name: /^Cliente: Martina Suárez martina@gmail\.com$/ })).toBeInTheDocument();
+    expect(within(row).getByRole('cell', { name: /^Aprobado\s*Revisar$/ })).toBeInTheDocument();
+    expect(within(row).getByRole('cell', { name: '$ 10.500' })).toBeInTheDocument();
+  });
+
+  it('shows the cells in the same order on mobile as in the DOM', () => {
+    render(<PaymentsTable payments={[base]} />);
+    const cells = Array.from(screen.getAllByRole('row')[1].querySelectorAll('td'));
+    for (const cell of cells) expect(cell.className).not.toMatch(/max-md:order-/);
   });
 });

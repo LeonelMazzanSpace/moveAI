@@ -114,7 +114,7 @@ describe('RosterTable on mobile', () => {
     const first = screen.getByRole('row', { name: /Martina Suárez/ });
     expect(first).toHaveClass('max-md:grid');
     expect(first.closest('table')).toHaveClass('max-md:block');
-    expect(screen.getByRole('columnheader', { name: 'Registrar' }).closest('thead')).toHaveClass('max-md:hidden');
+    expect(screen.getByRole('columnheader', { name: 'Registrar' }).closest('thead')).toHaveClass('max-md:sr-only');
     const actions = within(first).getByRole('button', { name: 'Presente' }).closest('td');
     expect(actions).toHaveClass('max-md:col-span-2');
     expect(within(first).getByRole('button', { name: 'Cancelar reserva de Martina Suárez' }).closest('td')).toBe(actions);
@@ -161,5 +161,40 @@ describe('RosterTable button hover tints', () => {
     const cancel = screen.getByRole('button', { name: 'Cancelar reserva de Martina Suárez' });
     expect(cancel).toHaveClass('hover:bg-transparent', 'dark:hover:bg-transparent', 'hover:text-danger');
     for (const ghost of GHOST_HOVER) expect(cancel).not.toHaveClass(ghost);
+  });
+});
+
+describe('RosterTable semantics below md', () => {
+  const renderRows = () =>
+    render(<RosterTable rows={[row({ bookingId: 'b1' }), row({ bookingId: 'b2', client: { id: 'r', name: 'Rodrigo Silva' } })]} canMark onMark={vi.fn()} />);
+
+  it('spells the table roles so they survive display block/grid', () => {
+    renderRows();
+    const table = screen.getByRole('table');
+    expect(table).toHaveAttribute('role', 'table');
+    expect(screen.getAllByRole('rowgroup')).toHaveLength(2);
+    expect(screen.getAllByRole('row')).toHaveLength(3);
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+      'Alumno',
+      'Plan',
+      'Última asistencia',
+      'Estado',
+      'Registrar',
+    ]);
+    for (const element of table.querySelectorAll('thead, tbody, tr, th, td')) expect(element).toHaveAttribute('role');
+  });
+
+  it('labels the student and status cells for assistive technology', () => {
+    renderRows();
+    const first = screen.getAllByRole('row')[1];
+    expect(within(first).getByRole('cell', { name: /^Alumno:\s*Martina Suárez$/ })).toBeInTheDocument();
+    expect(within(first).getByRole('cell', { name: /^Estado:\s*Pendiente$/ })).toBeInTheDocument();
+  });
+
+  it('shows the cells in the same order on mobile as in the DOM', () => {
+    renderRows();
+    const cells = Array.from(screen.getAllByRole('row')[1].querySelectorAll('td'));
+    expect(cells.map((cell) => cell.getAttribute('data-label'))).toEqual([null, 'Plan', 'Última asistencia', null, null]);
+    for (const cell of cells) expect(cell.className).not.toMatch(/max-md:(order|row-start|col-start)/);
   });
 });
