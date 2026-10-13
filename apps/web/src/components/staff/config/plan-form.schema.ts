@@ -79,10 +79,10 @@ export interface PlanFormPayload {
   description: string;
   features: string[];
   price: number;
-  periodMonths: number | null;
-  periodDays: number | null;
-  sessionsIncluded: number | null;
-  durationMinutes: number | null;
+  periodMonths?: number;
+  periodDays?: number;
+  sessionsIncluded?: number;
+  durationMinutes?: number;
   featured: boolean;
   active: boolean;
   sortOrder: number;
@@ -129,8 +129,11 @@ export const planFormSchema = z
   .transform((values): PlanFormPayload => {
     const silent = () => undefined;
     const usage = KIND_FIELDS[values.kind];
-    const numeric = (field: NumericPlanField): number | null =>
-      usage[field] === 'hidden' ? null : readInteger(values[field], field, false, silent);
+    const numeric = (field: NumericPlanField): Partial<Record<NumericPlanField, number>> => {
+      if (usage[field] === 'hidden') return {};
+      const value = readInteger(values[field], field, false, silent);
+      return value === null ? {} : { [field]: value };
+    };
     return {
       service: values.service,
       kind: values.kind,
@@ -139,10 +142,10 @@ export const planFormSchema = z
       description: values.description,
       features: parseFeatures(values.features),
       price: readInteger(values.price, 'price', true, silent) ?? 0,
-      periodMonths: numeric('periodMonths'),
-      periodDays: numeric('periodDays'),
-      sessionsIncluded: numeric('sessionsIncluded'),
-      durationMinutes: numeric('durationMinutes'),
+      ...numeric('periodMonths'),
+      ...numeric('periodDays'),
+      ...numeric('sessionsIncluded'),
+      ...numeric('durationMinutes'),
       featured: values.featured,
       active: values.active,
       sortOrder: readInteger(values.sortOrder, 'sortOrder', false, silent) ?? 0,
