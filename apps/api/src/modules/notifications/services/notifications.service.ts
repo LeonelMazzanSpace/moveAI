@@ -57,7 +57,7 @@ export class NotificationsService {
     const { subject, html, text } = renderEmail(input.template, input.params);
     try {
       const { messageId } = await this.brevo.sendTransactional({ to: input.to, subject, html, text });
-      await this.emailLogs.update(logId, { status: 'sent', providerMessageId: messageId, sentAt: new Date() });
+      await this.emailLogs.update(logId, { status: 'sent', providerMessageId: messageId || null, sentAt: new Date() });
       return 'sent';
     } catch (error) {
       if (!(error instanceof BrevoError)) throw error;

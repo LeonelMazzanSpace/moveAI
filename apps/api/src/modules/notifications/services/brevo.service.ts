@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { brevoConfig, type BrevoConfig } from '../../../config/brevo.config.js';
 
 const BREVO_SEND_URL = 'https://api.brevo.com/v3/smtp/email';
+const BREVO_TIMEOUT_MS = 10_000;
 
 export interface TransactionalEmail {
   to: { email: string; name: string };
@@ -45,6 +46,7 @@ export class BrevoService {
           accept: 'application/json',
         },
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(BREVO_TIMEOUT_MS),
       });
     } catch {
       throw new BrevoError('network');
