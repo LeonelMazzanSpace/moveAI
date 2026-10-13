@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
+import { CommonModule } from './common/common.module.js';
 import { appConfig } from './config/app.config.js';
+import { authConfig } from './config/auth.config.js';
 import { databaseConfig } from './config/database.config.js';
 import { validate } from './config/env.validation.js';
+import { mercadoPagoConfig } from './config/mercado-pago.config.js';
+import { schedulerConfig } from './config/scheduler.config.js';
 import { DatabaseModule } from './database/database.module.js';
+import { HealthModule } from './health/health.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 
 @Module({
@@ -14,12 +17,12 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
       isGlobal: true,
       cache: true,
       validate,
-      load: [appConfig, databaseConfig],
+      load: [appConfig, databaseConfig, authConfig, mercadoPagoConfig, schedulerConfig],
     }),
     DatabaseModule,
+    CommonModule,
+    HealthModule,
     NotificationsModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}
