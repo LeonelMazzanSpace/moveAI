@@ -1,31 +1,33 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import { toast } from 'sonner';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Controller, useForm, type FieldPath } from 'react-hook-form';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { apiFetch } from '@/lib/api/client';
-import { errorMessage } from '@/lib/api/errors';
-import type { ContactChannel, ContactDto, ContactOutcome } from '@/lib/api/types';
+import type { ContactChannel, ContactOutcome } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
+import { applyApiError, NOTE_MAX_LENGTH, NOTE_TOO_LONG } from '../shared/inactivity-reason-form';
 import { CHANNEL_LABEL, OUTCOME_LABEL } from './alert-labels';
+import { useCreateContact, type ContactValues } from './use-followup';
 
-const NOTE_MAX_LENGTH = 1000;
 const CHANNELS = Object.keys(CHANNEL_LABEL) as ContactChannel[];
 const OUTCOMES = Object.keys(OUTCOME_LABEL) as ContactOutcome[];
 
-/** Refresca alertas, contadores (incluido el badge del sidebar) y respuestas de check-in. */
-export function useRefreshFollowup() {
-  const queryClient = useQueryClient();
-  return () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['staff', 'alerts'] }),
-      queryClient.invalidateQueries({ queryKey: ['staff', 'alert-counts'] }),
-      queryClient.invalidateQueries({ queryKey: ['staff', 'checkins'] }),
-    ]);
+const contactSchema = z.object({
+  channel: z.custom<ContactChannel>((value) => typeof value === 'string' && Object.hasOwn(CHANNEL_LABEL, value), 'Elegí un canal.'),
+  outcome: z.custom<ContactOutcome>((value) => typeof value === 'string' && Object.hasOwn(OUTCOME_LABEL, value), 'Elegí un resultado.'),
+  note: z.string().trim().max(NOTE_MAX_LENGTH, NOTE_TOO_LONG),
+});
+
+type ContactFormValues = z.infer<typeof contactSchema>;
+
+const FIELDS: FieldPath<ContactFormValues>[] = ['channel', 'outcome', 'note'];
+
+function toPayload({ channel, outcome, note }: ContactFormValues): ContactValues {
+  return { channel, outcome, ...(note && { note }) };
 }
 
 export interface ContactTarget {
@@ -66,55 +68,65 @@ function ChoiceChips<T extends string>({ label, options, labels, value, onChange
 }
 
 function ContactForm({ target, onClose }: { target: ContactTarget; onClose: () => void }) {
-  const refresh = useRefreshFollowup();
-  const [channel, setChannel] = useState<ContactChannel>('whatsapp');
-  const [outcome, setOutcome] = useState<ContactOutcome>('reached');
-  const [note, setNote] = useState('');
-  const mutation = useMutation({
-    mutationFn: () => {
-      const trimmed = note.trim();
-      return apiFetch<ContactDto>(`/staff/alerts/${target.alertId}/contacts`, {
-        method: 'POST',
-        body: { channel, outcome, ...(trimmed ? { note: trimmed } : {}) },
-      });
-    },
-    onSuccess: async () => {
-      await refresh();
-      toast.success('Contacto registrado');
+  const create = useCreateContact(target.alertId);
+  const {
+    register,
+    control,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<ContactFormValues>({ resolver: zodResolver(contactSchema), defaultValues: { channel: 'whatsapp', outcome: 'reached', note: '' } });
+
+  async function onSubmit(values: ContactFormValues) {
+    try {
+      await create.mutateAsync(toPayload(values));
       onClose();
-    },
-  });
+    } catch (error) {
+      applyApiError(error, setError, FIELDS);
+    }
+  }
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            mutation.mutate();
-          }}
-          className="grid gap-4"
-        >
+        <form noValidate onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
           <DialogHeader>
             <DialogTitle>Contactar a {target.clientName}</DialogTitle>
             <DialogDescription>Registrá cómo fue el contacto para que quede en el historial.</DialogDescription>
           </DialogHeader>
-          <ChoiceChips label="Canal" options={CHANNELS} labels={CHANNEL_LABEL} value={channel} onChange={setChannel} />
-          <ChoiceChips label="Resultado" options={OUTCOMES} labels={OUTCOME_LABEL} value={outcome} onChange={setOutcome} />
+          <Controller
+            control={control}
+            name="channel"
+            render={({ field }) => <ChoiceChips label="Canal" options={CHANNELS} labels={CHANNEL_LABEL} value={field.value} onChange={field.onChange} />}
+          />
+          {errors.channel ? <p className="text-xs text-danger">{errors.channel.message}</p> : null}
+          <Controller
+            control={control}
+            name="outcome"
+            render={({ field }) => <ChoiceChips label="Resultado" options={OUTCOMES} labels={OUTCOME_LABEL} value={field.value} onChange={field.onChange} />}
+          />
+          {errors.outcome ? <p className="text-xs text-danger">{errors.outcome.message}</p> : null}
           <div className="grid gap-2">
             <Label htmlFor="contact-note">Nota</Label>
-            <Textarea id="contact-note" maxLength={NOTE_MAX_LENGTH} placeholder="Nota interna (opcional)…" value={note} onChange={(event) => setNote(event.target.value)} />
+            <Textarea
+              id="contact-note"
+              maxLength={NOTE_MAX_LENGTH}
+              placeholder="Nota interna (opcional)…"
+              aria-invalid={errors.note ? true : undefined}
+              {...register('note')}
+            />
+            {errors.note ? <p className="text-xs text-danger">{errors.note.message}</p> : null}
           </div>
-          {mutation.error ? (
+          {errors.root ? (
             <p role="alert" className="text-sm text-danger">
-              {errorMessage(mutation.error)}
+              {errors.root.message}
             </p>
           ) : null}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Volver
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button type="submit" disabled={isSubmitting}>
               Guardar contacto
             </Button>
           </DialogFooter>
