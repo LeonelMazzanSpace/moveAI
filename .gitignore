@@ -16,5 +16,3 @@ vault/.obsidian/plugins/
 
 # Orchestration (local)
 SCRATCHPAD.md
-apps/web/test-results/
-apps/web/playwright-report/

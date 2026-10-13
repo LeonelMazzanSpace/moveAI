@@ -7,8 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run --passWithNoTests",
-    "test:e2e": "playwright test"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -31,7 +30,6 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@playwright/test": "1.64.0",
     "@tailwindcss/turbopack": "^4",
     "@testing-library/dom": "10.4.2",
     "@testing-library/jest-dom": "7.0.1",

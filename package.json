@@ -15,7 +15,6 @@
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",
-    "test:e2e": "pnpm --filter @move/api test:e2e",
-    "test:e2e:web": "pnpm --filter @move/web test:e2e"
+    "test:e2e": "pnpm --filter @move/api test:e2e"
   }
 }
