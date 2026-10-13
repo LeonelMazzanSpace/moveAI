@@ -50,7 +50,7 @@ Recovery Room by MOVE está abierta a todo público, sin plan previo. Podés pag
 
 ![Recovery](img/06-recovery.png)
 
-En **Reservá tu sesión** elegís la modalidad (**Sesión individual** o **Paquete**), el día y el horario. La sesión individual se paga en el momento y se puede reservar sin tener cuenta (la captura está tomada sin sesión iniciada). Los paquetes duran 30 días desde la compra y las sesiones que no uses vencen al final.
+En **Reservá tu sesión** elegís la modalidad (**Sesión individual** o **Paquete**), el día y el horario. La sesión individual se paga en el momento y se puede reservar sin tener cuenta. Los paquetes duran 30 días desde la compra y las sesiones que no uses vencen al final.
 
 ![Recovery: reservar una sesión](img/07-recovery-reserva.png)
 
@@ -90,7 +90,7 @@ La pantalla de acceso tiene dos pestañas: **Iniciar sesión** (email y contrase
 
 ![Crear cuenta](img/13-registro.png)
 
-Si querés reservar Rehab o Recovery sin ser alumno, no hace falta registrarte antes: la cuenta se crea durante el proceso de reserva. Si ya tenés una cuenta con ese email, la plataforma te avisa "Ya tenés una cuenta con ese email: ingresá para continuar" y te pide **ingresar** (así nadie reserva a nombre de otra persona); al ingresar, la operación queda vinculada a tu perfil.
+Si querés reservar Rehab o Recovery sin ser alumno, no hace falta registrarte antes: la cuenta se crea durante el proceso de reserva. Si ya tenés una cuenta con ese email, la plataforma te avisa "Ya tenés una cuenta con ese email: ingresá para continuar" y te pide **ingresar** (así nadie reserva a nombre de otra persona). Al ingresar volvés a la pantalla de reserva y elegís el horario de nuevo, ahora con tu cuenta: no queda ninguna reserva a medias.
 
 **Volvés a donde estabas.** Si te piden ingresar cuando querías abrir una página (por ejemplo, el checkout de un plan o tu historial), después de ingresar la plataforma te lleva a **esa misma página**, con su dirección exacta, y no al inicio de tu perfil. Solo se vuelve a páginas internas permitidas para tu tipo de cuenta: un cliente nunca termina en el panel de staff, ni al revés.
 
@@ -126,9 +126,9 @@ Cuando el pago se aprueba, ves el resultado y podés ir a tu perfil: el plan que
 
 ![Resultado del pago](img/24-checkout-resultado.png)
 
-Si el pago de un plan todavía no se confirmó (por ejemplo, fue rechazado), la pantalla te muestra "Confirmando tu pago" mientras espera y, pasado un minuto aproximadamente, **"Pago en proceso"**: "Tu pago está en proceso. Te avisamos por email cuando se acredite." Debajo aparece **Intentar de nuevo**, que te lleva otra vez al checkout de ese plan para probar con otro medio de pago. Si el pago no se completó, el botón **Intentar de nuevo** también aparece en "Pago no completado".
+Si el pago de un plan sigue pendiente después de la espera (por ejemplo, porque Mercado Pago tarda en acreditarlo), la pantalla te muestra "Confirmando tu pago" mientras espera y, pasado un minuto aproximadamente, **"Pago en proceso"**: "Tu pago está en proceso. Te avisamos por email cuando se acredite." Debajo aparece **Intentar de nuevo**, que te lleva otra vez al checkout de ese plan para probar con otro medio de pago. Si el pago fue rechazado o no se completó, la pantalla muestra enseguida "Pago no completado" y el botón **Intentar de nuevo** también aparece ahí.
 
-**Límites del checkout.** Para evitar abusos, cada persona puede tener como máximo **2 reservas pendientes de pago** a la vez: si intentás una tercera, ves "Ya tenés reservas pendientes de pago. Completá el pago o esperá a que venzan." (las retenidas vencen a los 15 minutos). Además, el checkout acepta hasta 10 intentos por minuto desde una misma conexión: si lo superás, ves "Hiciste demasiados intentos. Esperá un minuto y probá de nuevo."
+**Límites del checkout.** Para evitar abusos, cada persona puede tener como máximo **2 reservas pendientes de pago** a la vez: si intentás una tercera, ves "Ya tenés reservas pendientes de pago. Completá el pago o esperá a que venzan." (las retenidas vencen a los 15 minutos). Además, el checkout acepta hasta 10 intentos por minuto desde una misma conexión y, al reservar una sesión de Rehab o Recovery, hasta 20 intentos por hora desde esa misma conexión: si superás cualquiera de los dos límites, ves "Hiciste demasiados intentos. Esperá un rato y probá de nuevo."
 
 ### Mi perfil
 
@@ -362,7 +362,13 @@ Requisitos: Node 24 (`nvm use` lee `.nvmrc`), pnpm 10 (`corepack enable`) y Dock
    unset CREATE_STAFF_PASSWORD
    ```
 
-   El comando imprime solo el id. La contraseña debe tener al menos 8 caracteres. Si ya existe una cuenta con ese email, el comando **se niega** y avisa "Ya existe una cuenta con ese email; usá --promote-existing para convertirla en staff". Con `--promote-existing` esa cuenta se convierte en staff, se le fija la contraseña indicada, se marca su email como verificado y se cierran todas sus sesiones abiertas; el comando avisa que reutilizó una cuenta existente.
+   El comando imprime solo el id. La contraseña debe tener al menos 8 caracteres. Si ya existe una cuenta con ese email, el comando **se niega** y avisa:
+
+   ```text
+   Ya existe una cuenta con ese email; usá --promote-existing para convertirla en staff.
+   ```
+
+   Con `--promote-existing` esa cuenta se convierte en staff, se le fija la contraseña indicada, se marca su email como verificado y se cierran todas sus sesiones abiertas; el comando avisa que reutilizó una cuenta existente.
 
    ```bash
    pnpm --filter @move/api user:create-staff -- --email persona@ejemplo.com --name "Nombre Apellido" --promote-existing
@@ -417,11 +423,12 @@ Fuente completa: [`docs/deploy.md`](../deploy.md). Nada de esto se ejecutó toda
 1. **Base de datos en Neon.** Crear una base nueva (Postgres 17, sin reutilizar el esquema anterior). Usar el host **directo** (sin `-pooler`: los jobs usan locks de sesión). Definir `DB_*` con `DB_SSL=true`. Correr las migraciones **antes** de cambiar el tráfico, desde el mismo bundle que se despliega (`node_modules/.bin/typeorm migration:run -d dist/database/data-source.js`) y cargar el seed (`node dist/database/seed.js`).
 2. **API en AWS Elastic Beanstalk (Node 24).** Generar el zip con `bash scripts/package-api-eb.sh`, crear el entorno *Web server* con la plataforma Node.js 24, cargar las variables de entorno de la API, subir el zip y configurar el health check en `GET /api/health`. HTTPS con certificado en ACM y dominio `api.move.uy`.
 3. **Proxy y límite de body de auth.** `/api/auth/*` responde 413 a cualquier request de más de 64 KB o con `Transfer-Encoding` sin `content-length`. El proxy (Nginx de Beanstalk o el ALB) tiene que **reenviar `content-length`**: dejar `proxy_request_buffering on` (el default).
-4. **Scheduler en una sola instancia.** Dejar el entorno con una instancia, o `SCHEDULER_ENABLED=true` en una y `false` en las demás (solo se aceptan esos dos valores).
-5. **Web en Vercel.** Importar el repo con *Root Directory* `apps/web`, Node 24, definir `NEXT_PUBLIC_API_URL` (con `/api`) y, si corresponde, `NEXT_PUBLIC_GOOGLE_ENABLED`. Producción desde `main`; los previews apuntan a la API de **desarrollo**, nunca a la de producción.
-6. **Dominio raíz y cookies.** Web y API bajo el mismo dominio raíz para que la cookie de sesión sea first-party: `COOKIE_DOMAIN=.move.uy` (con el punto inicial), `WEB_URL=https://move.uy`, `API_PUBLIC_URL=https://api.move.uy`, `NEXT_PUBLIC_API_URL=https://api.move.uy/api`. `api.move.uy` es un CNAME al entorno de Beanstalk y `move.uy` usa los registros que indique Vercel. En producción las cookies son `Secure`: probar siempre por HTTPS.
-7. **Primer staff de producción.** Con las variables `DB_*` de producción y `CREATE_STAFF_PASSWORD` por variable: `node dist/cli/create-staff.js --email <email> --name "<Nombre Apellido>"` desde el bundle descomprimido (con `SCHEDULER_ENABLED=false`).
-8. **Checklist posterior al deploy** (ver el detalle en `docs/deploy.md`): health, carga de la web sin errores de CORS, registro y login con cookie `Secure` y dominio `.move.uy`, `/api/staff/dashboard` con 401 sin sesión y 403 con sesión de cliente, pago de prueba de punta a punta, webhook recibido, email recibido, crons en los logs, y **reemplazar los valores provisorios** de Configuración.
+4. **IP del cliente detrás del proxy (`TRUST_PROXY_HOPS`).** El checkout limita los intentos por IP (10 por minuto y, en reservas, 20 por hora). Detrás del ALB y el Nginx de Beanstalk la API recibe todas las requests desde el proxy, así que hay que definir `TRUST_PROXY_HOPS=2` (un solo dígito de 0 a 5; el default `0` ignora `X-Forwarded-For`). **Nunca `true`**: confiaría en todo el header, que el cliente puede escribir, y cualquiera podría saltarse el límite cambiando su IP. Un valor mayor que la cantidad real de proxies tiene el mismo problema; uno menor (o dejar `0`) hace que todos los clientes compartan un solo contador y el checkout se bloquee para todos. Si cambia la topología (por ejemplo, se agrega CloudFront), ajustar el valor y repetir la verificación "IP real detrás del proxy" del checklist. Además, los contadores viven en la memoria de cada instancia: con N instancias el límite efectivo es hasta N veces el configurado. Detalle en [`docs/deploy.md`](../deploy.md#proxy-ip-del-cliente-y-límites-de-checkout).
+5. **Scheduler en una sola instancia.** Dejar el entorno con una instancia, o `SCHEDULER_ENABLED=true` en una y `false` en las demás (solo se aceptan esos dos valores).
+6. **Web en Vercel.** Importar el repo con *Root Directory* `apps/web`, Node 24, definir `NEXT_PUBLIC_API_URL` (con `/api`) y, si corresponde, `NEXT_PUBLIC_GOOGLE_ENABLED`. Producción desde `main`; los previews apuntan a la API de **desarrollo**, nunca a la de producción.
+7. **Dominio raíz y cookies.** Web y API bajo el mismo dominio raíz para que la cookie de sesión sea first-party: `COOKIE_DOMAIN=.move.uy` (con el punto inicial), `WEB_URL=https://move.uy`, `API_PUBLIC_URL=https://api.move.uy`, `NEXT_PUBLIC_API_URL=https://api.move.uy/api`. `api.move.uy` es un CNAME al entorno de Beanstalk y `move.uy` usa los registros que indique Vercel. En producción las cookies son `Secure`: probar siempre por HTTPS.
+8. **Primer staff de producción.** Con las variables `DB_*` de producción y `CREATE_STAFF_PASSWORD` por variable: `node dist/cli/create-staff.js --email <email> --name "<Nombre Apellido>"` desde el bundle descomprimido (con `SCHEDULER_ENABLED=false`). Si el email ya tiene una cuenta, agregar `--promote-existing` (ver el paso 3 de "Correr todo en local").
+9. **Checklist posterior al deploy** (ver el detalle en `docs/deploy.md`): health, IP real detrás del proxy (`TRUST_PROXY_HOPS=2`), carga de la web sin errores de CORS, registro y login con cookie `Secure` y dominio `.move.uy`, `/api/staff/dashboard` con 401 sin sesión y 403 con sesión de cliente, pago de prueba de punta a punta, webhook recibido, email recibido, crons en los logs, y **reemplazar los valores provisorios** de Configuración.
 
 En producción (`NODE_ENV=production`) la API exige las credenciales de proveedores y deshabilita el simulador de pagos.
 
@@ -449,7 +456,7 @@ En producción (`NODE_ENV=production`) la API exige las credenciales de proveedo
 
 #### Dominio y cookies
 
-Ver el paso 6 del deploy. Si la web y la API quedaran en dominios distintos, la cookie de sesión dejaría de ser first-party y el login no funcionaría como está diseñado.
+Ver el paso 7 del deploy. Si la web y la API quedaran en dominios distintos, la cookie de sesión dejaría de ser first-party y el login no funcionaría como está diseñado.
 
 ### Valores provisorios y decisiones abiertas
 
