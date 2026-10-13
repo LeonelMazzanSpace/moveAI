@@ -4,6 +4,7 @@ import {
   IsBooleanString,
   IsEmail,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -100,7 +101,7 @@ class EnvironmentVariables {
   BREVO_SENDER_NAME?: string;
 
   @IsOptional()
-  @IsBooleanString()
+  @IsIn(['true', 'false'])
   SCHEDULER_ENABLED?: string;
 }
 

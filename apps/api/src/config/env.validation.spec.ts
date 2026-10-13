@@ -6,6 +6,11 @@ const base = {
   BETTER_AUTH_SECRET: 'x'.repeat(32),
 };
 
+const prodFull = {
+  ...base, NODE_ENV: 'production', MP_ACCESS_TOKEN: 'APP_USR-1', MP_WEBHOOK_SECRET: 'whsec',
+  BREVO_API_KEY: 'xkeysib-1', BREVO_SENDER_EMAIL: 'hola@example.com',
+};
+
 describe('env validation', () => {
   it('accepts a minimal development env', () => {
     expect(() => validate(base)).not.toThrow();
@@ -18,20 +23,29 @@ describe('env validation', () => {
 
   it('requires provider credentials in production', () => {
     expect(() => validate({ ...base, NODE_ENV: 'production' })).toThrow();
-    expect(() =>
-      validate({
-        ...base, NODE_ENV: 'production', MP_ACCESS_TOKEN: 'APP_USR-1', MP_WEBHOOK_SECRET: 'whsec',
-        BREVO_API_KEY: 'xkeysib-1', BREVO_SENDER_EMAIL: 'hola@example.com',
-      }),
-    ).not.toThrow();
+    expect(() => validate(prodFull)).not.toThrow();
   });
+
+  it.each(['MP_ACCESS_TOKEN', 'MP_WEBHOOK_SECRET', 'BREVO_API_KEY', 'BREVO_SENDER_EMAIL'])(
+    'rejects an empty %s in production',
+    (key) => {
+      expect(() => validate({ ...prodFull, [key]: '' })).toThrow();
+    },
+  );
 
   it('requires google id and secret together', () => {
     expect(() => validate({ ...base, GOOGLE_CLIENT_ID: 'id' })).toThrow();
+    expect(() => validate({ ...base, GOOGLE_CLIENT_SECRET: 'secret' })).toThrow();
     expect(() => validate({ ...base, GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 'secret' })).not.toThrow();
   });
 
   it('treats empty values as missing', () => {
     expect(() => validate({ ...base, MP_ACCESS_TOKEN: '' })).not.toThrow();
+  });
+
+  it('accepts only true or false for SCHEDULER_ENABLED', () => {
+    expect(() => validate({ ...base, SCHEDULER_ENABLED: 'false' })).not.toThrow();
+    expect(() => validate({ ...base, SCHEDULER_ENABLED: 'true' })).not.toThrow();
+    expect(() => validate({ ...base, SCHEDULER_ENABLED: '0' })).toThrow();
   });
 });
