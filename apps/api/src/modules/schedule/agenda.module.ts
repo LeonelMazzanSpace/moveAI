@@ -16,6 +16,6 @@ import { TemplatesService } from './services/templates.service.js';
   imports: [TypeOrmModule.forFeature([Professional, ScheduleTemplate, TimeSlot]), SettingsModule],
   controllers: [StaffProfessionalsController, StaffTemplatesController, StaffSlotsController],
   providers: [ProfessionalsService, ScheduleService, TemplatesService, GenerateSlotsJob],
-  exports: [ScheduleService],
+  exports: [ScheduleService, GenerateSlotsJob],
 })
 export class AgendaModule {}

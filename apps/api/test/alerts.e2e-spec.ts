@@ -3,6 +3,7 @@ import type { DataSource } from 'typeorm';
 import { addDays, businessDateTime, businessMonth, businessToday } from '../src/common/time/business-time.js';
 import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
 import { AlertsService } from '../src/modules/followup/services/alerts.service.js';
+import { InactivityService } from '../src/modules/followup/services/inactivity.service.js';
 import { createTestApp, type TestApp } from './utils/app.js';
 import { signUp, signUpClient, signUpStaff, type TestAgent } from './utils/auth.js';
 import { resetDb } from './utils/db.js';
@@ -134,6 +135,34 @@ describe('follow-up alerts (e2e)', () => {
     expect(alert.pause).toEqual({ reason: 'injury', since: pause.body.startedAt, recontactOn: today() });
 
     expect(await alerts.detectAlerts(addDays(today(), 1))).toEqual({ ...ZERO_COUNTS, recontact: 1 });
+  });
+
+  it('skips a client paused after detection read the pauses, except for recontact', async () => {
+    const paused = await signUpClient(ctx.app);
+    const active = await signUpClient(ctx.app);
+    // Both would raise expiring and no_attendance if they were not paused.
+    for (const client of [paused, active]) {
+      await givePerformancePlan(ctx.dataSource, client.userId, { startsOn: addDays(today(), -20), endsOn: addDays(today(), 3) });
+    }
+    const pause = await staff.agent.post(`/api/staff/clients/${paused.userId}/inactivity-reasons`)
+      .send({ reason: 'injury', recontactOn: today() }).expect(201);
+
+    // The pause opens between the read of active pauses and the insert: detection sees no pause at all.
+    const inactivity = ctx.app.get(InactivityService);
+    const stub = vi.spyOn(inactivity, 'getActivePauses').mockResolvedValue(new Map());
+    try {
+      expect(await alerts.detectAlerts(today())).toEqual({ ...ZERO_COUNTS, expiring: 1, no_attendance: 1 });
+    } finally {
+      stub.mockRestore();
+    }
+    expect((await alertRows()).map((r: { userId: string; type: string }) => [r.userId, r.type])).toEqual([
+      [active.userId, 'expiring'], [active.userId, 'no_attendance'],
+    ]);
+
+    // The recontact alert of the paused client still goes through the insert.
+    expect(await alerts.detectAlerts(today())).toEqual({ ...ZERO_COUNTS, recontact: 1 });
+    expect(await ctx.dataSource.query(`SELECT type, period_key AS "periodKey" FROM followup_alerts WHERE user_id = $1`, [paused.userId]))
+      .toEqual([{ type: 'recontact', periodKey: `reason:${pause.body.id}` }]);
   });
 
   it('records contacts against the alert and its client', async () => {

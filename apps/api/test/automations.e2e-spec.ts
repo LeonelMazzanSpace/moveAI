@@ -175,6 +175,20 @@ describe('automations — staff endpoint (e2e)', () => {
     expect(await slots()).toEqual(fromEndpoint);
   });
 
+  it('runs generate-slots through GenerateSlotsJob with its default window', async () => {
+    const staff = await signUpStaff(ctx.app, ctx.dataSource);
+    const execute = vi.spyOn(ctx.app.get(GenerateSlotsJob), 'execute');
+    try {
+      const res = await staff.agent.post('/api/staff/automations/run/generate-slots').expect(200);
+      expect(execute.mock.calls).toEqual([[{ force: true }]]);
+      expect(res.body.result).toEqual((await execute.mock.results[0].value).result);
+    } finally {
+      execute.mockRestore();
+    }
+    expect(await ctx.app.get(AutomationsService).run('generate-slots', { force: false }))
+      .toEqual({ job: 'generate-slots', ran: false, result: {} });
+  });
+
   it('registers the three crons with their expressions and the Montevideo time zone', () => {
     const jobs = ctx.app.get(SchedulerRegistry).getCronJobs();
     const specOf = (name: string) => {

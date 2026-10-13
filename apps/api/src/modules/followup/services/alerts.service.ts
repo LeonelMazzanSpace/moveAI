@@ -160,6 +160,8 @@ export class AlertsService {
     );
   }
 
+  // D11: the pause check is repeated in the insert, so a pause opened after `detectAlerts` read the pauses still leaves
+  // that client with no alert but `recontact`.
   private async insertNew(alerts: NewAlert[]): Promise<Record<AlertType, number>> {
     const created = zeroCounts();
     if (alerts.length === 0) return created;
@@ -168,6 +170,8 @@ export class AlertsService {
          INSERT INTO followup_alerts (user_id, type, period_key, context)
          SELECT x.user_id, x.type, x.period_key, x.context
          FROM jsonb_to_recordset($1::jsonb) AS x(user_id uuid, type text, period_key text, context jsonb)
+         WHERE x.type = 'recontact'
+           OR NOT EXISTS (SELECT 1 FROM inactivity_reasons r WHERE r.user_id = x.user_id AND r.ended_at IS NULL)
          ON CONFLICT (user_id, type, period_key) DO NOTHING
          RETURNING type
        ) SELECT type, count(*)::int AS count FROM inserted GROUP BY type`,

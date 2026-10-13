@@ -35,14 +35,17 @@ interface ResponseRow {
   alertStatus: AlertStatus | null;
 }
 
-// Answered check-ins with the alert that follows their flag (pain → checkin_pain, goals → checkin_goals).
+// The alert that follows a check-in's flag (pain → checkin_pain, goals → checkin_goals). `responses` reports its status and
+// `stats` counts it as needing intervention while it is open, so both always agree.
+const FLAG_ALERT_MATCH = `a.user_id = c.user_id AND a.period_key = 'checkin:' || c.id
+    AND a.type = CASE c.flag WHEN 'pain' THEN 'checkin_pain' WHEN 'goals' THEN 'checkin_goals' END`;
+
 const RESPONSE_SELECT = `
   SELECT c.id, c.user_id AS "userId", u.name AS "userName", c.period, c.feeling, c.pain, c.pain_detail AS "painDetail",
     c.goals, c.goals_detail AS "goalsDetail", c.flag, c.responded_at AS "respondedAt", a.id AS "alertId", a.status AS "alertStatus"
   FROM checkins c
   JOIN users u ON u.id = c.user_id
-  LEFT JOIN followup_alerts a ON a.user_id = c.user_id AND a.period_key = 'checkin:' || c.id
-    AND a.type = CASE c.flag WHEN 'pain' THEN 'checkin_pain' WHEN 'goals' THEN 'checkin_goals' END
+  LEFT JOIN followup_alerts a ON ${FLAG_ALERT_MATCH}
   WHERE c.status = 'answered'`;
 
 const firstName = (name: string): string => name.trim().split(/\s+/)[0] ?? name;
@@ -59,34 +62,12 @@ export class CheckinsService {
     @Inject(appConfig.KEY) private readonly app: ConfigType<typeof appConfig>,
   ) {}
 
-  // R13: one check-in per client and period; only newly inserted rows are emailed (after the insert commits).
+  // R13: one check-in per client and period; `sent` counts the new rows only. Emails go out after the insert commits, to
+  // every check-in of the period still without an invite, so a run that stopped before its emails is completed by the next.
   async send(period: string): Promise<{ sent: number; period: string }> {
-    const rows: { id: string; userId: string }[] = await this.dataSource.query(
-      `INSERT INTO checkins (user_id, period)
-       SELECT u.id, $1 FROM users u
-       WHERE u.role = 'client' AND u.deleted_at IS NULL
-         AND EXISTS (
-           SELECT 1 FROM subscriptions s
-           WHERE s.user_id = u.id AND s.service = 'performance' AND s.deleted_at IS NULL AND s.starts_on <= $2 AND s.ends_on >= $2
-         )
-         AND NOT EXISTS (SELECT 1 FROM inactivity_reasons r WHERE r.user_id = u.id AND r.ended_at IS NULL)
-       ON CONFLICT (user_id, period) DO NOTHING
-       RETURNING id, user_id AS "userId"`,
-      [period, businessToday()],
-    );
-    const users = new Map((await this.users.findByIds(rows.map((row) => row.userId))).map((user) => [user.id, user]));
-    for (const row of rows) {
-      const user = users.get(row.userId);
-      if (!user) continue;
-      await this.notifications.send({
-        template: 'checkin-invite',
-        to: { email: user.email, name: user.name },
-        userId: user.id,
-        idempotencyKey: `checkin:${row.id}`,
-        params: { name: user.name, url: `${this.app.webUrl}/check-in` },
-      });
-    }
-    return { sent: rows.length, period };
+    const sent = await this.insertEligible(period);
+    await this.emailMissingInvites(period);
+    return { sent, period };
   }
 
   async pendingFor(userId: string): Promise<PendingCheckinDto | null> {
@@ -123,10 +104,8 @@ export class CheckinsService {
     const [row]: Omit<CheckinStatsDto, 'period'>[] = await this.dataSource.query(
       `SELECT count(*)::int AS sent,
          count(*) FILTER (WHERE c.status = 'answered')::int AS answered,
-         count(*) FILTER (WHERE c.status = 'answered' AND c.flag IN ('pain','goals') AND EXISTS (
-           SELECT 1 FROM followup_alerts a
-           WHERE a.user_id = c.user_id AND a.period_key = 'checkin:' || c.id
-             AND a.type IN ('checkin_pain','checkin_goals') AND a.status = 'open'
+         count(*) FILTER (WHERE c.status = 'answered' AND EXISTS (
+           SELECT 1 FROM followup_alerts a WHERE ${FLAG_ALERT_MATCH} AND a.status = 'open'
          ))::int AS "needsIntervention"
        FROM checkins c WHERE c.period = $1`,
       [period],
@@ -166,6 +145,47 @@ export class CheckinsService {
       [userId],
     );
     return row ?? null;
+  }
+
+  private async insertEligible(period: string): Promise<number> {
+    const rows: { id: string }[] = await this.dataSource.query(
+      `INSERT INTO checkins (user_id, period)
+       SELECT u.id, $1 FROM users u
+       WHERE u.role = 'client' AND u.deleted_at IS NULL
+         AND EXISTS (
+           SELECT 1 FROM subscriptions s
+           WHERE s.user_id = u.id AND s.service = 'performance' AND s.deleted_at IS NULL AND s.starts_on <= $2 AND s.ends_on >= $2
+         )
+         AND NOT EXISTS (SELECT 1 FROM inactivity_reasons r WHERE r.user_id = u.id AND r.ended_at IS NULL)
+       ON CONFLICT (user_id, period) DO NOTHING
+       RETURNING id`,
+      [period, businessToday()],
+    );
+    return rows.length;
+  }
+
+  // The `checkin:<id>` idempotency key keeps concurrent or repeated runs to one invite. Paused clients get none (D11).
+  private async emailMissingInvites(period: string): Promise<void> {
+    const rows: { id: string; userId: string }[] = await this.dataSource.query(
+      `SELECT c.id, c.user_id AS "userId" FROM checkins c
+       JOIN users u ON u.id = c.user_id
+       WHERE c.period = $1 AND c.status = 'sent' AND u.deleted_at IS NULL
+         AND NOT EXISTS (SELECT 1 FROM inactivity_reasons r WHERE r.user_id = c.user_id AND r.ended_at IS NULL)
+         AND NOT EXISTS (SELECT 1 FROM email_logs l WHERE l.idempotency_key = 'checkin:' || c.id)`,
+      [period],
+    );
+    const users = new Map((await this.users.findByIds(rows.map((row) => row.userId))).map((user) => [user.id, user]));
+    for (const row of rows) {
+      const user = users.get(row.userId);
+      if (!user) continue;
+      await this.notifications.send({
+        template: 'checkin-invite',
+        to: { email: user.email, name: user.name },
+        userId: user.id,
+        idempotencyKey: `checkin:${row.id}`,
+        params: { name: user.name, url: `${this.app.webUrl}/check-in` },
+      });
+    }
   }
 
   private async sendRehabReferral(userId: string, checkinId: string): Promise<void> {
