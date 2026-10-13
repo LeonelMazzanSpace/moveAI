@@ -1,7 +1,6 @@
 import 'reflect-metadata';
 import { plainToInstance, Transform, type TransformFnParams } from 'class-transformer';
 import {
-  IsBooleanString,
   IsEmail,
   IsEnum,
   IsIn,
@@ -31,6 +30,14 @@ export const parseTrustProxyHops = (raw: unknown): number => {
   return typeof raw === 'string' && /^[0-5]$/.test(raw) ? Number(raw) : Number.NaN;
 };
 
+// Plain digits only, 1 to 65535; any other spelling ('8e3', '0x1F90', '+80', ' 80') is NaN, which fails validation. appConfig
+// and databaseConfig convert with this same function, so the server and the database client get the validated number.
+export const parsePort = (raw: unknown): number => {
+  if (typeof raw !== 'string' || !/^\d{1,5}$/.test(raw)) return Number.NaN;
+  const port = Number(raw);
+  return port >= 1 && port <= 65535 ? port : Number.NaN;
+};
+
 const hasGoogle = (o: EnvironmentVariables): boolean =>
   o.GOOGLE_CLIENT_ID !== undefined || o.GOOGLE_CLIENT_SECRET !== undefined;
 const isProduction = (o: EnvironmentVariables): boolean => o.NODE_ENV === NodeEnv.Production;
@@ -39,6 +46,7 @@ class EnvironmentVariables {
   @IsEnum(NodeEnv)
   NODE_ENV: NodeEnv;
 
+  @Transform(({ obj }: TransformFnParams) => parsePort((obj as Record<string, unknown>).PORT))
   @IsInt()
   @Min(1)
   @Max(65535)
@@ -53,6 +61,7 @@ class EnvironmentVariables {
   @IsString()
   DB_HOST: string;
 
+  @Transform(({ obj }: TransformFnParams) => parsePort((obj as Record<string, unknown>).DB_PORT))
   @IsInt()
   @Min(1)
   @Max(65535)
@@ -68,7 +77,7 @@ class EnvironmentVariables {
   DB_NAME: string;
 
   @IsOptional()
-  @IsBooleanString()
+  @IsIn(['true', 'false'])
   DB_SSL?: string;
 
   @IsString()

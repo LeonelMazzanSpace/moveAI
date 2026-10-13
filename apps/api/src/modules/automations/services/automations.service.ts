@@ -6,7 +6,7 @@ import { ExpireHoldsJob } from '../../bookings/jobs/expire-holds.job.js';
 import { AlertsService } from '../../followup/services/alerts.service.js';
 import { CheckinsService } from '../../followup/services/checkins.service.js';
 import { ReconcilePaymentsJob } from '../../payments/jobs/reconcile-payments.job.js';
-import { ScheduleService } from '../../schedule/services/schedule.service.js';
+import { GenerateSlotsJob } from '../../schedule/jobs/generate-slots.job.js';
 import { SettingsService } from '../../settings/services/settings.service.js';
 import { isJobName, type JobName, type JobRunResultDto } from '../models/job.model.js';
 import { ExpiryRemindersService } from './expiry-reminders.service.js';
@@ -20,10 +20,7 @@ export class AutomationsService {
     'followup-detect': this.locked('followup-detect', () => this.alerts.detectAlerts(businessToday())),
     'checkins-monthly': this.locked('checkins-monthly', (force) => this.sendMonthlyCheckins(force)),
     'expiry-reminders': this.locked('expiry-reminders', () => this.expiryReminders.run()),
-    // `GenerateSlotsJob` is not exported by its module, so its default window (today + bookingWindowDays inclusive) is repeated here.
-    'generate-slots': this.locked('generate-slots', async () => ({
-      created: await this.schedule.generateSlots(businessToday(), (await this.settings.get('bookingWindowDays')) + 1),
-    })),
+    'generate-slots': (force) => this.generateSlots.execute({ force }),
     'expire-holds': (force) => this.expireHolds.execute({ force }),
     'reconcile-payments': (force) => this.reconcilePayments.execute({ force }),
   };
@@ -33,7 +30,7 @@ export class AutomationsService {
     private readonly alerts: AlertsService,
     private readonly checkins: CheckinsService,
     private readonly expiryReminders: ExpiryRemindersService,
-    private readonly schedule: ScheduleService,
+    private readonly generateSlots: GenerateSlotsJob,
     private readonly expireHolds: ExpireHoldsJob,
     private readonly reconcilePayments: ReconcilePaymentsJob,
     private readonly settings: SettingsService,

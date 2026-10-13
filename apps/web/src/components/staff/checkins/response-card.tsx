@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import { StatusBadge, type StatusTone } from '@/components/move/status-badge';
+import { moveButtonSize } from '@/components/move/button-styles';
 import { Button, buttonVariants } from '@/components/ui/button';
 import type { CheckinFlag, CheckinResponseDto } from '@/lib/api/types';
 import { addDaysWeb, businessTodayWeb, formatDayMonth, formatTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-const ACTION_CLASS = 'h-auto px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em]';
+const ACTION_CLASS = moveButtonSize();
 
 const FLAG_BADGE: Record<CheckinFlag, { tone: StatusTone; label: string }> = {
   pain: { tone: 'warning', label: 'Molestia reportada' },

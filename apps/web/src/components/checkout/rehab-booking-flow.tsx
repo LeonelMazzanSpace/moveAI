@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { EmptyState } from '@/components/move/empty-state';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { moveButton, moveButtonSize } from '@/components/move/button-styles';
+import { ErrorState } from '@/components/move/error-state';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError, errorMessage } from '@/lib/api/errors';
 import type { PlanDto } from '@/lib/api/types';
 import { withNext } from '@/lib/auth/post-login';
-import { cn } from '@/lib/utils';
 import { BookingSummary, SlotPicker } from './booking-summary';
 import { GuestForm } from './guest-form';
 import type { GuestValues } from './guest-form.schema';
@@ -32,10 +33,12 @@ interface PaidBookingFlowProps {
 /** Elegir turno y pagarlo con Mercado Pago, con sesión o como invitado. */
 export function PaidBookingFlow({ plan, nextPath, steps }: PaidBookingFlowProps) {
   const picker = useSlotPicker(plan.service);
-  const { me, isPending: mePending } = useMe();
+  const { me, isPending: mePending, error: meError, refetch: refetchMe } = useMe();
   const checkout = useBookingCheckout();
   const [showGuest, setShowGuest] = useState(false);
-  const needsGuest = me === null && showGuest && picker.slotId !== null;
+  // El formulario de invitado sigue montado aunque el turno se haya liberado, para no perder lo escrito.
+  const needsGuest = me === null && showGuest;
+  const hasSlot = picker.slotId !== null;
 
   function pay(guest?: GuestValues) {
     if (!picker.slotId) return;
@@ -50,7 +53,9 @@ export function PaidBookingFlow({ plan, nextPath, steps }: PaidBookingFlowProps)
     setShowGuest(true);
   }
 
-  const paying = needsGuest || checkout.isPending || checkout.isSuccess;
+  const paying = (needsGuest && hasSlot) || checkout.isPending || checkout.isSuccess;
+
+  if (meError) return <ErrorState error={meError} onRetry={() => void refetchMe()} />;
 
   return (
     <div className="space-y-8">
@@ -63,7 +68,12 @@ export function PaidBookingFlow({ plan, nextPath, steps }: PaidBookingFlowProps)
               <p className="mb-5 text-sm text-muted-foreground">
                 Dejanos tus datos para crear tu cuenta y confirmar la reserva.
               </p>
-              <GuestForm onSubmit={pay} isSubmitting={checkout.isPending || checkout.isSuccess} submitLabel="Ir a pagar" />
+              {hasSlot ? null : <p className="mb-5 text-sm text-danger">Elegí otro horario para continuar.</p>}
+              <GuestForm
+                onSubmit={pay}
+                isSubmitting={checkout.isPending || checkout.isSuccess || !hasSlot}
+                submitLabel="Ir a pagar"
+              />
             </div>
           ) : null}
         </div>
@@ -73,7 +83,7 @@ export function PaidBookingFlow({ plan, nextPath, steps }: PaidBookingFlowProps)
             <div role="alert" className="space-y-3 text-sm text-danger">
               <p>{errorMessage(checkout.error)}</p>
               {isError(checkout.error, 'LOGIN_REQUIRED') ? (
-                <Link href={withNext('/ingresar', nextPath)} className={cn(buttonVariants(), 'h-auto px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em]')}>
+                <Link href={withNext('/ingresar', nextPath)} className={moveButton({ size: 'cta' })}>
                   Ingresar
                 </Link>
               ) : null}
@@ -83,7 +93,7 @@ export function PaidBookingFlow({ plan, nextPath, steps }: PaidBookingFlowProps)
             <Button
               disabled={picker.slotId === null || mePending || checkout.isPending || checkout.isSuccess}
               onClick={continueToPayment}
-              className="h-auto w-full py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em]"
+              className={moveButtonSize({ size: 'block' })}
             >
               Continuar al pago
             </Button>

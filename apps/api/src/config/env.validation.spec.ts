@@ -1,4 +1,5 @@
 import { appConfig } from './app.config.js';
+import { databaseConfig } from './database.config.js';
 import { validate } from './env.validation.js';
 
 const base = {
@@ -48,6 +49,73 @@ describe('env validation', () => {
     expect(() => validate({ ...base, SCHEDULER_ENABLED: 'false' })).not.toThrow();
     expect(() => validate({ ...base, SCHEDULER_ENABLED: 'true' })).not.toThrow();
     expect(() => validate({ ...base, SCHEDULER_ENABLED: '0' })).toThrow();
+  });
+
+  describe.each(['PORT', 'DB_PORT'] as const)('%s', (key) => {
+    it.each([['1', 1], ['3001', 3001], ['65535', 65535]])('accepts %s', (value, expected) => {
+      expect(validate({ ...base, [key]: value })[key]).toBe(expected);
+    });
+
+    it.each(['0', '65536', '8e3', '0x1F90', '3001.0', '-1', '+3001', ' 3001', '3001 ', 'abc', '1e2'])('rejects %j', (value) => {
+      expect(() => validate({ ...base, [key]: value })).toThrow();
+    });
+
+    it('is required', () => {
+      const rest: Record<string, string> = { ...base };
+      delete rest[key];
+      expect(() => validate(rest)).toThrow();
+    });
+  });
+
+  describe('DB_SSL', () => {
+    it.each(['true', 'false'])('accepts %s', (value) => {
+      expect(() => validate({ ...base, DB_SSL: value })).not.toThrow();
+    });
+
+    it('treats an absent or empty value as missing', () => {
+      expect(() => validate(base)).not.toThrow();
+      expect(() => validate({ ...base, DB_SSL: '' })).not.toThrow();
+    });
+
+    it.each(['1', '0', 'TRUE', 'True', 'yes', ' true'])('rejects %j', (value) => {
+      expect(() => validate({ ...base, DB_SSL: value })).toThrow();
+    });
+  });
+
+  describe('port parsing is shared with the config factories', () => {
+    const keys = ['PORT', 'DB_PORT'] as const;
+    const original = { PORT: process.env.PORT, DB_PORT: process.env.DB_PORT };
+    afterEach(() => {
+      for (const key of keys) {
+        if (original[key] === undefined) delete process.env[key];
+        else process.env[key] = original[key];
+      }
+    });
+
+    it.each(['1', '3001', '65535', '0', '65536', '8e3', '0x1F90', '3001.0', ' 3001', '+3001', 'abc'])(
+      'never differs from a validated %j',
+      (value) => {
+        process.env.PORT = value;
+        process.env.DB_PORT = value;
+        let validated: { PORT: number; DB_PORT: number };
+        try {
+          validated = validate({ ...base, PORT: value, DB_PORT: value });
+        } catch {
+          expect(appConfig().port).toBeNaN();
+          expect(databaseConfig().port).toBeNaN();
+          return;
+        }
+        expect(appConfig().port).toBe(validated.PORT);
+        expect(databaseConfig().port).toBe(validated.DB_PORT);
+      },
+    );
+
+    it('keeps the local defaults when the variables are absent', () => {
+      delete process.env.PORT;
+      delete process.env.DB_PORT;
+      expect(appConfig().port).toBe(3001);
+      expect(databaseConfig().port).toBe(5432);
+    });
   });
 
   describe('TRUST_PROXY_HOPS', () => {

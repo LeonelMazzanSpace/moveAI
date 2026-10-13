@@ -1,8 +1,6 @@
 import type { AlertCountsDto, AlertType } from '@/lib/api/types';
-import { cn } from '@/lib/utils';
+import { moveButton } from '@/components/move/button-styles';
 import { ALERT_LABEL, ALERT_ORDER } from './alert-labels';
-
-const CHIP_CLASS = 'rounded px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.15em]';
 
 const TONE_CLASS: Partial<Record<AlertType, string>> = {
   expiring: 'border-warning/40 text-warning',
@@ -26,7 +24,7 @@ export function AlertFilters({ counts, selected, onSelect }: AlertFiltersProps) 
         type="button"
         aria-pressed={selected === null}
         onClick={() => onSelect(null)}
-        className={cn(CHIP_CLASS, selected === null ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground hover:text-foreground')}
+        className={moveButton({ variant: selected === null ? 'default' : 'outline' })}
       >
         {chipLabel('Todas', counts?.total)}
       </button>
@@ -36,12 +34,7 @@ export function AlertFilters({ counts, selected, onSelect }: AlertFiltersProps) 
           type="button"
           aria-pressed={selected === type}
           onClick={() => onSelect(type)}
-          className={cn(
-            CHIP_CLASS,
-            selected === type
-              ? 'bg-primary text-primary-foreground'
-              : cn('border', TONE_CLASS[type] ?? 'border-border text-muted-foreground hover:text-foreground'),
-          )}
+          className={moveButton({ variant: selected === type ? 'default' : 'outline', className: selected === type ? undefined : TONE_CLASS[type] })}
         >
           {chipLabel(ALERT_LABEL[type], counts?.[type])}
         </button>

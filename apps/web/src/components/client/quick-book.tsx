@@ -1,12 +1,9 @@
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
+import { moveButton } from '@/components/move/button-styles';
 
 interface QuickBookProps {
   rehabFollowupEnabled: boolean;
 }
-
-const LINK_CLASSES =
-  'flex w-full items-center justify-between rounded px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.2em]';
 
 export function QuickBook({ rehabFollowupEnabled }: QuickBookProps) {
   const options = [
@@ -23,7 +20,7 @@ export function QuickBook({ rehabFollowupEnabled }: QuickBookProps) {
           <Link
             key={label}
             href={href}
-            className={cn(LINK_CLASSES, primary ? 'bg-primary text-primary-foreground' : 'border border-border hover:bg-soft')}
+            className={moveButton({ variant: primary ? 'default' : 'outline', size: 'cta', className: 'w-full justify-between' })}
           >
             {label}
             <span aria-hidden="true">→</span>

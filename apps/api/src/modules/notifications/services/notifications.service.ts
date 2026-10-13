@@ -55,15 +55,25 @@ export class NotificationsService {
 
   private async deliver<K extends EmailTemplate>(logId: string, input: SendEmailInput<K>): Promise<SendResult> {
     const { subject, html, text } = renderEmail(input.template, input.params);
+    let messageId: string;
     try {
-      const { messageId } = await this.brevo.sendTransactional({ to: input.to, subject, html, text });
-      await this.emailLogs.update(logId, { status: 'sent', providerMessageId: messageId || null, sentAt: new Date() });
-      return 'sent';
+      ({ messageId } = await this.brevo.sendTransactional({ to: input.to, subject, html, text }));
     } catch (error) {
       if (!(error instanceof BrevoError)) throw error;
       this.logger.warn(`email failed ${input.template} user=${input.userId} code=${error.status}`);
       await this.markFailed(logId, String(error.status));
       return 'failed';
+    }
+    await this.markSent(logId, messageId);
+    return 'sent';
+  }
+
+  // Brevo already accepted the email: a failed update must never turn the row into `failed`.
+  private async markSent(logId: string, messageId: string): Promise<void> {
+    try {
+      await this.emailLogs.update(logId, { status: 'sent', providerMessageId: messageId || null, sentAt: new Date() });
+    } catch {
+      this.logger.error(`email log ${logId} could not be marked as sent`);
     }
   }
 

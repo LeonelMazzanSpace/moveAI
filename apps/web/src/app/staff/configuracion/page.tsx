@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { moveButton } from '@/components/move/button-styles';
 import { StaffPageHeader } from '@/components/move/staff-page-header';
 import { PlansTab } from '@/components/staff/config/plans-tab';
 import { ProfessionalsTab } from '@/components/staff/config/professionals-tab';
 import { RulesTab } from '@/components/staff/config/rules-tab';
 import { ScheduleTab } from '@/components/staff/config/schedule-tab';
-import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = { title: 'Configuración' };
 
@@ -41,10 +41,7 @@ async function ConfigurationTabs({ searchParams }: { searchParams: SearchParams 
             key={tab.value}
             href={`/staff/configuracion?tab=${tab.value}`}
             aria-current={tab.value === active ? 'page' : undefined}
-            className={cn(
-              'rounded px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em]',
-              tab.value === active ? 'bg-primary text-primary-foreground' : 'border border-border text-foreground hover:bg-card',
-            )}
+            className={moveButton({ variant: tab.value === active ? 'default' : 'outline' })}
           >
             {tab.label}
           </Link>

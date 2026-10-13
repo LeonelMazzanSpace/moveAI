@@ -13,7 +13,6 @@ export function configureApp(app: NestExpressApplication): void {
   // Body parsers go after any raw handlers: Better Auth reads its own body.
   mountAuth(app);
   app.useBodyParser('json', { limit: '1mb' });
-  app.useBodyParser('urlencoded', { extended: true, limit: '1mb' });
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true, exceptionFactory: validationExceptionFactory }),
   );

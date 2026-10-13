@@ -2,9 +2,10 @@ import { z } from 'zod';
 
 const EMAIL_MESSAGE = 'Ingresá un email válido.';
 const PASSWORD_MIN_MESSAGE = 'La contraseña debe tener al menos 8 caracteres.';
+const PASSWORD_MAX_MESSAGE = 'La contraseña puede tener hasta 128 caracteres.';
 
-const emailField = z.email(EMAIL_MESSAGE);
-const newPasswordField = z.string().min(8, PASSWORD_MIN_MESSAGE);
+const emailField = z.string().trim().pipe(z.email(EMAIL_MESSAGE).max(254, EMAIL_MESSAGE));
+const newPasswordField = z.string().min(8, PASSWORD_MIN_MESSAGE).max(128, PASSWORD_MAX_MESSAGE);
 
 export const loginSchema = z.object({
   email: emailField,

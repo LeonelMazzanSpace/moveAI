@@ -9,6 +9,8 @@ import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 import { Public } from '../src/common/auth/public.decorator.js';
 import { Roles } from '../src/common/auth/roles.decorator.js';
+import { BETTER_AUTH } from '../src/modules/auth/auth.constants.js';
+import type { BetterAuthInstance } from '../src/modules/auth/better-auth.factory.js';
 import { AuthService } from '../src/modules/auth/services/auth.service.js';
 import { UsersService } from '../src/modules/users/services/users.service.js';
 import { createTestApp, type TestApp } from './utils/app.js';
@@ -16,6 +18,8 @@ import { signUp, signUpStaff, TEST_ORIGIN } from './utils/auth.js';
 import { resetDb } from './utils/db.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const HOUR_MS = 3_600_000;
+const MINUTE_MS = 60_000;
 
 describe('auth (e2e)', () => {
   let ctx: TestApp;
@@ -23,6 +27,14 @@ describe('auth (e2e)', () => {
   afterAll(async () => { await ctx.app.close(); });
   beforeEach(async () => { await resetDb(ctx.dataSource); });
   const http = () => request(ctx.app.getHttpServer());
+  const expectResetLinkLasts = async (hours: number) => {
+    const [row] = await ctx.dataSource.query(
+      `SELECT expires_at FROM verifications WHERE identifier LIKE 'reset-password:%' ORDER BY created_at DESC LIMIT 1`,
+    );
+    const remaining = new Date(row.expires_at).getTime() - Date.now();
+    expect(remaining).toBeGreaterThan(hours * HOUR_MS - MINUTE_MS);
+    expect(remaining).toBeLessThanOrEqual(hours * HOUR_MS + MINUTE_MS);
+  };
 
   it('signs up as client and reads /me', async () => {
     const { agent, email } = await signUp(ctx.app, { name: 'Martina Suárez' });
@@ -235,6 +247,54 @@ describe('auth (e2e)', () => {
     expect((await login.get('/api/me').expect(200)).body.id).toBe(userId);
   });
 
+  it('gives invitation links 72 hours and password reset links 1 hour (D71)', async () => {
+    await ctx.app.get(AuthService).createInvitedUser({ name: 'Lucía Pereira', email: 'lu72@test.move' });
+    await expectResetLinkLasts(72);
+    const { email } = await signUp(ctx.app);
+    await http().post('/api/auth/request-password-reset').set('Origin', TEST_ORIGIN)
+      .send({ email, redirectTo: `${TEST_ORIGIN}/restablecer` }).expect(200);
+    await expectResetLinkLasts(1);
+  });
+
+  it('sends the 72-hour invitation again when an invited user asks for a password reset', async () => {
+    await ctx.app.get(AuthService).createInvitedUser({ name: 'Lucía Pereira', email: 'lu-again@test.move' });
+    await ctx.dataSource.query('DELETE FROM verifications');
+    await http().post('/api/auth/request-password-reset').set('Origin', TEST_ORIGIN)
+      .send({ email: 'lu-again@test.move', redirectTo: `${TEST_ORIGIN}/restablecer` }).expect(200);
+    const templates = await ctx.dataSource.query(`SELECT template FROM email_logs ORDER BY created_at`);
+    expect(templates).toEqual([{ template: 'account-invitation' }, { template: 'account-invitation' }]);
+    await expectResetLinkLasts(72);
+  });
+
+  // A transient DB error while extending the link must not leave a created user without an invitation.
+  it('still emails the invitation, with the 1-hour link, when extending it to 72 hours fails', async () => {
+    const adapter = (await ctx.app.get<BetterAuthInstance>(BETTER_AUTH).$context).internalAdapter;
+    const extend = vi.spyOn(adapter, 'updateVerificationByIdentifier').mockRejectedValueOnce(new Error('connection reset'));
+    const logged = [vi.spyOn(Logger.prototype, 'warn'), vi.spyOn(Logger.prototype, 'error')];
+    try {
+      const { userId } = await ctx.app.get(AuthService).createInvitedUser({ name: 'Lucía Pereira', email: 'lu-extend@test.move' });
+      expect(extend).toHaveBeenCalledTimes(1);
+      const logs = await ctx.dataSource.query(`SELECT template, user_id AS "userId" FROM email_logs`);
+      expect(logs).toEqual([{ template: 'account-invitation', userId }]);
+      await expectResetLinkLasts(1);
+      const lines = logged.flatMap((spy) => spy.mock.calls.map((call) => call.map(String).join(' ')));
+      expect(lines.some((line) => line.includes(userId))).toBe(true);
+      expect(lines.join('\n')).not.toMatch(/lu-extend|connection reset|reset-password/);
+    } finally {
+      extend.mockRestore();
+      logged.forEach((spy) => spy.mockRestore());
+    }
+  });
+
+  it('caps the stored User-Agent at 512 characters', async () => {
+    const res = await http().post('/api/auth/sign-up/email').set('Origin', TEST_ORIGIN).set('User-Agent', 'a'.repeat(2000))
+      .send({ name: 'Ana Pérez', email: 'ua@test.move', password: 'Secreto123!' }).expect(200);
+    const [session] = await ctx.dataSource.query(
+      `SELECT length(user_agent)::int AS length FROM sessions WHERE user_id = $1`, [res.body.user.id],
+    );
+    expect(session.length).toBe(512);
+  });
+
   it('creates invited users as password-less clients', async () => {
     const { userId } = await ctx.app.get(AuthService).createInvitedUser({ name: 'Lucía', email: 'Lu2@Test.move', phone: '099111222' });
     const [user] = await ctx.dataSource.query(`SELECT email, role, phone FROM users WHERE id = $1`, [userId]);
@@ -299,6 +359,11 @@ describe('UsersService (e2e)', () => {
   beforeAll(async () => { ctx = await createTestApp(); users = ctx.app.get(UsersService); });
   afterAll(async () => { await ctx.app.close(); });
   beforeEach(async () => { await resetDb(ctx.dataSource); });
+  // Compared inside Postgres, at full precision: a write in the same millisecond as the previous one cannot flake.
+  const updatedAt = async (id: string): Promise<string> =>
+    (await ctx.dataSource.query(`SELECT updated_at::text AS at FROM users WHERE id = $1`, [id]))[0].at;
+  const movedSince = async (id: string, at: string): Promise<boolean> =>
+    (await ctx.dataSource.query(`SELECT updated_at > $2::timestamptz AS moved FROM users WHERE id = $1`, [id, at]))[0].moved;
 
   it('lists clients by name, without staff or deleted users', async () => {
     const bruno = await signUp(ctx.app, { name: 'Bruno' });
@@ -325,6 +390,42 @@ describe('UsersService (e2e)', () => {
     expect((await users.findById(userId))?.rehabFollowupEnabled).toBe(false);
     await expect(users.setRehabFollowupEnabled('00000000-0000-4000-8000-000000000000', true))
       .rejects.toMatchObject({ code: 'USER_NOT_FOUND' });
+  });
+
+  it('promotes a user to staff with a verified email inside the given transaction', async () => {
+    const { userId } = await signUp(ctx.app);
+    const other = await signUp(ctx.app);
+    const [promotedBefore, otherBefore] = [await updatedAt(userId), await updatedAt(other.userId)];
+    await ctx.dataSource.transaction((manager) => users.promoteToStaff(manager, userId));
+    const rows = await ctx.dataSource.query(
+      `SELECT id, role, email_verified FROM users WHERE id IN ($1, $2)`, [userId, other.userId],
+    );
+    expect(rows).toEqual(expect.arrayContaining([
+      { id: userId, role: 'staff', email_verified: true },
+      { id: other.userId, role: 'client', email_verified: false },
+    ]));
+    expect(await movedSince(userId, promotedBefore)).toBe(true);
+    expect(await movedSince(other.userId, otherBefore)).toBe(false);
+    await expect(ctx.dataSource.transaction(async (manager) => {
+      await users.promoteToStaff(manager, other.userId);
+      throw new Error('rollback');
+    })).rejects.toThrow('rollback');
+    expect((await users.findById(other.userId))?.role).toBe('client');
+  });
+
+  it('sets only the staff role inside the given transaction and moves updated_at', async () => {
+    const { userId } = await signUp(ctx.app);
+    const before = await updatedAt(userId);
+    await ctx.dataSource.transaction((manager) => users.setStaffRole(manager, userId));
+    const [after] = await ctx.dataSource.query(`SELECT role, email_verified FROM users WHERE id = $1`, [userId]);
+    expect(after).toEqual({ role: 'staff', email_verified: false });
+    expect(await movedSince(userId, before)).toBe(true);
+    await ctx.dataSource.query(`UPDATE users SET role = 'client' WHERE id = $1`, [userId]);
+    await expect(ctx.dataSource.transaction(async (manager) => {
+      await users.setStaffRole(manager, userId);
+      throw new Error('rollback');
+    })).rejects.toThrow('rollback');
+    expect((await users.findById(userId))?.role).toBe('client');
   });
 });
 

@@ -123,8 +123,10 @@ async function insertPlans(manager: EntityManager): Promise<number> {
     const rows: { id: string }[] = await manager.query(
       `INSERT INTO plans (slug, service, kind, name, description, features, price, period_months, period_days,
          sessions_included, duration_minutes, featured, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-       ON CONFLICT (slug) DO NOTHING
+       SELECT $1::text, $2::text, $3::text, $4::text, $5::text, $6::text[], $7::integer, $8::smallint, $9::smallint,
+         $10::smallint, $11::smallint, $12::boolean, $13::smallint
+       WHERE NOT EXISTS (SELECT 1 FROM plans WHERE slug = $1)
+       ON CONFLICT (slug) WHERE deleted_at IS NULL DO NOTHING
        RETURNING id`,
       [
         plan.slug, plan.service, plan.kind, plan.name, DESCRIPTIONS[plan.service], plan.features, plan.price,

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import type { AuthUser } from '../../../common/auth/auth-user.js';
 import { CurrentUser } from '../../../common/auth/current-user.decorator.js';
 import { Roles } from '../../../common/auth/roles.decorator.js';
@@ -17,6 +17,7 @@ export class MyCheckinsController {
   }
 
   @Post(':id')
+  @HttpCode(200)
   answer(
     @CurrentUser() user: AuthUser,
     @Param('id', ParseUUIDPipe) id: string,

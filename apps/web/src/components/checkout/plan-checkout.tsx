@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { EmptyState } from '@/components/move/empty-state';
 import { ErrorState } from '@/components/move/error-state';
+import { moveButtonSize } from '@/components/move/button-styles';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
@@ -42,7 +43,10 @@ function PlanSummary({ plan, startsOn }: { plan: PlanDto; startsOn: string | nul
   return (
     <div className="rounded border border-border bg-card p-7">
       <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">{plan.name}</p>
-      <p className="mt-3 font-display text-4xl font-black">{formatUYU(plan.price)}</p>
+      <p className="mt-3 font-display text-4xl font-black">
+        <span>{formatUYU(plan.price)}</span>
+        {plan.kind === 'session_pack' ? <span className="text-sm font-semibold text-muted-foreground"> /paquete</span> : null}
+      </p>
       <dl className="mt-5 space-y-3 text-sm">
         {summaryRows(plan).map(([label, value]) => (
           <div key={label} className="flex justify-between gap-4">
@@ -110,7 +114,7 @@ export function PlanCheckout({ slug }: { slug: string }) {
       <Button
         disabled={checkout.isPending || checkout.isSuccess}
         onClick={() => checkout.mutate(plan.data.id)}
-        className="h-auto w-full py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em]"
+        className={moveButtonSize({ size: 'block' })}
       >
         Pagar con Mercado Pago
       </Button>

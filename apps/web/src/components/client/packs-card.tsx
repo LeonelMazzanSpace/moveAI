@@ -2,7 +2,6 @@
 
 import { CtaLink } from '@/components/public/hero';
 import { EmptyState } from '@/components/move/empty-state';
-import { ErrorState } from '@/components/move/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { PackDto } from '@/lib/api/types';
 import { formatDate } from '@/lib/format';
@@ -52,8 +51,9 @@ export function PacksCard({ packs }: { packs: PackDto[] }) {
 }
 
 export function PacksSection() {
-  const { data, isPending, isError, error, refetch } = useMySubscriptions();
+  const { data, isPending, isError } = useMySubscriptions();
   if (isPending) return <Skeleton className="h-28 w-full" />;
-  if (isError) return <ErrorState error={error} onRetry={() => void refetch()} />;
+  // La consulta es la misma que la de `ClientPlanSection`, que ya muestra el error con su reintento.
+  if (isError) return null;
   return <PacksCard packs={data.recoveryPacks} />;
 }

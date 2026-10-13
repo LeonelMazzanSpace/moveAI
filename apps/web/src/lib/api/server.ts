@@ -1,3 +1,4 @@
+import 'server-only';
 import { headers } from 'next/headers';
 import { buildApiUrl, type ApiRequestInit } from './config';
 import { ApiError, networkError, readApiResponse } from './errors';

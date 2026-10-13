@@ -30,12 +30,24 @@ export class UsersService {
     return users.map(toModel);
   }
 
-  async findByEmail(email: string): Promise<UserModel | null> {
+  // Includes soft-deleted accounts, whose email stays taken: `deleted` tells them apart.
+  async findByEmailWithDeleted(email: string): Promise<{ user: UserModel; deleted: boolean } | null> {
     const user = await this.users
       .createQueryBuilder('user')
+      .withDeleted()
       .where('LOWER(user.email) = LOWER(:email)', { email })
       .getOne();
-    return user ? toModel(user) : null;
+    return user ? { user: toModel(user), deleted: user.deletedAt !== null } : null;
+  }
+
+  // Role only, inside the caller's transaction (the CLI keeps the email verification as Better Auth left it).
+  async setStaffRole(manager: EntityManager, userId: string): Promise<void> {
+    await manager.getRepository(User).update({ id: userId }, { role: 'staff' });
+  }
+
+  // D54: staff role plus a verified email, inside the caller's transaction.
+  async promoteToStaff(manager: EntityManager, userId: string): Promise<void> {
+    await manager.getRepository(User).update({ id: userId }, { role: 'staff', emailVerified: true });
   }
 
   async listClients(): Promise<UserModel[]> {

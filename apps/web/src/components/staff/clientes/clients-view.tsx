@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { EmptyState } from '@/components/move/empty-state';
+import { moveButton } from '@/components/move/button-styles';
 import { ErrorState } from '@/components/move/error-state';
 import { StaffPageHeader } from '@/components/move/staff-page-header';
 import { buttonVariants } from '@/components/ui/button';
@@ -13,7 +14,6 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
 import type { ClientKpisDto, ClientRowDto, Paginated } from '@/lib/api/types';
-import { cn } from '@/lib/utils';
 import { ClientKpis } from './client-kpis';
 import { ClientsTable } from './clients-table';
 import { parseStatusFilter, StatusFilter, type ClientStatusFilter } from './status-filter';
@@ -21,6 +21,7 @@ import { parseStatusFilter, StatusFilter, type ClientStatusFilter } from './stat
 const PATH = '/staff/clientes';
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
+const MAX_PAGE = 10_000;
 
 interface UrlState {
   q: string;
@@ -30,7 +31,7 @@ interface UrlState {
 
 function parsePage(value: string | null): number {
   const page = Number(value);
-  return Number.isInteger(page) && page >= 1 ? page : 1;
+  return Number.isInteger(page) && page >= 1 ? Math.min(page, MAX_PAGE) : 1;
 }
 
 function toUrl({ q, status, page }: UrlState): string {
@@ -43,23 +44,51 @@ function toUrl({ q, status, page }: UrlState): string {
 }
 
 interface SearchBoxProps {
-  initialValue: string;
+  q: string;
   onSearch: (q: string) => void;
 }
 
-function SearchBox({ initialValue, onSearch }: SearchBoxProps) {
-  const [value, setValue] = useState(initialValue);
+function SearchBox({ q, onSearch }: SearchBoxProps) {
+  const [value, setValue] = useState(q);
+  const [syncedQ, setSyncedQ] = useState(q);
+  // Trimmed values sent to the URL and not seen back in it yet, oldest first: a URL that merely catches up with any of them
+  // must not overwrite newer keystrokes.
+  const [unconfirmed, setUnconfirmed] = useState<string[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // The timer fires later: it must call the latest onSearch (with the latest filter and page), not the one from the keystroke.
+  const latestOnSearch = useRef(onSearch);
+  const latestQ = useRef(q);
+  useEffect(() => {
+    latestOnSearch.current = onSearch;
+    latestQ.current = q;
+  });
   useEffect(() => () => clearTimeout(timer.current), []);
+
+  // Follow the URL only when it changes from somewhere else (back/forward, cleared elsewhere), not when it echoes what was sent.
+  if (q !== syncedQ) {
+    setSyncedQ(q);
+    const echoed = unconfirmed.indexOf(q);
+    if (echoed === -1) {
+      setUnconfirmed([]);
+      setValue(q);
+    } else {
+      setUnconfirmed(unconfirmed.slice(echoed + 1));
+    }
+  }
 
   function handleChange(next: string) {
     setValue(next);
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => onSearch(next.trim()), SEARCH_DEBOUNCE_MS);
+    timer.current = setTimeout(() => {
+      const trimmed = next.trim();
+      // A value the URL already holds (or is about to hold) never comes back from the router: it would stay pending forever.
+      setUnconfirmed((current) => (trimmed === (current.at(-1) ?? latestQ.current) ? current : [...current, trimmed]));
+      latestOnSearch.current(trimmed);
+    }, SEARCH_DEBOUNCE_MS);
   }
 
   return (
-    <div className="relative w-72">
+    <div className="relative w-full min-w-0 flex-1 sm:w-72 sm:flex-none">
       <SearchIcon aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
       <Input
         type="search"
@@ -82,7 +111,7 @@ interface PaginationProps {
 
 function Pagination({ shown, total, page, onPageChange }: PaginationProps) {
   const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const buttonClass = 'rounded border border-border px-3 py-1.5 disabled:opacity-50';
+  const buttonClass = buttonVariants({ variant: 'outline' });
   return (
     <div className="flex items-center justify-between border-t border-border px-5 py-3 text-xs text-muted-foreground">
       <span>
@@ -119,13 +148,14 @@ function ClientList({ state, onPageChange }: { state: UrlState; onPageChange: (p
 
   if (clients.isError) return <ErrorState error={clients.error} onRetry={() => void clients.refetch()} />;
   if (clients.isPending) return <Skeleton className="h-64" />;
-  if (clients.data.items.length === 0) {
-    return <EmptyState title="Sin clientes" description="No hay clientes que coincidan con la búsqueda o el filtro." />;
-  }
+  const { items, total } = clients.data;
+  const empty = <EmptyState title="Sin clientes" description="No hay clientes que coincidan con la búsqueda o el filtro." />;
+  // A page past the end is empty but must keep the pagination, or staff cannot go back.
+  if (items.length === 0 && state.page <= 1) return empty;
   return (
-    <div className="overflow-hidden rounded border border-border bg-card">
-      <ClientsTable rows={clients.data.items} />
-      <Pagination shown={clients.data.items.length} total={clients.data.total} page={state.page} onPageChange={onPageChange} />
+    <div className="min-w-0 max-w-full overflow-hidden rounded border border-border bg-card">
+      {items.length > 0 ? <ClientsTable rows={items} /> : empty}
+      <Pagination shown={items.length} total={total} page={state.page} onPageChange={onPageChange} />
     </div>
   );
 }
@@ -146,8 +176,8 @@ export function ClientsView() {
         title="Clientes"
         actions={
           <>
-            <SearchBox initialValue={state.q} onSearch={(q) => navigate({ ...state, q, page: 1 })} />
-            <Link href="/staff/clientes/nuevo" className={cn(buttonVariants(), 'h-auto px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em]')}>
+            <SearchBox q={state.q} onSearch={(q) => navigate({ ...state, q, page: 1 })} />
+            <Link href="/staff/clientes/nuevo" className={moveButton({ className: 'shrink-0' })}>
               Nuevo cliente
             </Link>
           </>

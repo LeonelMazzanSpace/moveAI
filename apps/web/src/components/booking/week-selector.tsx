@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { AvailabilityDayDto } from '@/lib/api/types';
+import { buttonVariants } from '@/components/ui/button';
 import { addDaysWeb, formatWeekdayShort } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -46,7 +47,7 @@ export function WeekSelector({
           aria-label="Semana anterior"
           disabled={addDaysWeb(weekStart, -1) < minDate}
           onClick={onPrevWeek}
-          className="rounded border border-border p-1.5 hover:bg-soft disabled:pointer-events-none disabled:opacity-40"
+          className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
         >
           <ChevronLeft className="size-4" aria-hidden="true" />
         </button>
@@ -55,7 +56,7 @@ export function WeekSelector({
           aria-label="Semana siguiente"
           disabled={addDaysWeb(weekStart, WEEK_DAYS) > maxDate}
           onClick={onNextWeek}
-          className="rounded border border-border p-1.5 hover:bg-soft disabled:pointer-events-none disabled:opacity-40"
+          className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
         >
           <ChevronRight className="size-4" aria-hidden="true" />
         </button>
@@ -73,11 +74,7 @@ export function WeekSelector({
             disabled={!isSelectable(date)}
             aria-pressed={date === value}
             onClick={() => onChange(date)}
-            className={cn(
-              'rounded border py-3 text-sm',
-              date === value ? 'border-transparent bg-primary font-bold text-primary-foreground' : 'border-border hover:bg-soft',
-              'disabled:pointer-events-none disabled:border-border/50 disabled:text-muted-foreground/40 disabled:hover:bg-transparent',
-            )}
+            className={cn(buttonVariants({ variant: date === value ? 'default' : 'outline' }), 'h-auto py-3')}
           >
             {Number(date.slice(8))}
           </button>

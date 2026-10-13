@@ -4,12 +4,12 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useId, useState } from 'react';
 import { EmptyState } from '@/components/move/empty-state';
+import { moveButton } from '@/components/move/button-styles';
 import { ErrorState } from '@/components/move/error-state';
-import { BUTTON_OUTLINE, BUTTON_PRIMARY, FormField, SELECT_CLASS } from '@/components/staff/config/plan-form';
+import { BUTTON_OUTLINE, BUTTON_PRIMARY, FormField, SELECT_CLASS } from '@/components/staff/form-primitives';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
 import type { Paginated, PaymentMethod, PurchaseStatus, StaffPaymentDto } from '@/lib/api/types';
-import { cn } from '@/lib/utils';
 import { ManualPaymentDialog } from './manual-payment-dialog';
 import { METHOD_LABEL, PaymentsTable } from './payments-table';
 
@@ -112,10 +112,10 @@ export function PaymentsView({ filters }: { filters: PaymentFilters }) {
           <button
             type="button"
             aria-pressed={filters.needsAttention}
-            className={cn(
-              'rounded px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em]',
-              filters.needsAttention ? 'bg-warning-muted text-warning' : 'border border-border text-foreground hover:bg-card',
-            )}
+            className={moveButton({
+              variant: filters.needsAttention ? 'ghost' : 'outline',
+              className: filters.needsAttention ? 'bg-warning-muted text-warning hover:bg-warning-muted hover:text-warning' : undefined,
+            })}
             onClick={() => navigate({ needsAttention: !filters.needsAttention })}
           >
             Requieren atención

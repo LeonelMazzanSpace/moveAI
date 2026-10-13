@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/move/empty-state';
@@ -31,9 +32,10 @@ function useCancelBooking(onDone: () => void) {
       onDone();
       await Promise.all(INVALIDATED_KEYS.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
     },
-    onError: (error) => {
+    onError: async (error) => {
       toast.error(errorMessage(error));
       onDone();
+      await queryClient.invalidateQueries({ queryKey: ['me', 'bookings'] });
     },
   });
 }
@@ -52,7 +54,12 @@ function BookingRow({ booking, onCancel }: { booking: BookingDto; onCancel: (boo
         </div>
       </div>
       {booking.canCancel ? (
-        <Button variant="outline" size="sm" onClick={() => onCancel(booking)}>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label={`Cancelar reserva del ${formatDate(booking.startsAt)} a las ${formatTime(booking.startsAt)}`}
+          onClick={() => onCancel(booking)}
+        >
           Cancelar
         </Button>
       ) : null}
@@ -117,8 +124,11 @@ export function UpcomingBookings() {
 
   return (
     <div className="rounded border border-border bg-card">
-      <div className="border-b border-border px-7 py-4">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-7 py-4">
         <h2 className="text-sm font-semibold">Próximas reservas</h2>
+        <Link href="/historial" className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground">
+          Ver todas
+        </Link>
       </div>
       <BookingsBody onCancel={setPending} />
       <CancelDialog booking={pending} onClose={() => setPending(null)} />

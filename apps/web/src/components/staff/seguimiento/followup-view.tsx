@@ -1,44 +1,35 @@
 'use client';
 
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
-import { toast } from 'sonner';
 import { useBusinessToday } from '@/components/booking/day-selector';
 import { EmptyState } from '@/components/move/empty-state';
 import { ErrorState } from '@/components/move/error-state';
 import { StaffPageHeader } from '@/components/move/staff-page-header';
+import { moveButtonSize } from '@/components/move/button-styles';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
-import { errorMessage } from '@/lib/api/errors';
-import type { AlertCountsDto, AlertDto, AlertType, JobRunResultDto } from '@/lib/api/types';
+import type { AlertDto, AlertType } from '@/lib/api/types';
 import { AlertCard } from './alert-card';
 import { AlertFilters } from './alert-filters';
 import { ALERT_LABEL, isAlertType } from './alert-labels';
-import { ContactDialog, useRefreshFollowup, type ContactTarget } from './contact-dialog';
+import { ContactDialog, type ContactTarget } from './contact-dialog';
 import { ReasonPanel } from './reason-panel';
+import { useAlertCounts, useHandleAlert, useRunDetection } from './use-followup';
 
 const PATH = '/staff/seguimiento';
 
-export function useHandleAlert() {
-  const refresh = useRefreshFollowup();
-  return useMutation({
-    mutationFn: (alertId: string) => apiFetch<AlertDto>(`/staff/alerts/${alertId}/handle`, { method: 'POST' }),
-    onSuccess: () => toast.success('Alerta marcada como gestionada'),
-    onError: (error) => toast.error(errorMessage(error)),
-    onSettled: () => refresh(),
-  });
-}
-
-function useRunDetection() {
-  const refresh = useRefreshFollowup();
-  return useMutation({
-    mutationFn: () => apiFetch<JobRunResultDto>('/staff/automations/run/followup-detect', { method: 'POST' }),
-    onSuccess: (result) => (result.ran ? toast.success('Detección ejecutada') : toast.info('Ya hay una detección en curso')),
-    onError: (error) => toast.error(errorMessage(error)),
-    onSettled: () => refresh(),
-  });
+function CountersError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div role="alert" className="mt-3 flex items-center gap-3 text-xs text-danger">
+      <p>No pudimos cargar los contadores.</p>
+      <Button variant="outline" size="sm" onClick={onRetry}>
+        Reintentar
+      </Button>
+    </div>
+  );
 }
 
 interface AlertListProps {
@@ -79,7 +70,7 @@ function AlertList({ type, today }: AlertListProps) {
             onHandle={(item) => handle.mutate(item.id)}
             onReason={(item) => setReasonFor((current) => (current === item.id ? null : item.id))}
           >
-            {reasonFor === alert.id ? <ReasonPanel clientId={alert.client.id} today={today} onDone={() => setReasonFor(null)} /> : null}
+            {reasonFor === alert.id ? <ReasonPanel clientId={alert.client.id} onDone={() => setReasonFor(null)} /> : null}
           </AlertCard>
         ))}
       </div>
@@ -95,10 +86,7 @@ export function FollowupView() {
   const detection = useRunDetection();
   const tipo = searchParams.get('tipo');
   const selected = isAlertType(tipo) ? tipo : null;
-  const counts = useQuery({
-    queryKey: ['staff', 'alerts', 'counts'],
-    queryFn: () => apiFetch<AlertCountsDto>('/staff/alerts/counts'),
-  });
+  const counts = useAlertCounts();
 
   return (
     <>
@@ -107,7 +95,7 @@ export function FollowupView() {
         actions={
           <Button
             variant="outline"
-            className="h-auto px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em]"
+            className={moveButtonSize()}
             disabled={detection.isPending}
             onClick={() => detection.mutate()}
           >
@@ -121,6 +109,7 @@ export function FollowupView() {
       </p>
       <div className="mt-6">
         <AlertFilters counts={counts.data} selected={selected} onSelect={(type) => router.replace(type ? `${PATH}?tipo=${type}` : PATH)} />
+        {counts.isError ? <CountersError onRetry={() => void counts.refetch()} /> : null}
       </div>
       <div className="mt-6">
         <AlertList type={selected} today={today} />

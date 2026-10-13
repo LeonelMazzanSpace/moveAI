@@ -4,7 +4,7 @@ import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
 import { BookingsService } from '../src/modules/bookings/services/bookings.service.js';
 import { createTestApp, type TestApp } from './utils/app.js';
 import { signUpClient, signUpStaff } from './utils/auth.js';
-import { resetDb } from './utils/db.js';
+import { resetDb, waitForLockWaiters } from './utils/db.js';
 import { createProfessional, createSlot, givePack, givePerformancePlan } from './utils/fixtures.js';
 
 describe('bookings (e2e)', () => {
@@ -14,18 +14,6 @@ describe('bookings (e2e)', () => {
   beforeEach(async () => { await resetDb(ctx.dataSource); await seedCatalogAndSchedule(ctx.dataSource); });
 
   const tomorrow = () => addDays(businessToday(), 1);
-
-  async function waitForLockWaiters(expected: number): Promise<void> {
-    const deadline = Date.now() + 10_000;
-    while (Date.now() < deadline) {
-      const [{ waiting }] = await ctx.dataSource.query(
-        `SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
-      );
-      if (waiting >= expected) return;
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
-    throw new Error(`expected ${expected} backends waiting on a lock`);
-  }
 
   it('requires a plan covering the slot date for Performance', async () => {
     const { agent, userId } = await signUpClient(ctx.app);
@@ -70,7 +58,7 @@ describe('bookings (e2e)', () => {
         a.agent.post('/api/bookings').send({ timeSlotId: slotId }),
         b.agent.post('/api/bookings').send({ timeSlotId: slotId }),
       ]);
-      await waitForLockWaiters(2);
+      await waitForLockWaiters(ctx.dataSource, 2);
     } finally {
       await gate.commitTransaction();
       await gate.release();

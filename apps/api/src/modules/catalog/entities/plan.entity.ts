@@ -1,11 +1,12 @@
 import {
-  Check, Column, CreateDateColumn, DeleteDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn,
+  Check, Column, CreateDateColumn, DeleteDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn,
 } from 'typeorm';
 
 export type Service = 'performance' | 'rehab' | 'recovery';
 export type PlanKind = 'period_plan' | 'session_pack' | 'single_session' | 'evaluation';
 
 @Entity('plans')
+@Index('UQ_plans_slug_not_deleted', ['slug'], { unique: true, where: '"deleted_at" IS NULL' })
 @Check(`"service" IN ('performance','rehab','recovery')`)
 @Check(`"kind" IN ('period_plan','session_pack','single_session','evaluation')`)
 @Check(`"price" >= 0`)
@@ -17,7 +18,7 @@ export class Plan {
   @PrimaryGeneratedColumn('uuid') id: string;
   @Column('text') service: Service;
   @Column('text') kind: PlanKind;
-  @Column({ type: 'text', unique: true }) slug: string;
+  @Column('text') slug: string;
   @Column('text') name: string;
   @Column({ type: 'text', default: '' }) description: string;
   @Column({ type: 'text', array: true, default: '{}' }) features: string[];

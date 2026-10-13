@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { fieldA11y } from '@/components/staff/form-primitives';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,6 +34,9 @@ const capacitySchema = z.object({
 });
 
 type CapacityForm = z.infer<typeof capacitySchema>;
+
+const activeBookings = (booked: number): string =>
+  booked === 1 ? 'Tiene 1 reserva activa.' : `Tiene ${booked} reservas activas.`;
 
 function useRefreshSlots() {
   const queryClient = useQueryClient();
@@ -98,7 +102,7 @@ function EditCapacityDialog({ slot, open, onOpenChange }: { slot: StaffTimeSlotD
       apiFetch<StaffTimeSlotDto>(`/staff/time-slots/${slot.id}`, { method: 'PATCH', body: { capacity: values.capacity } }),
     onSuccess: async () => {
       await refresh();
-      toast.success('Cupo actualizado');
+      toast.success('Cupo actualizado.');
       onOpenChange(false);
     },
   });
@@ -109,13 +113,19 @@ function EditCapacityDialog({ slot, open, onOpenChange }: { slot: StaffTimeSlotD
         <form onSubmit={form.handleSubmit((values) => mutation.mutate(values))} className="grid gap-4">
           <DialogHeader>
             <DialogTitle>Editar cupo</DialogTitle>
-            <DialogDescription>Turno de las {formatTime(slot.startsAt)}. Hoy hay {slot.booked} reservas activas.</DialogDescription>
+            <DialogDescription>{`Turno de las ${formatTime(slot.startsAt)}. ${activeBookings(slot.booked)}`}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-2">
             <Label htmlFor="slot-capacity">Cupo</Label>
-            <Input id="slot-capacity" type="number" inputMode="numeric" {...form.register('capacity', { valueAsNumber: true })} />
+            <Input
+              id="slot-capacity"
+              type="number"
+              inputMode="numeric"
+              {...fieldA11y('slot-capacity', form.formState.errors.capacity?.message)}
+              {...form.register('capacity', { valueAsNumber: true })}
+            />
             {form.formState.errors.capacity ? (
-              <p role="alert" className="text-sm text-danger">
+              <p id="slot-capacity-error" role="alert" className="text-sm text-danger">
                 {form.formState.errors.capacity.message}
               </p>
             ) : null}
@@ -145,7 +155,7 @@ function CancelSlotDialog({ slot, open, onOpenChange }: { slot: StaffTimeSlotDto
     mutationFn: () => apiFetch<StaffTimeSlotDto>(`/staff/time-slots/${slot.id}/cancel`, { method: 'POST' }),
     onSuccess: async () => {
       await refresh();
-      toast.success('Turno cancelado');
+      toast.success('Turno cancelado.');
       onOpenChange(false);
     },
   });
@@ -178,7 +188,7 @@ export function SlotActions({ slot }: { slot: StaffTimeSlotDto }) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => setDialog('capacity')}>Editar cupo</DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" disabled={slot.cancelledAt !== null} onClick={() => setDialog('cancel')}>
+          <DropdownMenuItem variant="destructive" onClick={() => setDialog('cancel')}>
             Cancelar turno
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -195,7 +205,7 @@ function CancelBookingConfirm({ booking, onClose }: { booking: RosterItemDto; on
     mutationFn: () => apiFetch<RosterItemDto>(`/staff/bookings/${booking.bookingId}/cancel`, { method: 'POST' }),
     onSuccess: async () => {
       await refresh();
-      toast.success('Reserva cancelada');
+      toast.success('Reserva cancelada.');
       onClose();
     },
   });

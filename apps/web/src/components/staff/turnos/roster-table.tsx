@@ -1,4 +1,6 @@
+import { moveButton } from '@/components/move/button-styles';
 import { StatusBadge, type StatusTone } from '@/components/move/status-badge';
+import { buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { AttendanceStatus, RosterItemDto } from '@/lib/api/types';
 import { formatDayMonth, formatTime } from '@/lib/format';
@@ -15,6 +17,7 @@ interface RosterPagination {
 interface RosterTableProps {
   rows: RosterItemDto[];
   canMark: boolean;
+  markHint?: string;
   onMark: (bookingId: string, status: AttendanceStatus) => void;
   onCancel?: (bookingId: string) => void;
   pagination?: RosterPagination;
@@ -40,26 +43,27 @@ function rowState(row: RosterItemDto): RowState {
 
 const isInactive = (row: RosterItemDto): boolean => row.status === 'cancelled' || row.status === 'expired';
 
-function cancelledLabel(row: RosterItemDto): string | null {
+function inactiveLabel(row: RosterItemDto): string | null {
   if (!row.cancelledAt) return null;
-  return `Canceló ${formatDayMonth(row.cancelledAt)} — ${formatTime(row.cancelledAt)}`;
+  const verb = row.status === 'expired' ? 'Expiró' : 'Canceló';
+  return `${verb} ${formatDayMonth(row.cancelledAt)} — ${formatTime(row.cancelledAt)}`;
 }
 
-function RowActions({ row, canMark, onMark, onCancel }: Pick<RosterTableProps, 'canMark' | 'onMark' | 'onCancel'> & { row: RosterItemDto }) {
+function RowActions({ row, canMark, markHint, onMark, onCancel }: Pick<RosterTableProps, 'canMark' | 'markHint' | 'onMark' | 'onCancel'> & { row: RosterItemDto }) {
   if (isInactive(row)) {
-    return <span className="text-xs text-muted-foreground">{cancelledLabel(row)}</span>;
+    return <span className="text-xs text-muted-foreground">{inactiveLabel(row)}</span>;
   }
   return (
     <div className="flex items-center justify-end gap-2">
       {row.status === 'confirmed' ? (
-        <AttendanceButtons value={row.attendance} canMark={canMark} onMark={(status) => onMark(row.bookingId, status)} />
+        <AttendanceButtons value={row.attendance} canMark={canMark} hint={markHint} onMark={(status) => onMark(row.bookingId, status)} />
       ) : null}
       {onCancel ? (
         <button
           type="button"
           aria-label={`Cancelar reserva de ${row.client.name}`}
           onClick={() => onCancel(row.bookingId)}
-          className="rounded px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-danger"
+          className={moveButton({ variant: 'ghost', className: 'px-2 text-muted-foreground hover:bg-transparent hover:text-danger' })}
         >
           Cancelar
         </button>
@@ -70,7 +74,7 @@ function RowActions({ row, canMark, onMark, onCancel }: Pick<RosterTableProps, '
 
 function Pagination({ total, page, pageSize, onPageChange, shown }: RosterPagination & { shown: number }) {
   const lastPage = Math.max(1, Math.ceil(total / pageSize));
-  const buttonClass = 'rounded border border-border px-3 py-1.5 disabled:opacity-50';
+  const buttonClass = buttonVariants({ variant: 'outline' });
   return (
     <div className="flex items-center justify-between border-t border-border px-6 py-3 text-xs text-muted-foreground">
       <span>
@@ -88,7 +92,7 @@ function Pagination({ total, page, pageSize, onPageChange, shown }: RosterPagina
   );
 }
 
-export function RosterTable({ rows, canMark, onMark, onCancel, pagination }: RosterTableProps) {
+export function RosterTable({ rows, canMark, markHint, onMark, onCancel, pagination }: RosterTableProps) {
   return (
     <>
       <Table>
@@ -115,7 +119,7 @@ export function RosterTable({ rows, canMark, onMark, onCancel, pagination }: Ros
                   <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
                 </TableCell>
                 <TableCell className="px-6 py-3.5 text-right">
-                  <RowActions row={row} canMark={canMark} onMark={onMark} onCancel={onCancel} />
+                  <RowActions row={row} canMark={canMark} markHint={markHint} onMark={onMark} onCancel={onCancel} />
                 </TableCell>
               </TableRow>
             );

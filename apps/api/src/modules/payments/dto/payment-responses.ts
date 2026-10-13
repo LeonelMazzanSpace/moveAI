@@ -21,6 +21,7 @@ export interface PurchaseStatusDto {
   bookingId: string | null;
   startsAt: string | null;
   needsAttention: boolean;
+  planSlug: string | null;
 }
 
 export interface StaffPaymentDto {

@@ -7,7 +7,7 @@ import { ALL_ENTITIES } from '../src/database/entities.js';
 import { buildDataSourceOptions } from '../src/database/typeorm.options.js';
 import { InvalidSettingsError, SettingsService } from '../src/modules/settings/services/settings.service.js';
 import { SettingsModule } from '../src/modules/settings/settings.module.js';
-import { resetDb } from './utils/db.js';
+import { resetDb, waitForLockWaiters } from './utils/db.js';
 
 describe('SettingsService (e2e)', () => {
   let ds: DataSource;
@@ -65,19 +65,22 @@ describe('SettingsService (e2e)', () => {
     const concurrent = ds.createQueryRunner();
     await concurrent.connect();
     await concurrent.startTransaction();
+    let pending: Promise<unknown> | undefined;
     try {
       await concurrent.query('SELECT key FROM settings FOR UPDATE');
       await concurrent.query(`UPDATE settings SET value = '20'::jsonb WHERE key = 'no_attendance_days'`);
-      const pending = settings.update({ prolongedInactivityDays: 15 }, id).then(
+      pending = settings.update({ prolongedInactivityDays: 15 }, id).then(
         () => 'resolved',
         (error: unknown) => error,
       );
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      // Barrier: the update is blocked on the settings row lock before the concurrent write commits.
+      await waitForLockWaiters(ds, 1);
       await concurrent.commitTransaction();
       expect(await pending).toBeInstanceOf(InvalidSettingsError);
     } finally {
       if (concurrent.isTransactionActive) await concurrent.rollbackTransaction();
       await concurrent.release();
+      await pending;
     }
     expect(await settings.getAll()).toMatchObject({ noAttendanceDays: 20, prolongedInactivityDays: 21 });
   });

@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@/lib/api/errors';
 import type { SettingsDto } from '@/lib/api/types';
 
 const apiFetch = vi.fn();
@@ -69,6 +70,40 @@ describe('RulesTab', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
     await vi.waitFor(() => expect(patchCalls()).toHaveLength(1));
     expect(apiFetch).toHaveBeenCalledWith('/staff/settings', { method: 'PATCH', body: { cancelLimitHours: 3 } });
+  });
+
+  it('maps the field errors of an API validation failure onto the inputs and still toasts', async () => {
+    const { toast } = await import('sonner');
+    apiFetch.mockImplementation(async (_path: string, init?: { method?: string }) => {
+      if (init?.method === 'PATCH') {
+        throw new ApiError(400, 'VALIDATION_FAILED', 'Los datos enviados no son válidos.', [
+          { field: 'cancelLimitHours', messages: ['cancelLimitHours must not be greater than 48'] },
+        ]);
+      }
+      return DEFAULTS;
+    });
+    renderTab();
+    const field = await screen.findByLabelText('Horas para cancelar');
+    await userEvent.clear(field);
+    await userEvent.type(field, '60');
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+
+    const message = await screen.findByText('Revisá este valor.');
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    expect(field).toHaveAttribute('aria-describedby', message.id);
+    expect(screen.queryByText(/must not be greater/)).toBeNull();
+    expect(screen.queryByText(/cancelLimitHours/)).toBeNull();
+    expect(toast.error).toHaveBeenCalledWith('Los datos enviados no son válidos.');
+  });
+
+  it('confirms the save with a toast that ends in a period', async () => {
+    const { toast } = await import('sonner');
+    renderTab();
+    const field = await screen.findByLabelText('Horas para cancelar');
+    await userEvent.clear(field);
+    await userEvent.type(field, '3');
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+    await vi.waitFor(() => expect(toast.success).toHaveBeenCalledWith('Reglas guardadas.'));
   });
 
   it('marks the values as confirmed when the checkbox is ticked', async () => {

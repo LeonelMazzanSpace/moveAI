@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { INTEGER_PATTERN, MAX_MONEY_AMOUNT } from '@/components/staff/form-primitives';
 import type { PlanDto, PlanKind, Service } from '@/lib/api/types';
 
 export const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -29,7 +30,7 @@ export const KIND_FIELDS: Record<PlanKind, Record<NumericPlanField, FieldUsage>>
 };
 
 const NUMERIC_RANGES: Record<NumericPlanField | 'price' | 'sortOrder', [number, number]> = {
-  price: [0, 10_000_000],
+  price: [0, MAX_MONEY_AMOUNT],
   periodMonths: [1, 36],
   periodDays: [1, 365],
   sessionsIncluded: [1, 100],
@@ -59,7 +60,7 @@ function readInteger(
     return null;
   }
   const value = Number(text);
-  if (!Number.isInteger(value)) {
+  if (!INTEGER_PATTERN.test(text)) {
     addIssue('Ingresá un número entero.');
     return null;
   }

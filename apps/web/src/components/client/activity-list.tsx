@@ -75,7 +75,7 @@ export function ActivityList({ variant = 'compact' }: ActivityListProps) {
   const full = variant === 'full';
   const pageSize = full ? FULL_PAGE_SIZE : COMPACT_PAGE_SIZE;
 
-  const { data, isPending, isError, error, refetch } = useQuery({
+  const { data, isPending, isPlaceholderData, isError, error, refetch } = useQuery({
     queryKey: ['me', 'activity', filter, page, pageSize],
     queryFn: () =>
       apiFetch<Paginated<ActivityItemDto>>('/me/activity', { query: { type: filter, page, pageSize } }),
@@ -110,6 +110,11 @@ export function ActivityList({ variant = 'compact' }: ActivityListProps) {
         </div>
       </div>
       {isPending ? <Skeleton className="m-7 h-28" /> : null}
+      {isPlaceholderData ? (
+        <p role="status" className="px-7 pt-3 text-xs text-muted-foreground">
+          Actualizando…
+        </p>
+      ) : null}
       {isError ? <div className="p-4"><ErrorState error={error} onRetry={() => void refetch()} /></div> : null}
       {data && data.items.length === 0 ? <div className="p-4"><EmptyState title={EMPTY_TITLE[filter]} /></div> : null}
       {data && data.items.length > 0 ? <ActivityRows items={data.items} /> : null}

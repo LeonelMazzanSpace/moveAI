@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import { buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { moveButton } from '@/components/move/button-styles';
 
 export function PlanRequiredNotice({ renewHref }: { renewHref: string }) {
   return (
@@ -14,7 +13,7 @@ export function PlanRequiredNotice({ renewHref }: { renewHref: string }) {
       </p>
       <Link
         href={renewHref}
-        className={cn(buttonVariants({ size: 'sm' }), 'text-[10px] font-semibold uppercase tracking-[0.2em]')}
+        className={moveButton()}
       >
         Renovar plan
       </Link>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { moveButtonSize } from '@/components/move/button-styles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -53,7 +54,7 @@ export function ResetPasswordForm() {
     try {
       const { error } = await authClient.resetPassword({ newPassword: values.password, token });
       if (!error) return setStatus('done');
-      setStatus(error.status === 400 ? 'invalid' : 'error');
+      setStatus(error.code === 'INVALID_TOKEN' ? 'invalid' : 'error');
     } catch {
       setStatus('error');
     }
@@ -95,7 +96,7 @@ export function ResetPasswordForm() {
           No pudimos restablecer tu contraseña. Probá de nuevo en unos minutos.
         </p>
       ) : null}
-      <Button type="submit" disabled={isSubmitting} className="h-auto w-full py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em]">
+      <Button type="submit" disabled={isSubmitting} className={moveButtonSize({ size: 'block' })}>
         Restablecer contraseña
       </Button>
     </form>

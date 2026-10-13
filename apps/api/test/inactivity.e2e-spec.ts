@@ -4,7 +4,7 @@ import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
 import { AlertsService } from '../src/modules/followup/services/alerts.service.js';
 import { createTestApp, type TestApp } from './utils/app.js';
 import { signUpClient, signUpStaff, type TestAgent } from './utils/auth.js';
-import { resetDb } from './utils/db.js';
+import { resetDb, waitForLockWaiters } from './utils/db.js';
 import { givePerformancePlan } from './utils/fixtures.js';
 
 describe('inactivity reasons (e2e)', () => {
@@ -73,14 +73,37 @@ describe('inactivity reasons (e2e)', () => {
     expect(rows).toEqual([{ reason: 'vacation', active: false }, { reason: 'moving', active: true }]);
   });
 
+  // Barrier: an open transaction holds the client's active-pause key, so both requests are seen waiting on it before it
+  // rolls back.
   it('answers PAUSE_ALREADY_ACTIVE to one of two concurrent pauses', async () => {
     const client = await signUpClient(ctx.app);
-    const results = await Promise.all([
-      staff.agent.post(startPath(client.userId)).send({ reason: 'injury' }),
-      staff.agent.post(startPath(client.userId)).send({ reason: 'vacation' }),
-    ]);
+    const holder = ctx.dataSource.createQueryRunner();
+    await holder.connect();
+    await holder.startTransaction();
+    let pending: Promise<request.Response[]> | undefined;
+    try {
+      await holder.query(
+        `INSERT INTO inactivity_reasons (user_id, reason, created_by) VALUES ($1, 'moving', $2)`,
+        [client.userId, staff.userId],
+      );
+      pending = Promise.all([
+        staff.agent.post(startPath(client.userId)).send({ reason: 'injury' }),
+        staff.agent.post(startPath(client.userId)).send({ reason: 'vacation' }),
+      ]);
+      await waitForLockWaiters(ctx.dataSource, 2);
+    } catch (error) {
+      await holder.rollbackTransaction();
+      await holder.release();
+      await Promise.allSettled([pending]);
+      throw error;
+    }
+    await holder.rollbackTransaction();
+    await holder.release();
+    const results = (await pending) ?? [];
     expect(results.map((r) => r.status).sort((a, b) => a - b)).toEqual([201, 409]);
     expect(results.find((r) => r.status === 409)?.body.code).toBe('PAUSE_ALREADY_ACTIVE');
+    const rows = await ctx.dataSource.query(`SELECT reason FROM inactivity_reasons WHERE ended_at IS NULL`);
+    expect(rows).toEqual([{ reason: results.find((r) => r.status === 201)?.body.reason }]);
   });
 
   it('validates the reason, note and recontact date', async () => {

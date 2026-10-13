@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { EmptyState } from '@/components/move/empty-state';
 import { ErrorState } from '@/components/move/error-state';
+import { moveButtonSize } from '@/components/move/button-styles';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
@@ -89,10 +90,9 @@ function FollowupPicker({ today, bookingWindowDays }: { today: string; bookingWi
       <Button
         disabled={slotId === null || pendingSlotId !== null}
         onClick={() => {
-          if (slotId) book(slotId);
-          setSlotId(null);
+          if (slotId) book(slotId, { onSuccess: () => setSlotId(null) });
         }}
-        className="text-[10px] font-semibold uppercase tracking-[0.2em]"
+        className={moveButtonSize()}
       >
         Reservar
       </Button>
@@ -118,7 +118,7 @@ export function FollowupBooking() {
 
 export function FollowupCard() {
   const me = useQuery({ queryKey: ['me'], queryFn: () => apiFetch<MeDto>('/me'), retry: false });
-  if (!me.data?.rehabFollowupEnabled) return null;
+  if (me.data?.role !== 'client' || !me.data.rehabFollowupEnabled) return null;
 
   return (
     <Link href="/reservar/fisioterapia" className="rounded border border-border bg-card p-7 hover:bg-soft">

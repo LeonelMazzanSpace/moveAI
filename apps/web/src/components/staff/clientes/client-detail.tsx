@@ -190,7 +190,7 @@ function RehabToggle({ client }: { client: ClientDetailDto['client'] }) {
   const refresh = useRefreshClients();
   const toggle = useMutation({
     mutationFn: (enabled: boolean) =>
-      apiFetch<ClientDetailDto['client']>(`/staff/clients/${client.id}/rehab-followup`, { method: 'PATCH', body: { enabled } }),
+      apiFetch<ClientDetailDto['client']>(`/staff/clients/${encodeURIComponent(client.id)}/rehab-followup`, { method: 'PATCH', body: { enabled } }),
     onSuccess: async (_data, enabled) => {
       await refresh();
       toast.success(enabled ? 'Seguimiento fisioterapéutico habilitado' : 'Seguimiento fisioterapéutico deshabilitado');
@@ -279,7 +279,7 @@ function DetailContent({ detail }: { detail: ClientDetailDto }) {
 export function ClientDetail({ id }: { id: string }) {
   const detail = useQuery({
     queryKey: ['staff', 'clients', 'detail', id],
-    queryFn: () => apiFetch<ClientDetailDto>(`/staff/clients/${id}`),
+    queryFn: () => apiFetch<ClientDetailDto>(`/staff/clients/${encodeURIComponent(id)}`),
   });
 
   return (

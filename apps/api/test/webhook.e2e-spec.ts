@@ -8,6 +8,7 @@ import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 import { addDays, businessDateTime, businessToday } from '../src/common/time/business-time.js';
 import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
+import { BookingsService } from '../src/modules/bookings/services/bookings.service.js';
 import type { ProviderPayment } from '../src/modules/payments/models/provider-payment.model.js';
 import { MercadoPagoService } from '../src/modules/payments/services/mercado-pago.service.js';
 import { PaymentsService } from '../src/modules/payments/services/payments.service.js';
@@ -430,20 +431,51 @@ describe('Mercado Pago webhook (e2e)', () => {
       const [row] = await ds.query(`SELECT status, cancelled_by FROM bookings WHERE id = $1`, [booking.bookingId]);
       expect(row).toEqual({ status: 'cancelled', cancelled_by: 'staff' });
       expect(await count(`email_logs WHERE template = 'booking-confirmed'`)).toBe(0);
+      expect(await count(`email_logs WHERE template = 'purchase-approved'`)).toBe(1);
+
+      // The lost webhook arrives after all: nothing changes and nothing is emailed again.
+      fake.getPayment.mockClear();
+      await notify('810').expect(200);
+      expect(fake.getPayment).toHaveBeenCalledWith('810');
+      expect(await purchaseOf(booking.ref)).toEqual({ status: 'approved', needs_attention: true });
+      expect(await count(`payments WHERE mp_payment_id = '810'`)).toBe(1);
+      expect(await count(`email_logs WHERE template = 'purchase-approved'`)).toBe(1);
+      expect(await count(`email_logs WHERE template = 'booking-confirmed'`)).toBe(0);
     });
 
-    it('rechecks expired purchases from the last 7 days and applies a late approval (D45, D60)', async () => {
+    it('rechecks expired booking purchases for 72 hours and expired plan purchases for 7 days (D45, D70)', async () => {
+      const recent = await rehabCheckout((await signUpClient(app)).agent);
+      const stale = await rehabCheckout((await signUpClient(app)).agent);
+      const plan = await buyQuarterly();
+      const rejected = await rehabCheckout((await signUpClient(app)).agent);
+      await backdate(recent.ref, '71 hours');
+      await backdate(stale.ref, '73 hours');
+      await backdate(plan.ref, '6 days');
+      await backdate(rejected.ref, '1 hour');
+      await ds.query(`UPDATE purchases SET status = 'expired' WHERE external_reference IN ($1, $2, $3)`, [recent.ref, stale.ref, plan.ref]);
+      await ds.query(`UPDATE purchases SET status = 'rejected' WHERE external_reference = $1`, [rejected.ref]);
+      fake.searchByExternalReference.mockClear();
+
+      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 0 });
+      expect(fake.searchByExternalReference.mock.calls).toEqual([[plan.ref], [recent.ref]]);
+    });
+
+    it('rechecks expired purchases and applies a late approval (D45, D60)', async () => {
       const { agent, ref } = await buyQuarterly();
       await backdate(ref, '25 hours');
-      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 1 });
+      const booking = await rehabCheckout((await signUpClient(app)).agent);
+      // The hold runs out and the expiry job releases it, as in production.
+      await ds.query(`UPDATE bookings SET hold_expires_at = now() - interval '1 minute' WHERE id = $1`, [booking.bookingId]);
+      await expect(app.get(BookingsService).expireHolds(new Date())).resolves.toBe(1);
+      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 2 });
       expect((await purchaseOf(ref)).status).toBe('expired');
+      expect(await purchaseOf(booking.ref)).toEqual({ status: 'expired', needs_attention: false });
+      const [released] = await ds.query(`SELECT status, cancelled_by FROM bookings WHERE id = $1`, [booking.bookingId]);
+      expect(released).toEqual({ status: 'expired', cancelled_by: 'system' });
 
       const old = await buyQuarterly();
       await backdate(old.ref, '8 days');
       await ds.query(`UPDATE purchases SET status = 'expired' WHERE external_reference = $1`, [old.ref]);
-      const booking = await rehabCheckout((await signUpClient(app)).agent);
-      await backdate(booking.ref, '1 hour');
-      await ds.query(`UPDATE purchases SET status = 'expired' WHERE external_reference = $1`, [booking.ref]);
       providerPayments.set('806', approved('806', ref, 10500));
       providerPayments.set('807', approved('807', old.ref, 10500));
       providerPayments.set('808', approved('808', booking.ref, 1800));
@@ -455,14 +487,23 @@ describe('Mercado Pago webhook (e2e)', () => {
       const subs = await agent.get('/api/me/subscriptions').expect(200);
       expect(subs.body.performance).toMatchObject({ planName: 'Plan Trimestral' });
       expect((await purchaseOf(old.ref)).status).toBe('expired');
-      // The booking purchase expired while its hold was still live: the late approval confirms the booking.
+      // The hold expired but the slot still has room: the late approval re-confirms the booking unflagged (D43).
       expect(await purchaseOf(booking.ref)).toEqual({ status: 'approved', needs_attention: false });
-      const [held] = await ds.query(`SELECT status FROM bookings WHERE id = $1`, [booking.bookingId]);
-      expect(held.status).toBe('confirmed');
+      const [held] = await ds.query(`SELECT status, cancelled_by FROM bookings WHERE id = $1`, [booking.bookingId]);
+      expect(held).toEqual({ status: 'confirmed', cancelled_by: null });
+      expect(await count(`email_logs WHERE idempotency_key = $1`, [`booking-confirmed:${booking.bookingId}`])).toBe(1);
 
       // Idempotent: a further run finds nothing left to apply.
       await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 0 });
       expect(await count('subscriptions')).toBe(1);
+      expect(await count(`email_logs WHERE template = 'purchase-approved'`)).toBe(2);
+      expect(await count(`email_logs WHERE idempotency_key = $1`, [`booking-confirmed:${booking.bookingId}`])).toBe(1);
+
+      // The webhook of the already reconciled payment changes nothing and emails nothing again.
+      fake.getPayment.mockClear();
+      await notify('808').expect(200);
+      expect(fake.getPayment).toHaveBeenCalledWith('808');
+      expect(await purchaseOf(booking.ref)).toEqual({ status: 'approved', needs_attention: false });
       expect(await count(`email_logs WHERE template = 'purchase-approved'`)).toBe(2);
       expect(await count(`email_logs WHERE idempotency_key = $1`, [`booking-confirmed:${booking.bookingId}`])).toBe(1);
     });

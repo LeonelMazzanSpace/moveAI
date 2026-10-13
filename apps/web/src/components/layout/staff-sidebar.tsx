@@ -1,44 +1,14 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { apiFetch } from '@/lib/api/client';
-import type { AlertCountsDto } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
-
-interface SidebarItem {
-  label: string;
-  href: string;
-  exact?: boolean;
-  showAlerts?: boolean;
-  sub?: boolean;
-}
-
-const ITEMS: SidebarItem[] = [
-  { label: 'Dashboard', href: '/staff', exact: true },
-  { label: 'Clientes', href: '/staff/clientes' },
-  { label: 'Turnos y asistencia', href: '/staff/turnos' },
-  { label: 'Pagos', href: '/staff/pagos' },
-  { label: 'Seguimiento', href: '/staff/seguimiento', exact: true, showAlerts: true },
-  { label: 'Check-in', href: '/staff/seguimiento/check-in', sub: true },
-  { label: 'Configuración', href: '/staff/configuracion' },
-];
-
-function isActive(item: SidebarItem, pathname: string | null): boolean {
-  if (!pathname) return false;
-  if (item.exact) return pathname === item.href;
-  return pathname === item.href || pathname.startsWith(`${item.href}/`);
-}
+import { isNavItemActive, STAFF_NAV_ITEMS } from './nav-items';
+import { useStaffAlertsTotal } from './use-staff-alerts-total';
 
 export function StaffSidebar() {
   const pathname = usePathname();
-  const { data: counts } = useQuery({
-    queryKey: ['staff', 'alert-counts'],
-    queryFn: () => apiFetch<AlertCountsDto>('/staff/alerts/counts'),
-    refetchInterval: 60_000,
-  });
-  const alertsTotal = counts?.total ?? 0;
+  const alertsTotal = useStaffAlertsTotal();
 
   return (
     <aside className="sticky top-0 hidden h-screen w-60 shrink-0 border-r border-border bg-soft md:block">
@@ -51,8 +21,8 @@ export function StaffSidebar() {
         </span>
       </div>
       <nav className="space-y-1 p-4 text-xs font-medium text-muted-foreground">
-        {ITEMS.map((item) => {
-          const active = isActive(item, pathname);
+        {STAFF_NAV_ITEMS.map((item) => {
+          const active = isNavItemActive(item, pathname);
           return (
             <Link
               key={item.href}
