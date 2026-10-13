@@ -10,17 +10,21 @@
     "dev:web": "pnpm --filter @move/web dev",
     "dev:api": "pnpm --filter @move/api dev",
     "build": "pnpm -r run build",
-    "lint": "pnpm -r run lint",
+    "lint": "pnpm -r run lint && pnpm lint:e2e",
+    "lint:e2e": "pnpm --filter @move/web exec tsc -p ../../tsconfig.e2e.json && pnpm --filter @move/api exec sh -c 'PATH=\"$PWD/node_modules/.bin:$PATH\" && cd ../.. && oxlint -c apps/api/.oxlintrc.json -A no-empty-pattern --deny-warnings --type-aware --tsconfig tsconfig.e2e.json e2e playwright.config.ts scripts/e2e'",
     "test": "pnpm -r run test",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",
     "test:e2e": "pnpm --filter @move/api test:e2e",
+    "test:e2e:web": "playwright test",
+    "e2e:reset": "node scripts/e2e/reset.mjs",
     "manual:demo-data": "node scripts/manual/demo-data.mjs",
     "manual:screenshots": "node scripts/manual/capture.mjs",
     "manual:pdf": "node scripts/manual/build-pdf.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.0",
     "marked": "18.1.1",
     "playwright": "1.64.0"
   }
