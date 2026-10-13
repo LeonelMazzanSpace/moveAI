@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import type { AttendanceStatus } from '@/lib/api/types';
+import { moveButton } from '@/components/move/button-styles';
 import { cn } from '@/lib/utils';
 
 export const ATTENDANCE_HINT = 'Disponible desde el día del turno';
@@ -49,10 +50,10 @@ export function AttendanceButtons({ value, canMark, hint, onMark }: AttendanceBu
             title={option.title}
             disabled={!canMark}
             onClick={() => onMark(option.status)}
-            className={cn(
-              'rounded px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider disabled:cursor-not-allowed disabled:opacity-50',
-              active ? option.activeClass : cn('border border-border text-muted-foreground', canMark && option.hoverClass),
-            )}
+            className={moveButton({
+              variant: active ? 'ghost' : 'outline',
+              className: active ? cn(option.activeClass, option.hoverClass) : cn('text-muted-foreground', canMark && option.hoverClass),
+            })}
           >
             {option.short}
           </button>

@@ -4,8 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { EmptyState } from '@/components/move/empty-state';
+import { moveButton } from '@/components/move/button-styles';
 import { ErrorState } from '@/components/move/error-state';
-import { buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
 import { ApiError } from '@/lib/api/errors';
@@ -15,8 +15,8 @@ import { cn } from '@/lib/utils';
 
 const POLL_INTERVAL_MS = 3000;
 const MAX_ATTEMPTS = 20;
-const CTA_CLASS = cn(buttonVariants(), 'h-auto px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em]');
-const SECONDARY_CTA_CLASS = cn(buttonVariants({ variant: 'outline' }), 'h-auto px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em]');
+const CTA_CLASS = moveButton({ size: 'cta' });
+const SECONDARY_CTA_CLASS = moveButton({ variant: 'outline', size: 'cta' });
 
 function retryHref({ kind, service, planSlug }: PurchaseStatusDto): string {
   if (kind === 'booking') return `/${service}#reservar`;

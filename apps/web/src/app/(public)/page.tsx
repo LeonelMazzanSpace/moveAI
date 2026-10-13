@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { Suspense } from 'react';
 import { DisplayTitle } from '@/components/move/display-title';
 import { Eyebrow } from '@/components/move/eyebrow';
@@ -65,12 +64,9 @@ export default function HomePage() {
                 <DisplayTitle>Elegí tu plan.</DisplayTitle>
               </div>
             </div>
-            <Link
-              href="/planes"
-              className="rounded border border-border px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-foreground hover:bg-card"
-            >
+            <CtaLink href="/planes" variant="outline">
               Ver todos los planes
-            </Link>
+            </CtaLink>
           </div>
           <div className="mt-12">
             <Suspense fallback={<PlansSkeleton />}>

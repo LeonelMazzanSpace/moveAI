@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { EmptyState } from '@/components/move/empty-state';
 import { ErrorState } from '@/components/move/error-state';
+import { moveButtonSize } from '@/components/move/button-styles';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
@@ -113,7 +114,7 @@ export function PlanCheckout({ slug }: { slug: string }) {
       <Button
         disabled={checkout.isPending || checkout.isSuccess}
         onClick={() => checkout.mutate(plan.data.id)}
-        className="h-auto w-full py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em]"
+        className={moveButtonSize({ size: 'block' })}
       >
         Pagar con Mercado Pago
       </Button>

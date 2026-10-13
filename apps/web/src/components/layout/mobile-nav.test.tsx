@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ReactElement } from 'react';
+import type { ComponentProps, ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 let pathname = '/';
@@ -12,13 +12,27 @@ vi.mock('next/navigation', () => ({
 const apiFetch = vi.fn();
 vi.mock('@/lib/api/client', () => ({ apiFetch }));
 vi.mock('@/lib/auth-client', () => ({ authClient: { signOut: vi.fn() } }));
+// Real anchors make jsdom log "navigation to another Document"; the menu only needs the click handler.
+vi.mock('next/link', () => ({
+  default: ({ href, onClick, children, ...props }: ComponentProps<'a'>) => (
+    <a
+      href={href}
+      onClick={(event) => {
+        event.preventDefault();
+        onClick?.(event);
+      }}
+      {...props}
+    >
+      {children}
+    </a>
+  ),
+}));
 
 const { ClientHeader } = await import('./client-header');
 const { PublicHeader } = await import('./public-header');
 const { StaffTopbar } = await import('./staff-topbar');
 
-function renderWithQuery(ui: ReactElement) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderWithQuery(ui: ReactElement, queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
@@ -65,7 +79,7 @@ describe('MobileNav in the staff area', () => {
     expect(current.map((link) => link.textContent)).toEqual(['Turnos y asistencia']);
   });
 
-  it('shows the open alerts total on Seguimiento using the shared query key', async () => {
+  it('fetches the open alerts total from the staff alerts endpoint and shows it on Seguimiento', async () => {
     renderWithQuery(<StaffTopbar name="Ana Pérez" />);
     const { dialog } = await openMenu();
     const seguimiento = within(dialog).getByRole('link', { name: /^Seguimiento/ });
@@ -73,11 +87,23 @@ describe('MobileNav in the staff area', () => {
     expect(apiFetch).toHaveBeenCalledWith('/staff/alerts/counts');
   });
 
+  it('reads the badge from the shared query key, the one the sidebar fills', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(['staff', 'alert-counts'], { total: 9 });
+    apiFetch.mockReturnValue(new Promise(() => undefined));
+    renderWithQuery(<StaffTopbar name="Ana Pérez" />, queryClient);
+    const { dialog } = await openMenu();
+    const seguimiento = within(dialog).getByRole('link', { name: /^Seguimiento/ });
+    expect(within(seguimiento).getByText('9')).toBeInTheDocument();
+  });
+
   it('hides the badge when there are no open alerts', async () => {
     apiFetch.mockResolvedValue({ total: 0 });
-    renderWithQuery(<StaffTopbar name="Ana Pérez" />);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderWithQuery(<StaffTopbar name="Ana Pérez" />, queryClient);
     const { dialog } = await openMenu();
-    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+    await waitFor(() => expect(queryClient.getQueryData(['staff', 'alert-counts'])).toEqual({ total: 0 }));
+    expect(within(dialog).getByRole('link', { name: 'Seguimiento' })).toHaveTextContent(/^Seguimiento$/);
     expect(within(dialog).queryByText('0')).not.toBeInTheDocument();
   });
 
@@ -198,5 +224,46 @@ describe('MobileNav in the public area', () => {
     const { user, dialog } = await openMenu();
     await user.click(within(dialog).getByRole('link', { name: 'Reservar' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+});
+
+describe('MobileNav dismissal and focus', () => {
+  beforeEach(() => {
+    pathname = '/rehab';
+  });
+
+  it('closes with Escape and gives the focus back to the hamburger button', async () => {
+    render(<PublicHeader user={null} />);
+    const { user } = await openMenu();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Abrir menú' })).toHaveFocus();
+  });
+
+  it('closes with the "Cerrar menú" button and gives the focus back to the hamburger button', async () => {
+    render(<PublicHeader user={null} />);
+    const { user, dialog } = await openMenu();
+    await user.click(within(dialog).getByRole('button', { name: 'Cerrar menú' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Abrir menú' })).toHaveFocus();
+  });
+
+  it('closes when the page changes without a click on the menu, such as the browser Back button', async () => {
+    const { rerender } = render(<PublicHeader user={null} />);
+    await openMenu();
+    pathname = '/recovery';
+    rerender(<PublicHeader user={null} />);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('stays closed when the user comes back to the page where it was opened', async () => {
+    const { rerender } = render(<PublicHeader user={null} />);
+    await openMenu();
+    pathname = '/recovery';
+    rerender(<PublicHeader user={null} />);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    pathname = '/rehab';
+    rerender(<PublicHeader user={null} />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

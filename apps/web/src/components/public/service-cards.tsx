@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
+import { moveButton } from '@/components/move/button-styles';
 
 interface ServiceCard {
   label: string;
@@ -49,10 +49,7 @@ export function ServiceCards() {
           <p className="mt-4 flex-1 text-sm leading-relaxed text-muted-foreground">{service.description}</p>
           <Link
             href={service.href}
-            className={cn(
-              'mt-7 inline-flex w-fit rounded px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.2em]',
-              service.primary ? 'bg-primary text-primary-foreground' : 'border border-border text-foreground hover:bg-soft',
-            )}
+            className={moveButton({ variant: service.primary ? 'default' : 'outline', className: 'mt-7 w-fit' })}
           >
             {service.ctaLabel}
           </Link>

@@ -1,15 +1,16 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Controller, useForm, type Path } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { errorMessage } from '@/lib/api/errors';
+import { applyFieldErrors } from '@/lib/api/field-errors';
 import type { ContactChannel, ContactOutcome } from '@/lib/api/types';
-import { cn } from '@/lib/utils';
-import { applyApiError, NOTE_INVALID_CHARS, NOTE_MAX_LENGTH, NOTE_TOO_LONG } from '../shared/inactivity-reason-form';
+import { NOTE_INVALID_CHARS, NOTE_MAX_LENGTH, NOTE_TOO_LONG } from '../shared/inactivity-reason-form';
 import { CHANNEL_LABEL, OUTCOME_LABEL } from './alert-labels';
 import { useCreateContact, type ContactValues } from './use-followup';
 
@@ -28,11 +29,13 @@ const contactSchema = z.object({
 
 type ContactFormValues = z.infer<typeof contactSchema>;
 
-const FIELD_MESSAGES: Partial<Record<Path<ContactFormValues>, string>> = {
+const FORM_FIELDS = ['channel', 'outcome', 'note'] as const;
+
+const FIELD_MESSAGES = {
   channel: 'Elegí un canal válido.',
   outcome: 'Elegí un resultado válido.',
   note: 'La nota no es válida.',
-};
+} satisfies Partial<Record<(typeof FORM_FIELDS)[number], string>>;
 
 function toPayload({ channel, outcome, note }: ContactFormValues): ContactValues {
   return { channel, outcome, ...(note && { note }) };
@@ -62,10 +65,7 @@ function ChoiceChips<T extends string>({ label, options, labels, value, onChange
             type="button"
             aria-pressed={option === value}
             onClick={() => onChange(option)}
-            className={cn(
-              'rounded px-3 py-1.5 text-xs',
-              option === value ? 'bg-primary font-semibold text-primary-foreground' : 'border border-border text-muted-foreground hover:text-foreground',
-            )}
+            className={buttonVariants({ variant: option === value ? 'default' : 'outline', size: 'lg' })}
           >
             {labels[option]}
           </button>
@@ -90,7 +90,7 @@ function ContactForm({ target, onClose }: { target: ContactTarget; onClose: () =
       await create.mutateAsync(toPayload(values));
       onClose();
     } catch (error) {
-      applyApiError(error, setError, FIELD_MESSAGES);
+      if (!applyFieldErrors(error, FORM_FIELDS, setError, {}, FIELD_MESSAGES)) setError('root', { message: errorMessage(error) });
     }
   }
 

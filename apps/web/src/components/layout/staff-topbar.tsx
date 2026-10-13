@@ -1,6 +1,6 @@
 import { initials } from '@/lib/format';
 import { LogoutButton } from './logout-button';
-import { StaffMobileNav } from './mobile-nav';
+import { StaffMobileNav } from './staff-mobile-nav';
 
 export function StaffTopbar({ name }: { name: string }) {
   return (

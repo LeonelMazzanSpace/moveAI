@@ -45,7 +45,7 @@ export const manualPaymentSchema = z
   .superRefine((values, ctx) => {
     const text = values.amount.trim();
     const amount = Number(text);
-    if (text === '' || !Number.isFinite(amount)) {
+    if (text === '') {
       ctx.addIssue({ code: 'custom', path: ['amount'], message: 'Ingresá un monto.' });
       return;
     }

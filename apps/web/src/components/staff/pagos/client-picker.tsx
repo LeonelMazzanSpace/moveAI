@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { fieldA11y } from '@/components/staff/form-primitives';
 import { Input } from '@/components/ui/input';
 import { apiFetch } from '@/lib/api/client';
 import type { ClientRowDto, Paginated } from '@/lib/api/types';
@@ -24,11 +25,11 @@ function useDebouncedValue(value: string): string {
 interface ClientPickerProps {
   id: string;
   selected: PickedClient | null;
-  invalid?: boolean;
+  error?: string;
   onSelect: (client: PickedClient | null) => void;
 }
 
-export function ClientPicker({ id, selected, invalid = false, onSelect }: ClientPickerProps) {
+export function ClientPicker({ id, selected, error, onSelect }: ClientPickerProps) {
   const [text, setText] = useState('');
   const term = useDebouncedValue(text).trim();
   const searching = selected === null && term.length >= MIN_QUERY_LENGTH;
@@ -55,7 +56,7 @@ export function ClientPicker({ id, selected, invalid = false, onSelect }: Client
         value={text}
         autoComplete="off"
         placeholder="Buscá por nombre o email"
-        aria-invalid={invalid || undefined}
+        {...fieldA11y(id, error)}
         onChange={(event) => handleChange(event.target.value)}
       />
       {selected ? (

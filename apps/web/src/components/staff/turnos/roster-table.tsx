@@ -1,4 +1,6 @@
+import { moveButton } from '@/components/move/button-styles';
 import { StatusBadge, type StatusTone } from '@/components/move/status-badge';
+import { buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { AttendanceStatus, RosterItemDto } from '@/lib/api/types';
 import { formatDayMonth, formatTime } from '@/lib/format';
@@ -61,7 +63,7 @@ function RowActions({ row, canMark, markHint, onMark, onCancel }: Pick<RosterTab
           type="button"
           aria-label={`Cancelar reserva de ${row.client.name}`}
           onClick={() => onCancel(row.bookingId)}
-          className="rounded px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-danger"
+          className={moveButton({ variant: 'ghost', className: 'px-2 text-muted-foreground hover:bg-transparent hover:text-danger' })}
         >
           Cancelar
         </button>
@@ -72,7 +74,7 @@ function RowActions({ row, canMark, markHint, onMark, onCancel }: Pick<RosterTab
 
 function Pagination({ total, page, pageSize, onPageChange, shown }: RosterPagination & { shown: number }) {
   const lastPage = Math.max(1, Math.ceil(total / pageSize));
-  const buttonClass = 'rounded border border-border px-3 py-1.5 disabled:opacity-50';
+  const buttonClass = buttonVariants({ variant: 'outline' });
   return (
     <div className="flex items-center justify-between border-t border-border px-6 py-3 text-xs text-muted-foreground">
       <span>

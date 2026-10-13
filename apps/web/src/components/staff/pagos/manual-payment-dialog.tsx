@@ -91,7 +91,7 @@ function ManualPaymentForm({ onDone }: ManualPaymentFormProps) {
             <ClientPicker
               id={id('client')}
               selected={client}
-              invalid={Boolean(errors.clientId)}
+              error={errors.clientId?.message}
               onSelect={(picked) => {
                 setClient(picked);
                 field.onChange(picked?.id ?? '');

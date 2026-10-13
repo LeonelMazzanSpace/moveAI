@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { moveButton } from '@/components/move/button-styles';
 import type { PlanDto } from '@/lib/api/types';
 import { formatUYU } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -56,10 +57,7 @@ export function PlanCard({ plan, ctaHref, ctaLabel, unitLabel }: PlanCardProps) 
       ) : null}
       <Link
         href={ctaHref}
-        className={cn(
-          'mt-6 block rounded py-2 text-center text-[10px] font-semibold uppercase tracking-[0.2em]',
-          plan.featured ? 'bg-primary text-primary-foreground' : 'border border-border text-foreground',
-        )}
+        className={moveButton({ variant: plan.featured ? 'default' : 'outline', className: 'mt-6 flex w-full' })}
       >
         {ctaLabel}
       </Link>

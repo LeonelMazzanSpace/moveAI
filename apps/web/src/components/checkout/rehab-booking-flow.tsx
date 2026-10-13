@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { EmptyState } from '@/components/move/empty-state';
+import { moveButton, moveButtonSize } from '@/components/move/button-styles';
 import { ErrorState } from '@/components/move/error-state';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError, errorMessage } from '@/lib/api/errors';
 import type { PlanDto } from '@/lib/api/types';
 import { withNext } from '@/lib/auth/post-login';
-import { cn } from '@/lib/utils';
 import { BookingSummary, SlotPicker } from './booking-summary';
 import { GuestForm } from './guest-form';
 import type { GuestValues } from './guest-form.schema';
@@ -83,7 +83,7 @@ export function PaidBookingFlow({ plan, nextPath, steps }: PaidBookingFlowProps)
             <div role="alert" className="space-y-3 text-sm text-danger">
               <p>{errorMessage(checkout.error)}</p>
               {isError(checkout.error, 'LOGIN_REQUIRED') ? (
-                <Link href={withNext('/ingresar', nextPath)} className={cn(buttonVariants(), 'h-auto px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em]')}>
+                <Link href={withNext('/ingresar', nextPath)} className={moveButton({ size: 'cta' })}>
                   Ingresar
                 </Link>
               ) : null}
@@ -93,7 +93,7 @@ export function PaidBookingFlow({ plan, nextPath, steps }: PaidBookingFlowProps)
             <Button
               disabled={picker.slotId === null || mePending || checkout.isPending || checkout.isSuccess}
               onClick={continueToPayment}
-              className="h-auto w-full py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em]"
+              className={moveButtonSize({ size: 'block' })}
             >
               Continuar al pago
             </Button>

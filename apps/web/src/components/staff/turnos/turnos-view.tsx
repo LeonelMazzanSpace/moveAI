@@ -1,6 +1,6 @@
 'use client';
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryKey, type UseQueryResult } from '@tanstack/react-query';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useBusinessToday } from '@/components/booking/day-selector';
 import { EmptyState } from '@/components/move/empty-state';
 import { ErrorState } from '@/components/move/error-state';
+import { moveButton } from '@/components/move/button-styles';
 import { StaffPageHeader } from '@/components/move/staff-page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +17,6 @@ import { apiFetch } from '@/lib/api/client';
 import { errorMessage } from '@/lib/api/errors';
 import type { AttendanceStatus, Paginated, RosterItemDto, Service, StaffTimeSlotDto } from '@/lib/api/types';
 import { addDaysWeb, businessDateOf, formatDateLong, formatTime, SERVICE_LABEL } from '@/lib/format';
-import { cn } from '@/lib/utils';
 import { ATTENDANCE_HINT } from './attendance-buttons';
 import { PendingAttendanceBanner } from './pending-attendance-banner';
 import { RosterTable } from './roster-table';
@@ -35,7 +35,7 @@ interface UrlState {
   turno?: string;
 }
 
-function parseDate(value: string | null): string | null {
+function parseBusinessDate(value: string | null): string | null {
   if (!value || !DATE_ONLY.test(value)) return null;
   return addDaysWeb(value, 0) === value ? value : null;
 }
@@ -118,7 +118,7 @@ function DateNavigator({ date, onChange }: DateNavigatorProps) {
         value={date}
         className="w-40"
         onChange={(event) => {
-          const next = parseDate(event.target.value);
+          const next = parseBusinessDate(event.target.value);
           if (next) onChange(next);
         }}
       />
@@ -138,15 +138,50 @@ function ServiceTabs({ value, onChange }: { value: Service; onChange: (service: 
           type="button"
           aria-pressed={service === value}
           onClick={() => onChange(service)}
-          className={cn(
-            'rounded px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em]',
-            service === value ? 'bg-primary text-primary-foreground' : 'border border-border hover:bg-card',
-          )}
+          className={moveButton({ variant: service === value ? 'default' : 'outline' })}
         >
           {SERVICE_LABEL[service]}
         </button>
       ))}
     </div>
+  );
+}
+
+interface RosterContentProps {
+  roster: UseQueryResult<Paginated<RosterItemDto>>;
+  page: number;
+  canMark: boolean;
+  markHint?: string;
+  onMark: (bookingId: string, status: AttendanceStatus) => void;
+  onCancel: (bookingId: string) => void;
+  onPageChange: (page: number) => void;
+}
+
+function RosterContent({ roster, page, canMark, markHint, onMark, onCancel, onPageChange }: RosterContentProps) {
+  if (roster.isError) {
+    return (
+      <div className="p-6">
+        <ErrorState error={roster.error} onRetry={() => void roster.refetch()} />
+      </div>
+    );
+  }
+  if (roster.isPending) return <Skeleton className="m-6 h-40" />;
+  if (roster.data.items.length === 0) {
+    return (
+      <div className="p-6">
+        <EmptyState title="Sin reservas" description="Este turno todavía no tiene reservas." />
+      </div>
+    );
+  }
+  return (
+    <RosterTable
+      rows={roster.data.items}
+      canMark={canMark}
+      markHint={markHint}
+      onMark={onMark}
+      onCancel={onCancel}
+      pagination={{ total: roster.data.total, page, pageSize: ROSTER_PAGE_SIZE, onPageChange }}
+    />
   );
 }
 
@@ -166,7 +201,8 @@ function SlotDetail({ slot, today }: SlotDetailProps) {
     placeholderData: keepPreviousData,
   });
 
-  const canMark = today !== null && slot.cancelledAt === null && businessDateOf(slot.startsAt) <= today;
+  const slotDate = businessDateOf(slot.startsAt);
+  const canMark = today !== null && slot.cancelledAt === null && slotDate !== null && slotDate <= today;
   const rows = roster.data?.items ?? [];
 
   function handleMark(bookingId: string, status: AttendanceStatus) {
@@ -188,26 +224,15 @@ function SlotDetail({ slot, today }: SlotDetailProps) {
             {slot.cancelledAt ? null : <SlotActions slot={slot} />}
           </div>
         </div>
-        {roster.isError ? (
-          <div className="p-6">
-            <ErrorState error={roster.error} onRetry={() => void roster.refetch()} />
-          </div>
-        ) : roster.isPending ? (
-          <Skeleton className="m-6 h-40" />
-        ) : rows.length === 0 ? (
-          <div className="p-6">
-            <EmptyState title="Sin reservas" description="Este turno todavía no tiene reservas." />
-          </div>
-        ) : (
-          <RosterTable
-            rows={rows}
-            canMark={canMark}
-            markHint={slot.cancelledAt === null && today !== null ? ATTENDANCE_HINT : undefined}
-            onMark={handleMark}
-            onCancel={(bookingId) => setCancelling(rows.find((row) => row.bookingId === bookingId) ?? null)}
-            pagination={{ total: roster.data.total, page, pageSize: ROSTER_PAGE_SIZE, onPageChange: setPage }}
-          />
-        )}
+        <RosterContent
+          roster={roster}
+          page={page}
+          canMark={canMark}
+          markHint={slot.cancelledAt === null && today !== null ? ATTENDANCE_HINT : undefined}
+          onMark={handleMark}
+          onCancel={(bookingId) => setCancelling(rows.find((row) => row.bookingId === bookingId) ?? null)}
+          onPageChange={setPage}
+        />
       </div>
       <CancelBookingDialog booking={cancelling} onClose={() => setCancelling(null)} />
     </>
@@ -252,7 +277,7 @@ export function TurnosView() {
     queryFn: () => apiFetch<StaffTimeSlotDto[]>('/staff/time-slots/pending-attendance'),
   });
 
-  const fecha = parseDate(searchParams.get('fecha')) ?? today;
+  const fecha = parseBusinessDate(searchParams.get('fecha')) ?? today;
   const servicio = parseService(searchParams.get('servicio'));
   const turno = searchParams.get('turno') ?? undefined;
   const navigate = (state: UrlState) => router.replace(toUrl(state));

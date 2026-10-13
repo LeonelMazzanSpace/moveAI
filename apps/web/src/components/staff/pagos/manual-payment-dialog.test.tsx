@@ -74,6 +74,16 @@ describe('ManualPaymentDialog', () => {
     expect(postCalls()).toHaveLength(0);
   });
 
+  it('links the client picker to its error with aria attributes', async () => {
+    renderDialog();
+    await screen.findByRole('option', { name: /Plan Trimestral/ });
+    await submit();
+    const message = await screen.findByText('Elegí un cliente.');
+    const picker = screen.getByPlaceholderText('Buscá por nombre o email');
+    expect(picker).toHaveAttribute('aria-invalid', 'true');
+    expect(picker).toHaveAttribute('aria-describedby', message.id);
+  });
+
   it('only offers active period plans and session packs', async () => {
     plans = [
       trimestral,
@@ -158,6 +168,11 @@ describe('ManualPaymentDialog', () => {
   it.each(['1e3', '0x10', '1_000', '+5', '1e400', '5.', '1,5', '.5', ' '])('the schema rejects %j', (amount) => {
     const result = manualPaymentSchema.safeParse({ ...EMPTY_MANUAL_PAYMENT, clientId: 'c1', planId: 'p3', amount });
     expect(result.success).toBe(false);
+  });
+
+  it('tells a value that overflows to Infinity to enter a valid amount, not to enter one', () => {
+    const result = manualPaymentSchema.safeParse({ ...EMPTY_MANUAL_PAYMENT, clientId: 'c1', planId: 'p3', amount: '1e400' });
+    expect(result.error?.issues.map((issue) => issue.message)).toEqual(['Ingresá un monto válido.']);
   });
 
   it.each(['10.505', '0.001', '99.999'])('rejects the amount %s for having more than two decimals', async (value) => {

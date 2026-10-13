@@ -204,4 +204,40 @@ describe('TurnosView', () => {
     renderView();
     expect(await screen.findByRole('button', { name: 'Presente' })).toBeDisabled();
   });
+  it('keeps attendance buttons disabled when the slot start is not a valid instant', async () => {
+    apiFetch.mockImplementation((path: string) => {
+      if (path === '/staff/time-slots') return Promise.resolve([slot({ id: 'bad1', startsAt: 'not-a-date' })]);
+      if (path === '/staff/time-slots/pending-attendance') return Promise.resolve([]);
+      return Promise.resolve(roster([MARTINA]));
+    });
+    renderView();
+    expect(await screen.findByRole('button', { name: 'Presente' })).toBeDisabled();
+  });
+
+  it('tells the staff the slot has no bookings yet', async () => {
+    apiFetch.mockImplementation((path: string) => {
+      if (path === '/staff/time-slots') return Promise.resolve(SLOTS);
+      if (path === '/staff/time-slots/pending-attendance') return Promise.resolve([]);
+      return Promise.resolve(roster([]));
+    });
+    renderView();
+    expect(await screen.findByText('Sin reservas')).toBeInTheDocument();
+    expect(screen.getByText('Este turno todavía no tiene reservas.')).toBeInTheDocument();
+  });
+
+  it('shows the roster error and loads the roster again with "Reintentar"', async () => {
+    let failing = true;
+    apiFetch.mockImplementation((path: string) => {
+      if (path === '/staff/time-slots') return Promise.resolve(SLOTS);
+      if (path === '/staff/time-slots/pending-attendance') return Promise.resolve([]);
+      return failing ? Promise.reject(new ApiError(500, 'INTERNAL_ERROR', 'x')) : Promise.resolve(roster([MARTINA]));
+    });
+    renderView();
+    const retry = await screen.findByRole('button', { name: 'Reintentar' });
+    expect(screen.queryByText('Martina Suárez')).toBeNull();
+    failing = false;
+    await userEvent.click(retry);
+    expect(await screen.findByText('Martina Suárez')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reintentar' })).toBeNull();
+  });
 });

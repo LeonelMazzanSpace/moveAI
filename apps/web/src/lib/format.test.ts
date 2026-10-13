@@ -96,4 +96,9 @@ describe('format', () => {
       expect(businessDateOf('2027-01-01T03:00:00.000Z')).toBe('2027-01-01');
     });
   });
+
+  it('returns null instead of throwing for an invalid instant', () => {
+    expect(businessDateOf('not-a-date')).toBeNull();
+    expect(businessDateOf('')).toBeNull();
+  });
 });

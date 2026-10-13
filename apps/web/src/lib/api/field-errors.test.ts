@@ -24,6 +24,17 @@ describe('applyFieldErrors', () => {
     }
   });
 
+  it('uses the form copy for a field when it has one and the fixed message for the rest', () => {
+    const setError = vi.fn();
+    const error = validationError([
+      { field: 'name', messages: ['name must be a string'] },
+      { field: 'price', messages: ['price must be a number'] },
+    ]);
+    expect(applyFieldErrors(error, FIELDS, setError, {}, { name: 'Ingresá un nombre válido.' })).toBe(true);
+    expect(setError).toHaveBeenCalledWith('name', { type: 'server', message: 'Ingresá un nombre válido.' });
+    expect(setError).toHaveBeenCalledWith('price', { type: 'server', message: FIELD_ERROR_MESSAGE });
+  });
+
   it('uses Spanish with voseo', () => {
     expect(FIELD_ERROR_MESSAGE).toBe('Revisá este valor.');
   });

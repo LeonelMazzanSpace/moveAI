@@ -3,6 +3,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { EmptyState } from '@/components/move/empty-state';
+import { moveButtonSize } from '@/components/move/button-styles';
 import { Button } from '@/components/ui/button';
 import { apiFetch } from '@/lib/api/client';
 import { ApiError, errorMessage } from '@/lib/api/errors';
@@ -10,7 +11,7 @@ import type { PurchaseStatusDto } from '@/lib/api/types';
 
 type Outcome = 'approved' | 'rejected';
 
-const BUTTON_CLASS = 'h-auto flex-1 py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em]';
+const BUTTON_CLASS = moveButtonSize({ size: 'cta', className: 'flex-1' });
 
 function isSimulatorDisabled(error: unknown): boolean {
   return error instanceof ApiError && error.code === 'NOT_FOUND';

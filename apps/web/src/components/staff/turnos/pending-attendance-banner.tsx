@@ -4,16 +4,16 @@ import type { StaffTimeSlotDto } from '@/lib/api/types';
 import { businessDateOf, formatDayMonth, formatTime, formatWeekdayShort, SERVICE_LABEL } from '@/lib/format';
 
 function slotHref(slot: StaffTimeSlotDto): string {
-  const params = new URLSearchParams({
-    fecha: businessDateOf(slot.startsAt),
-    servicio: slot.service,
-    turno: slot.id,
-  });
+  const fecha = businessDateOf(slot.startsAt);
+  const params = new URLSearchParams();
+  if (fecha) params.set('fecha', fecha);
+  params.set('servicio', slot.service);
+  params.set('turno', slot.id);
   return `/staff/turnos?${params.toString()}`;
 }
 
 function slotLabel(slot: StaffTimeSlotDto): string {
-  const date = businessDateOf(slot.startsAt);
+  const date = businessDateOf(slot.startsAt) ?? '';
   return `${formatWeekdayShort(date)} ${formatDayMonth(date)} ${formatTime(slot.startsAt)} · ${SERVICE_LABEL[slot.service]} (${slot.pendingAttendance} sin marcar)`;
 }
 

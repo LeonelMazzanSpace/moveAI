@@ -7,6 +7,7 @@ import { useForm, useWatch, type UseFormRegisterReturn } from 'react-hook-form';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/move/empty-state';
 import { ErrorState } from '@/components/move/error-state';
+import { moveButtonSize } from '@/components/move/button-styles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -140,7 +141,7 @@ export function CheckinForm({ firstName, onSubmit }: CheckinFormProps) {
           {formError}
         </p>
       ) : null}
-      <Button type="submit" disabled={isSubmitting || sent} className="mt-7 h-auto w-full py-2.5 text-[10px] font-semibold uppercase tracking-[0.2em]">
+      <Button type="submit" disabled={isSubmitting || sent} className={moveButtonSize({ size: 'block', className: 'mt-7' })}>
         Enviar respuesta
       </Button>
     </form>

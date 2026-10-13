@@ -2,14 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { moveButton } from '@/components/move/button-styles';
 import { PageContainer } from '@/components/move/page-container';
 import type { MeDto } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
 import { MobileNav } from './mobile-nav';
 import { isNavItemActive, PUBLIC_NAV_ITEMS, publicAccountItem, type NavItem } from './nav-items';
-
-const BUTTON_CLASSES =
-  'rounded px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em]';
 
 export function HeaderNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
@@ -46,13 +44,13 @@ export function PublicHeader({ user }: { user: Pick<MeDto, 'role'> | null }) {
         <div className="flex items-center gap-3">
           <Link
             href={account.href}
-            className={cn(BUTTON_CLASSES, 'hidden border border-border text-foreground hover:bg-card md:inline-block')}
+            className={moveButton({ variant: 'outline', className: 'hidden md:inline-flex' })}
           >
             {account.label}
           </Link>
           <Link
             href="/reservar"
-            className={cn(BUTTON_CLASSES, 'hidden bg-primary text-primary-foreground hover:bg-primary/80 md:inline-block')}
+            className={moveButton({ className: 'hidden md:inline-flex' })}
           >
             Reservar
           </Link>
