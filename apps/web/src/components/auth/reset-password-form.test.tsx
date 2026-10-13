@@ -41,10 +41,31 @@ describe('ResetPasswordForm', () => {
   });
 
   it('asks for a new link when the token is invalid', async () => {
-    resetPassword.mockResolvedValue({ data: null, error: { status: 400, message: 'Invalid token' } });
+    resetPassword.mockResolvedValue({ data: null, error: { status: 400, code: 'INVALID_TOKEN', message: 'Invalid token' } });
     render(<ResetPasswordForm />);
     await fill('Secreto123!', 'Secreto123!');
     expect(await screen.findByText('El link venció o ya fue usado.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Pedir un link nuevo' })).toHaveAttribute('href', '/recuperar');
+  });
+
+  it('keeps the form and shows an error for any other 400, without calling the link invalid', async () => {
+    resetPassword.mockResolvedValue({ data: null, error: { status: 400, code: 'PASSWORD_TOO_LONG', message: 'Password too long' } });
+    render(<ResetPasswordForm />);
+    await fill('Secreto123!', 'Secreto123!');
+    expect(await screen.findByText('No pudimos restablecer tu contraseña. Probá de nuevo en unos minutos.')).toBeInTheDocument();
+    expect(screen.queryByText('El link venció o ya fue usado.')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Restablecer contraseña' })).toBeInTheDocument();
+  });
+
+  it('rejects a new password longer than 128 characters before calling the API', async () => {
+    const long = 'a'.repeat(129);
+    render(<ResetPasswordForm />);
+    await userEvent.click(screen.getByLabelText('Nueva contraseña'));
+    await userEvent.paste(long);
+    await userEvent.click(screen.getByLabelText('Repetí la contraseña'));
+    await userEvent.paste(long);
+    await userEvent.click(screen.getByRole('button', { name: 'Restablecer contraseña' }));
+    expect(await screen.findByText('La contraseña puede tener hasta 128 caracteres.')).toBeInTheDocument();
+    expect(resetPassword).not.toHaveBeenCalled();
   });
 });
