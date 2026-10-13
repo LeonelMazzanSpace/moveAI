@@ -21,12 +21,12 @@ pnpm install
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 pnpm db:up                                   # levanta Postgres en Docker
-pnpm --filter @move/api migration:run        # crea el esquema
+pnpm --filter @move/api migration:run        # crea el esquema (en una base existente aplica las migraciones nuevas)
 pnpm --filter @move/api seed                 # planes, horarios y configuración provisorios
 pnpm dev                                     # web + api en paralelo
 ```
 
-El `.env.example` de la API trae valores de desarrollo. Sin credenciales de proveedores todo funciona en local: Mercado Pago usa un simulador de pagos, Brevo registra los emails en el log (dry-run) y el botón de Google queda oculto. Variables, proveedores y detalles en [docs/development.md](docs/development.md).
+El `.env.example` de la API trae valores de desarrollo. Sin credenciales de proveedores todo funciona en local: Mercado Pago usa un simulador de pagos, Brevo registra los emails en el log (dry-run) y el botón de Google queda oculto. Variables, proveedores y detalles en [docs/development.md](docs/development.md). Para verla con datos de demostración, seguí [Probar MOVE en local](docs/manual/manual-de-usuario.md#probar-move-en-local).
 
 ### Variables de entorno
 
@@ -50,6 +50,7 @@ El `.env.example` de la API trae valores de desarrollo. Sin credenciales de prov
 | `pnpm dev:web` / `pnpm dev:api` | Una sola app |
 | `pnpm build` / `pnpm lint` / `pnpm test` | Corre el script en todas las apps |
 | `pnpm test:e2e` | E2E de la API contra Postgres (requiere `E2E_DATABASE_NAME`, ver [docs/development.md](docs/development.md#tests)) |
+| `pnpm e2e:reset` / `pnpm test:e2e:web` / `pnpm lint:e2e` | Reinicia la base `move_e2e`, corre las pruebas end to end de la web con Playwright en desktop y mobile, y revisa su código (tsc y oxlint; `pnpm lint` lo incluye). Las pruebas requieren `E2E_STAFF_PASSWORD` y `E2E_CLIENT_PASSWORD`; ver [docs/development.md](docs/development.md#pruebas-end-to-end). |
 | `pnpm db:up` / `pnpm db:down` / `pnpm db:logs` | Postgres local |
 | `pnpm manual:demo-data` | Carga datos de demostración inventados por HTTP contra la API local (ver [Manual de usuario](#manual-de-usuario)) |
 | `pnpm manual:screenshots` | Captura una imagen de cada pantalla de la web en `docs/manual/img/` |
@@ -81,6 +82,7 @@ Las tablas y columnas se nombran en snake_case automáticamente (`SnakeNamingStr
 
 [docs/manual/manual-de-usuario.md](docs/manual/manual-de-usuario.md) ([PDF](docs/manual/manual-de-usuario.pdf)) es la guía única para clientes, staff de MOVE y equipo técnico, con una captura de cada pantalla y el diagrama de arquitectura:
 
+- [Probar MOVE en local](docs/manual/manual-de-usuario.md#probar-move-en-local): pasos en orden para levantar todo con datos de demostración y la tabla de usuarios de demo.
 - [Estado actual frente a MOVE.pdf](docs/manual/manual-de-usuario.md#estado-actual-frente-a-movepdf): hecho, simulado en local y pendiente, sección por sección.
 - [Parte 1: Clientes](docs/manual/manual-de-usuario.md#parte-1-clientes) y [Parte 2: Staff de MOVE](docs/manual/manual-de-usuario.md#parte-2-staff-de-move).
 - [Parte 3: Cómo levantar todo](docs/manual/manual-de-usuario.md#parte-3-cómo-levantar-todo): local paso a paso y producción en orden.
@@ -91,7 +93,7 @@ Las capturas y el PDF se regeneran con `pnpm manual:demo-data`, `pnpm manual:scr
 
 ## Documentación
 
-- [docs/manual/manual-de-usuario.md](docs/manual/manual-de-usuario.md): manual de usuario con capturas de todas las pantallas, estado actual, cómo levantar todo y la guía de cada proveedor.
+- [docs/manual/manual-de-usuario.md](docs/manual/manual-de-usuario.md): manual de usuario con capturas de todas las pantallas, [Probar MOVE en local](docs/manual/manual-de-usuario.md#probar-move-en-local), estado actual, cómo levantar todo y la guía de cada proveedor.
 - [docs/development.md](docs/development.md): setup local, seed, staff, simulador de pagos, tests, jobs manuales y módulos de la API.
 - [docs/deploy.md](docs/deploy.md): runbook de deploy (Neon, Elastic Beanstalk, Vercel, dominios, proveedores y checklist).
 - [apps/api/CLAUDE.md](apps/api/CLAUDE.md) y [apps/web/CLAUDE.md](apps/web/CLAUDE.md): convenciones del proyecto.

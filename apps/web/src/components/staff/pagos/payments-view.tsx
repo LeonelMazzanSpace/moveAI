@@ -114,7 +114,7 @@ export function PaymentsView({ filters }: { filters: PaymentFilters }) {
             aria-pressed={filters.needsAttention}
             className={moveButton({
               variant: filters.needsAttention ? 'ghost' : 'outline',
-              className: filters.needsAttention ? 'bg-warning-muted text-warning hover:bg-warning-muted hover:text-warning' : undefined,
+              className: filters.needsAttention ? 'bg-warning-muted text-warning hover:bg-warning-muted hover:text-warning dark:hover:bg-warning-muted' : undefined,
             })}
             onClick={() => navigate({ needsAttention: !filters.needsAttention })}
           >

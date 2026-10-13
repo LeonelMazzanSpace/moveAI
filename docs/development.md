@@ -12,12 +12,16 @@ pnpm install
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 pnpm db:up                                   # Postgres 17 en Docker (contenedor move-postgres, puerto 5432)
-pnpm --filter @move/api migration:run        # crea el esquema
+pnpm --filter @move/api migration:run        # crea el esquema (en una base existente aplica las migraciones nuevas)
 pnpm --filter @move/api seed                 # planes, horarios y configuración provisorios (idempotente)
 pnpm dev                                     # web en :3000 y API en :3001 (/api)
 ```
 
-El `.env.example` de la API trae valores de desarrollo listos para usar. Las variables de la API están documentadas en [deploy.md](deploy.md#variables-de-entorno-de-la-api); la web usa `NEXT_PUBLIC_API_URL` (`http://localhost:3001/api`) y `NEXT_PUBLIC_GOOGLE_ENABLED`.
+El `.env.example` de la API trae valores de desarrollo listos para usar. En lugar de copiarlo a `apps/api/.env`, se puede exportar en el shell con `set -a; . apps/api/.env.example; set +a` (las variables exportadas tienen prioridad sobre un `.env`; hace falta `NODE_ENV=development`, que ya viene en el ejemplo). Hacelo solo en las consolas de la API y de los scripts del manual, **nunca en la de la web**: el ejemplo trae `PORT=3001` y la web toma su puerto de `PORT` (chocaría con la API). En la consola de la web exportá solo `NEXT_PUBLIC_API_URL`, o corré antes `unset PORT` (o `pnpm dev:web -p 3000`). Por la misma razón, con las variables exportadas no uses `pnpm dev` (web y API comparten el entorno): levantalas con `pnpm dev:api` y `pnpm dev:web` en consolas separadas. Las variables de la API están documentadas en [deploy.md](deploy.md#variables-de-entorno-de-la-api); la web usa `NEXT_PUBLIC_API_URL` (`http://localhost:3001/api`) y `NEXT_PUBLIC_GOOGLE_ENABLED`.
+
+`PORT` y `DB_PORT` aceptan solo dígitos (1 a 65535), `DB_SSL` y `SCHEDULER_ENABLED` solo `true` o `false`, y `TRUST_PROXY_HOPS` un dígito de 0 a 5: otro valor impide que la API arranque. `TRUST_PROXY_HOPS` queda en `0` (el default) en local, donde no hay proxies delante de la API; detrás del ALB + Nginx de Elastic Beanstalk va `2` y nunca `true` (ver [deploy.md](deploy.md#proxy-ip-del-cliente-y-límites-de-checkout)).
+
+La API solo interpreta bodies JSON: un POST con formulario codificado responde 400. Para una prueba rápida con datos de demostración (usuarios de ejemplo, reservas, pagos y alertas), seguir [Probar MOVE en local](manual/manual-de-usuario.md#probar-move-en-local) del manual.
 
 El seed carga los planes, precios y horarios del mockup como valores **provisorios**: Configuración muestra "Valores provisorios — confirmar con MOVE" mientras el ajuste `valuesProvisional` sea `true`.
 
@@ -26,7 +30,7 @@ El seed carga los planes, precios y horarios del mockup como valores **provisori
 Los clientes se registran desde la web. El staff se crea por línea de comandos:
 
 ```bash
-read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD   # preferible a pasar --password por argv
+printf 'Contraseña del staff: '; read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD; echo   # preferible a pasar --password por argv
 pnpm --filter @move/api user:create-staff -- --email staff@example.com --name "Nombre Apellido"
 unset CREATE_STAFF_PASSWORD
 ```
@@ -62,7 +66,7 @@ Desde la raíz del repo:
 | `pnpm test` | Unit tests de la API (Vitest) y de la web (Vitest + Testing Library) |
 | `pnpm test:e2e` | E2E de la API (Vitest + supertest) contra Postgres real |
 | `pnpm --filter @move/api test` / `pnpm --filter @move/web test` | Unit tests de una sola app |
-| `pnpm lint` | oxlint (API) y ESLint (web) |
+| `pnpm lint` | oxlint (API), ESLint (web) y `pnpm lint:e2e` (tsc estricto y oxlint sobre `e2e/`, `playwright.config.ts` y `scripts/e2e`) |
 | `pnpm build` | Build de la API y de la web |
 
 Los e2e de la API necesitan el Postgres local levantado y la variable `E2E_DATABASE_NAME` con el nombre de una base de test dedicada (distinta de la de desarrollo), que la suite migra sola y vacía con `resetDb` en cada test:
@@ -72,9 +76,50 @@ docker exec move-postgres createdb -U move move_test       # una sola vez
 E2E_DATABASE_NAME=move_test pnpm test:e2e
 ```
 
-No hay E2E de la web con navegador (se descartaron en el MVP): la web se cubre con tests de componentes y de utilidades, y con una prueba manual de las pantallas principales.
+La web además tiene pruebas end to end con navegador (Playwright): ver [Pruebas end to end](#pruebas-end-to-end).
 
 El pipeline de Bitbucket (`bitbucket-pipelines.yml`) corre el mismo gate en cada PR y en `main`/`feature/*`: `pnpm lint`, `pnpm test`, e2e de la API contra una base `move_ci_test` y `pnpm build`. Necesita la variable segura de repositorio `CI_BETTER_AUTH_SECRET`.
+
+## Pruebas end to end
+
+Suite de Playwright (`playwright.config.ts`, specs en `e2e/`) que recorre la web completa con dos proyectos que corren los mismos flujos:
+
+| Proyecto | Navegador | Navegación |
+|---|---|---|
+| `desktop` | Chromium 1440×900 | Header público y de cliente, sidebar de staff |
+| `mobile` | Dispositivo `iPhone 15` de Playwright con Chromium (viewport, touch y user agent móviles) | Menú móvil ("Abrir menú"); en cada pantalla se verifica que el documento no tenga scroll horizontal |
+
+Flujos cubiertos, cada uno en los dos proyectos:
+
+| Spec | Flujo |
+|---|---|
+| `public.spec.ts` | Visitante: inicio, Performance, Rehab, Recovery, Planes (precio `/paquete` en Recovery) y `/reservar` |
+| `auth.spec.ts` | Registro, ingreso (y error de contraseña), logout, email repetido, guards (cliente fuera de `/staff`, staff fuera del área de clientes) y vuelta a la página exacta después de ingresar |
+| `plan-purchase.spec.ts` | Compra de plan Performance con el simulador: aprobado → plan vigente en `/perfil`; rechazado → "Pago en proceso" y reintento |
+| `performance-booking.spec.ts` | Reserva, límite de cupo (completo y `SLOT_FULL`), cancelación dentro y fuera del plazo, plan vencido bloquea reservas |
+| `rehab-recovery.spec.ts` | Evaluación Rehab y sesión Recovery como invitado y con cuenta, `LOGIN_REQUIRED`, "Pago no completado" y reintento, paquete Recovery con saldo y tope `HOLD_LIMIT_REACHED` |
+| `client-area.spec.ts` | Perfil, historial (filtros) y check-in mensual con molestia → alerta para el staff |
+| `staff.spec.ts` | Dashboard y navegación, clientes (búsqueda, alta, detalle, pausa), turnos y asistencia, pagos (pago manual y filtros), seguimiento (contacto y gestionar), check-ins (derivar a Rehab) y configuración (planes, horarios, profesionales, reglas) |
+
+Entorno propio, sin archivos `.env` (D61): base `move_e2e`, API en `:3150` (modo desarrollo: simulador de Mercado Pago, Brevo en dry-run, sin crons) y web con build de producción en `:3250`. Playwright compila y levanta los dos servidores (`webServer`) y los apaga al terminar; los puertos tienen que estar libres. El resto de las variables de la API (`DB_HOST`, `DB_USER`, `DB_PASSWORD`, `BETTER_AUTH_SECRET`…) se toman del entorno, con los valores de `apps/api/.env.example`.
+
+```bash
+set -a; source apps/api/.env.example; set +a                 # o exportarlas a mano (NODE_ENV no hace falta)
+unset NODE_ENV
+read -rs E2E_STAFF_PASSWORD && export E2E_STAFF_PASSWORD     # contraseña del staff de E2E (mínimo 8 caracteres)
+read -rs E2E_CLIENT_PASSWORD && export E2E_CLIENT_PASSWORD   # contraseña de los clientes que crean las pruebas
+pnpm exec playwright install chromium                        # una sola vez
+pnpm e2e:reset                                               # borra y recrea move_e2e: migraciones, seed, staff y datos mínimos
+pnpm test:e2e:web                                            # las dos suites; --project=desktop o --project=mobile para una
+```
+
+- Toda entrada (`pnpm e2e:reset`, `pnpm test:e2e:web` y el SQL de las specs) se niega antes de tocar nada si `E2E_DB_NAME` no empieza con `move_e2e`, y el reset y la suite solo aceptan el Postgres del contenedor local: `DB_HOST` `localhost`, `127.0.0.1` o `::1`, y `DB_PORT` sin definir o igual al puerto que publica `move-postgres` (`docker port`).
+- `pnpm e2e:reset` (`scripts/e2e/reset.mjs`) crea el staff `staff.e2e@example.com` (`E2E_STAFF_EMAIL`) y, por la API, el profesional "Profesional E2E" y los turnos de la ventana de reserva. Usa el contenedor `move-postgres` (`E2E_DB_CONTAINER`).
+- Cada prueba crea sus propios clientes, turnos (en un día y minuto únicos) y compras por la API, así que no depende del orden ni de las otras pruebas, y las fechas se calculan desde hoy en la zona de Uruguay. Lo que la API no permite (un plan vencido, un turno de hoy para marcar asistencia) se ajusta con SQL en `move_e2e`, como `scripts/manual/demo-data.mjs`.
+- La API de E2E corre con `TRUST_PROXY_HOPS=1` y cada prueba manda su propio `X-Forwarded-For`, así el throttling por IP del checkout (D53/D58) no mezcla pruebas que corren en paralelo. No cambia nada de la app.
+- El reporte HTML queda en `artifacts/e2e/report` (`pnpm exec playwright show-report artifacts/e2e/report`) y las capturas y trazas, solo de las pruebas que fallan, en `artifacts/e2e/results`. `artifacts/` está ignorado por git.
+- `E2E_WORKERS` (entero de 1 a 99, default 4) fija los workers de Playwright.
+- La suite no corre en Bitbucket Pipelines; su código sí se revisa con `pnpm lint:e2e`, incluido en `pnpm lint`.
 
 ## Correr un job a mano
 

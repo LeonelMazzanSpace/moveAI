@@ -8,7 +8,7 @@ Esta versión de Next.js tiene cambios incompatibles. Leer la guía correspondie
 
 ## Estructura
 
-- `src/app/`: rutas. Grupos `(public)` (planes, servicios, reservar, checkout), `(auth)` (ingresar, registro, recuperar, restablecer, continuar), `(cliente)` (perfil, reservar, historial, check-in) y `staff/` (dashboard, clientes, turnos, pagos, seguimiento, configuración).
+- `src/app/`: rutas. Grupos `(public)` (inicio, performance, rehab, recovery, planes, reservar, checkout/resultado y checkout/simulado), `(auth)` (ingresar, registro, recuperar, restablecer, continuar), `(cliente)` (perfil, historial, check-in, reservar/fisioterapia, checkout/plan/[slug]) y `staff/` (dashboard, clientes, turnos, pagos, seguimiento, configuración).
 - `src/components/ui/`: componentes shadcn. `src/components/move/`: componentes propios de MOVE. El resto, por dominio (`auth`, `booking`, `checkout`, `client`, `staff`, `layout`, `public`), co-locados con sus tests.
 - `src/lib/api/`: `types.ts` (tipos de la API: no se redefinen en otro lado), `client.ts` (`apiFetch`, cliente), `server.ts` (`serverApiFetch`, servidor), `errors.ts`, `config.ts`. `src/lib/format.ts`: formato de fechas, horas y precios.
 
