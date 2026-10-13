@@ -53,7 +53,7 @@ export function ResetPasswordForm() {
     try {
       const { error } = await authClient.resetPassword({ newPassword: values.password, token });
       if (!error) return setStatus('done');
-      setStatus(error.status === 400 ? 'invalid' : 'error');
+      setStatus(error.code === 'INVALID_TOKEN' ? 'invalid' : 'error');
     } catch {
       setStatus('error');
     }

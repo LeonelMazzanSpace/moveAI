@@ -19,6 +19,7 @@ export function LogoutButton({ className }: { className?: string }) {
       return;
     }
     router.replace('/');
+    router.refresh();
   }
 
   return (

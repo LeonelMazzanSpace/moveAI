@@ -28,6 +28,24 @@ describe('resolvePostLogin', () => {
   it('does not match prefixes by substring', () => {
     expect(resolvePostLogin(me('client'), '/staffing')).toBe('/staffing');
   });
+  it('normalizes dot-segments before checking the role', () => {
+    expect(resolvePostLogin(me('client'), '/perfil/../staff')).toBe('/perfil');
+    expect(resolvePostLogin(me('staff'), '/staff/../perfil')).toBe('/staff');
+    expect(resolvePostLogin(me('client'), '/a/..//evil.com')).toBe('/perfil');
+    expect(resolvePostLogin(me('client'), '/a/b/../planes')).toBe('/a/planes');
+  });
+  it('never sends anyone back to an auth page, even through dot-segments', () => {
+    for (const role of ['client', 'staff'] as const) {
+      const home = role === 'client' ? '/perfil' : '/staff';
+      for (const path of ['/ingresar', '/registro', '/recuperar', '/restablecer', '/continuar', '/./continuar', '/x/../ingresar', '/%2e/registro?next=%2F']) {
+        expect(resolvePostLogin(me(role), path)).toBe(home);
+      }
+    }
+  });
+  it('rejects any backslash or control character', () => {
+    expect(resolvePostLogin(me('client'), '/a\\b')).toBe('/perfil');
+    expect(resolvePostLogin(me('client'), '/a\u007fb')).toBe('/perfil');
+  });
 });
 
 describe('withNext', () => {
