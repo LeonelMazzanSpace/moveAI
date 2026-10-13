@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { fieldA11y } from '@/components/staff/form-primitives';
+import { BUTTON_DANGER, BUTTON_OUTLINE, BUTTON_PRIMARY, fieldA11y } from '@/components/staff/form-primitives';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -79,12 +79,12 @@ function ConfirmDialog({
           </p>
         ) : null}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <button type="button" className={BUTTON_OUTLINE} onClick={() => onOpenChange(false)}>
             Volver
-          </Button>
-          <Button variant="destructive" disabled={pending} onClick={onConfirm}>
+          </button>
+          <button type="button" className={BUTTON_DANGER} disabled={pending} onClick={onConfirm}>
             {confirmLabel}
-          </Button>
+          </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -136,12 +136,12 @@ function EditCapacityDialog({ slot, open, onOpenChange }: { slot: StaffTimeSlotD
             ) : null}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <button type="button" className={BUTTON_OUTLINE} onClick={() => onOpenChange(false)}>
               Volver
-            </Button>
-            <Button type="submit" disabled={mutation.isPending}>
+            </button>
+            <button type="submit" className={BUTTON_PRIMARY} disabled={mutation.isPending}>
               Guardar
-            </Button>
+            </button>
           </DialogFooter>
         </form>
       </DialogContent>

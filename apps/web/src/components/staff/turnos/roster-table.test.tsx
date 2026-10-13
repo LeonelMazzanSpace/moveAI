@@ -107,3 +107,22 @@ describe('RosterTable', () => {
     expect(onCancel).toHaveBeenCalledWith('b1');
   });
 });
+
+describe('RosterTable on mobile', () => {
+  it('stacks each booking as a card so the attendance and cancel buttons need no horizontal swipe', () => {
+    render(<RosterTable rows={[row({ bookingId: 'b1' })]} canMark onMark={vi.fn()} onCancel={vi.fn()} />);
+    const first = screen.getByRole('row', { name: /Martina Suárez/ });
+    expect(first).toHaveClass('max-md:grid');
+    expect(first.closest('table')).toHaveClass('max-md:block');
+    expect(screen.getByRole('columnheader', { name: 'Registrar' }).closest('thead')).toHaveClass('max-md:hidden');
+    const actions = within(first).getByRole('button', { name: 'Presente' }).closest('td');
+    expect(actions).toHaveClass('max-md:col-span-2');
+    expect(within(first).getByRole('button', { name: 'Cancelar reserva de Martina Suárez' }).closest('td')).toBe(actions);
+  });
+
+  it('labels the cells whose header is hidden on mobile', () => {
+    render(<RosterTable rows={[row({ bookingId: 'b1' })]} canMark onMark={vi.fn()} />);
+    const cells = Array.from(screen.getByRole('row', { name: /Martina Suárez/ }).querySelectorAll('td'));
+    expect(cells.map((cell) => cell.getAttribute('data-label'))).toEqual([null, 'Plan', 'Última asistencia', null, null]);
+  });
+});

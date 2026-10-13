@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { BUTTON_DANGER, BUTTON_OUTLINE, BUTTON_PRIMARY } from '@/components/staff/form-primitives';
 import { ApiError } from '@/lib/api/errors';
 import type { RosterItemDto, StaffTimeSlotDto } from '@/lib/api/types';
 
@@ -158,5 +159,35 @@ describe('CancelBookingDialog', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(apiFetch).toHaveBeenCalledWith('/staff/bookings/b1/cancel', { method: 'POST' });
     expect(toastSuccess).toHaveBeenCalledWith('Reserva cancelada.');
+  });
+});
+
+describe('staff dialog buttons', () => {
+  const LETTERING = ['text-[10px]', 'font-semibold', 'uppercase', 'tracking-[0.2em]'];
+
+  beforeEach(() => {
+    apiFetch.mockReset();
+  });
+
+  it('spells the danger and back buttons of "Cancelar reserva" in the MOVE style', async () => {
+    renderWithClient(<CancelBookingDialog booking={BOOKING} onClose={vi.fn()} />);
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByRole('button', { name: 'Cancelar reserva' })).toHaveClass(...BUTTON_DANGER.split(' '));
+    expect(dialog.getByRole('button', { name: 'Volver' })).toHaveClass(...BUTTON_OUTLINE.split(' '));
+  });
+
+  it('uses the same danger button in "Cancelar turno" as in "Cancelar reserva"', async () => {
+    renderWithClient(<SlotActions slot={SLOT} />);
+    const dialog = await openAction('Cancelar turno');
+    const confirm = dialog.getByRole('button', { name: 'Cancelar turno' });
+    expect(confirm).toHaveClass(...BUTTON_DANGER.split(' '), ...LETTERING);
+    expect(confirm).not.toHaveClass('text-sm');
+  });
+
+  it('spells the buttons of "Editar cupo" in the MOVE style too', async () => {
+    renderWithClient(<SlotActions slot={SLOT} />);
+    const dialog = await openAction('Editar cupo');
+    expect(dialog.getByRole('button', { name: 'Guardar' })).toHaveClass(...BUTTON_PRIMARY.split(' '));
+    expect(dialog.getByRole('button', { name: 'Volver' })).toHaveClass(...BUTTON_OUTLINE.split(' '));
   });
 });

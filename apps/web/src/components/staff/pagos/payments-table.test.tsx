@@ -45,6 +45,16 @@ describe('PaymentsTable', () => {
     expect(screen.getByText('Lucía Pérez').closest('tr')).toHaveClass('bg-warning-muted/40');
     expect(screen.getByText('Martina Suárez').closest('tr')).not.toHaveClass('bg-warning-muted/40');
   });
+
+  it('stacks every payment as a card on mobile so nothing needs a horizontal swipe', () => {
+    render(<PaymentsTable payments={[base]} />);
+    const row = screen.getByText('Martina Suárez').closest('tr');
+    expect(row).toHaveClass('max-md:grid');
+    expect(row?.closest('table')).toHaveClass('max-md:block');
+    expect(screen.getByRole('columnheader', { name: 'Estado' }).closest('thead')).toHaveClass('max-md:hidden');
+    const labels = Array.from(row?.querySelectorAll('td') ?? []).map((cell) => cell.getAttribute('data-label'));
+    expect(labels).toEqual(['Fecha', null, 'Ítem', 'Servicio', 'Monto', 'Método', 'Estado']);
+  });
 });
 
 describe('PaymentsView filters', () => {
@@ -61,6 +71,14 @@ describe('PaymentsView filters', () => {
       </QueryClientProvider>,
     );
   }
+
+  it('keeps the amber tint of the active "Requieren atención" toggle on hover, in light and dark', async () => {
+    renderView({ status: null, method: null, needsAttention: true, page: 1 });
+    await screen.findByText('Martina Suárez');
+    const toggle = screen.getByRole('button', { name: 'Requieren atención' });
+    expect(toggle).toHaveClass('bg-warning-muted', 'text-warning', 'hover:bg-warning-muted', 'hover:text-warning', 'dark:hover:bg-warning-muted');
+    for (const ghost of ['hover:bg-muted', 'hover:text-foreground', 'dark:hover:bg-muted/50']) expect(toggle).not.toHaveClass(ghost);
+  });
 
   it('sends the filters to the API', async () => {
     renderView({ status: 'pending', method: 'cash', needsAttention: true, page: 2 });
