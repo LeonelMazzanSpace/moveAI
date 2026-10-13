@@ -21,6 +21,15 @@ describe('selectExpiryReminders', () => {
     expect(result.map((r) => `${r.userId}:${r.template}:${r.subscription.id}`)).toEqual(['a:plan-expiring:s1', 'c:plan-expired:s3']);
   });
 
+  it('never reminds a paused client, not even about a plan that expired 1 to 3 days ago', () => {
+    const ended = sub('s7', '2026-09-10', '2026-10-10');
+    const result = selectExpiryReminders({
+      today, expiringSoonDays: 7,
+      clients: [{ userId: 'p', paused: true, current: null, latest: ended, renewed: false }],
+    });
+    expect(result).toEqual([]);
+  });
+
   it('covers the window edges: expiring from today to expiringSoonDays, expired only 1 to 3 days after the end', () => {
     const pick = (current: ReturnType<typeof sub> | null, latest: ReturnType<typeof sub> | null) =>
       selectExpiryReminders({ today, expiringSoonDays: 7, clients: [{ userId: 'x', paused: false, current, latest, renewed: false }] })

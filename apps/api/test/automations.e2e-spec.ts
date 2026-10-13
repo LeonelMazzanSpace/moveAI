@@ -9,7 +9,12 @@ import { configureApp } from '../src/app.setup.js';
 import { addDays, businessToday } from '../src/common/time/business-time.js';
 import { schedulerConfig } from '../src/config/scheduler.config.js';
 import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
+import { CheckinsMonthlyJob } from '../src/modules/automations/jobs/checkins-monthly.job.js';
+import { ExpiryRemindersJob } from '../src/modules/automations/jobs/expiry-reminders.job.js';
+import { FollowupDetectJob } from '../src/modules/automations/jobs/followup-detect.job.js';
+import { JOB_NAMES } from '../src/modules/automations/models/job.model.js';
 import { AutomationsService } from '../src/modules/automations/services/automations.service.js';
+import { GenerateSlotsJob } from '../src/modules/schedule/jobs/generate-slots.job.js';
 import { SettingsService } from '../src/modules/settings/services/settings.service.js';
 import { createTestApp, type TestApp } from './utils/app.js';
 import { signUp, signUpClient, signUpStaff } from './utils/auth.js';
@@ -50,10 +55,12 @@ describe('automations — staff endpoint (e2e)', () => {
     expect(await emails(ctx.dataSource, 'plan-expired')).toEqual([]);
   });
 
-  it('sends plan-expired 1 to 3 days after the end, and neither reminder to renewed clients', async () => {
+  it('sends plan-expired 1 to 3 days after the end, and neither reminder to renewed or paused clients', async () => {
     const staff = await signUpStaff(ctx.app, ctx.dataSource);
     const expired = await planFor({ startsOn: addDays(today(), -32), endsOn: addDays(today(), -2) });
-    const tooOld = await planFor({ startsOn: addDays(today(), -40), endsOn: addDays(today(), -4) });
+    await planFor({ startsOn: addDays(today(), -40), endsOn: addDays(today(), -4) });
+    const pausedExpired = await planFor({ startsOn: addDays(today(), -32), endsOn: addDays(today(), -2) });
+    await staff.agent.post(`/api/staff/clients/${pausedExpired.userId}/inactivity-reasons`).send({ reason: 'vacation' }).expect(201);
     const renewed = await expiringIn5Days();
     await givePerformancePlan(ctx.dataSource, renewed.userId, { startsOn: addDays(today(), 6), endsOn: addDays(today(), 36) });
     const renewedAfterExpiry = await planFor({ startsOn: addDays(today(), -32), endsOn: addDays(today(), -1) });
@@ -63,7 +70,6 @@ describe('automations — staff endpoint (e2e)', () => {
     expect(body.result).toEqual({ expiring: 0, expired: 1 });
     expect((await emails(ctx.dataSource, 'plan-expired')).map((r: { userId: string }) => r.userId)).toEqual([expired.userId]);
     expect(await emails(ctx.dataSource, 'plan-expiring')).toEqual([]);
-    expect(tooOld.userId).not.toBe(expired.userId);
   });
 
   it('detects follow-up alerts without duplicating them and leaves paused clients out', async () => {
@@ -133,22 +139,68 @@ describe('automations — staff endpoint (e2e)', () => {
     await request(ctx.app.getHttpServer()).post('/api/staff/automations/run/followup-detect').expect(401).expect(expectCode('UNAUTHENTICATED'));
   });
 
-  it('respects the job lock: a run that finds the job locked reports ran=false and does nothing', async () => {
+  it.each(JOB_NAMES)('respects the lock of %s: a run that finds it taken reports ran=false and does nothing', async (job) => {
     const staff = await signUpStaff(ctx.app, ctx.dataSource);
     await expiringIn5Days();
     const holder = ctx.dataSource.createQueryRunner();
     await holder.connect();
     try {
-      await holder.query(`SELECT pg_advisory_lock(hashtext('followup-detect'))`);
-      const locked = await staff.agent.post('/api/staff/automations/run/followup-detect').expect(200);
-      expect(locked.body).toEqual({ job: 'followup-detect', ran: false, result: {} });
-      expect(await ctx.dataSource.query(`SELECT 1 FROM followup_alerts`)).toHaveLength(0);
+      await holder.query('SELECT pg_advisory_lock(hashtext($1))', [job]);
+      const locked = await staff.agent.post(`/api/staff/automations/run/${job}`).expect(200);
+      expect(locked.body).toEqual({ job, ran: false, result: {} });
+      expect(await ctx.dataSource.query('SELECT 1 FROM followup_alerts')).toHaveLength(0);
+      expect(await ctx.dataSource.query('SELECT 1 FROM email_logs')).toHaveLength(0);
+      expect(await ctx.dataSource.query('SELECT 1 FROM checkins')).toHaveLength(0);
+      expect(await ctx.dataSource.query('SELECT 1 FROM time_slots')).toHaveLength(0);
     } finally {
-      await holder.query(`SELECT pg_advisory_unlock(hashtext('followup-detect'))`);
+      await holder.query('SELECT pg_advisory_unlock(hashtext($1))', [job]);
       await holder.release();
     }
-    const free = await staff.agent.post('/api/staff/automations/run/followup-detect').expect(200);
-    expect(free.body).toMatchObject({ ran: true, result: { expiring: 1 } });
+    const free = await staff.agent.post(`/api/staff/automations/run/${job}`).expect(200);
+    expect(free.body).toMatchObject({ job, ran: true });
+  });
+
+  it('generates the same slots as the cron job default (today through today + bookingWindowDays, inclusive)', async () => {
+    const staff = await signUpStaff(ctx.app, ctx.dataSource);
+    const slots = () => ctx.dataSource.query('SELECT service, starts_at AS "startsAt" FROM time_slots ORDER BY service, starts_at');
+
+    const manual = await staff.agent.post('/api/staff/automations/run/generate-slots').expect(200);
+    const fromEndpoint = await slots();
+    expect(fromEndpoint.length).toBeGreaterThan(0);
+    expect(manual.body.result.created).toBe(fromEndpoint.length);
+
+    await ctx.dataSource.query('DELETE FROM time_slots');
+    const cron = await ctx.app.get(GenerateSlotsJob).execute({ force: true });
+    expect(cron.result.created).toBe(manual.body.result.created);
+    expect(await slots()).toEqual(fromEndpoint);
+  });
+
+  it('registers the three crons with their expressions and the Montevideo time zone', () => {
+    const jobs = ctx.app.get(SchedulerRegistry).getCronJobs();
+    const specOf = (name: string) => {
+      const job = jobs.get(name);
+      return job ? { expression: job.cronTime.source, timeZone: job.cronTime.timeZone } : undefined;
+    };
+    expect(specOf('followup-detect')).toEqual({ expression: '0 7 * * *', timeZone: 'America/Montevideo' });
+    expect(specOf('expiry-reminders')).toEqual({ expression: '0 9 * * *', timeZone: 'America/Montevideo' });
+    expect(specOf('checkins-monthly')).toEqual({ expression: '0 10 * * *', timeZone: 'America/Montevideo' });
+  });
+
+  it('creates nothing when the three crons fire with SCHEDULER_ENABLED=false, not even on the first Monday', async () => {
+    const client = await signUpClient(ctx.app);
+    await givePerformancePlan(ctx.dataSource, client.userId, { startsOn: '2026-10-20', endsOn: '2026-11-06' });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-11-02T12:30:00Z'));
+      await ctx.app.get(FollowupDetectJob).handleCron();
+      await ctx.app.get(ExpiryRemindersJob).handleCron();
+      await ctx.app.get(CheckinsMonthlyJob).handleCron();
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(await ctx.dataSource.query('SELECT 1 FROM followup_alerts')).toHaveLength(0);
+    expect(await ctx.dataSource.query('SELECT 1 FROM email_logs')).toHaveLength(0);
+    expect(await ctx.dataSource.query('SELECT 1 FROM checkins')).toHaveLength(0);
   });
 
   it('does not run scheduled (non-forced) jobs while SCHEDULER_ENABLED=false', async () => {
