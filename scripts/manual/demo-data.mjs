@@ -14,6 +14,8 @@
 //                           solo si faltan, de apps/api/.env (si existe). Si no hay ni entorno ni archivo, falla.
 //   DB_HOST                 (opcional) mismo origen que las anteriores; si está definido tiene que ser local
 //                           (localhost, 127.0.0.1 o ::1): el script se niega a cargar datos en una base remota.
+//   API_URL                 tiene que apuntar a un host local (misma regla): el script se niega a registrar cuentas ni
+//                           comprar planes en una API remota.
 //
 // Antes de escribir nada comprueba que Docker y la base responden (`SELECT 1`) e imprime la base destino.
 // Las contraseñas nunca se imprimen. Falla con un mensaje claro si ya hay datos de demostración.
@@ -197,11 +199,25 @@ function assertDatabaseReachable(sql, dbName) {
   }
 }
 
-// La carga de demostración escribe usuarios y compras: solo se permite contra una base local.
+// La carga de demostración escribe usuarios y compras: solo se permite contra una base y una API locales.
+const isLocalHost = (host) => LOCAL_DB_HOSTS.has(host.toLowerCase());
+
 function assertLocalDatabaseHost() {
   const host = databaseSetting('DB_HOST');
-  if (host && !LOCAL_DB_HOSTS.has(host.toLowerCase())) {
+  if (host && !isLocalHost(host)) {
     throw new Error('DB_HOST no es local: los datos de demostración solo se cargan en una base local.');
+  }
+}
+
+function assertLocalApiUrl() {
+  let host;
+  try {
+    host = new URL(API_URL).hostname;
+  } catch {
+    throw new Error('API_URL no es una URL válida (por ejemplo http://localhost:3001/api).');
+  }
+  if (!isLocalHost(host)) {
+    throw new Error('API_URL no es local: los datos de demostración solo se cargan en una API local.');
   }
 }
 
@@ -341,6 +357,7 @@ async function main() {
   const dbName = databaseSetting('DB_NAME');
   const dbUser = databaseSetting('DB_USER') ?? 'move';
   if (!dbName) throw new Error('No se sabe qué base usar: definí DB_NAME en el entorno (o creá apps/api/.env con DB_NAME).');
+  assertLocalApiUrl();
   assertLocalDatabaseHost();
   const sql = createSql(dbName, dbUser);
   assertDatabaseReachable(sql, dbName);

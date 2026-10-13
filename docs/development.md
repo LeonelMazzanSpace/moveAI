@@ -17,7 +17,7 @@ pnpm --filter @move/api seed                 # planes, horarios y configuración
 pnpm dev                                     # web en :3000 y API en :3001 (/api)
 ```
 
-El `.env.example` de la API trae valores de desarrollo listos para usar. En lugar de copiarlo a `apps/api/.env`, se puede exportar en el shell con `set -a; . apps/api/.env.example; set +a` (las variables exportadas tienen prioridad sobre un `.env`; hace falta `NODE_ENV=development`, que ya viene en el ejemplo). Las variables de la API están documentadas en [deploy.md](deploy.md#variables-de-entorno-de-la-api); la web usa `NEXT_PUBLIC_API_URL` (`http://localhost:3001/api`) y `NEXT_PUBLIC_GOOGLE_ENABLED`.
+El `.env.example` de la API trae valores de desarrollo listos para usar. En lugar de copiarlo a `apps/api/.env`, se puede exportar en el shell con `set -a; . apps/api/.env.example; set +a` (las variables exportadas tienen prioridad sobre un `.env`; hace falta `NODE_ENV=development`, que ya viene en el ejemplo). Hacelo solo en las consolas de la API y de los scripts del manual, **nunca en la de la web**: el ejemplo trae `PORT=3001` y la web toma su puerto de `PORT` (chocaría con la API). En la consola de la web exportá solo `NEXT_PUBLIC_API_URL`, o corré antes `unset PORT` (o `pnpm dev:web -p 3000`). Por la misma razón, con las variables exportadas no uses `pnpm dev` (web y API comparten el entorno): levantalas con `pnpm dev:api` y `pnpm dev:web` en consolas separadas. Las variables de la API están documentadas en [deploy.md](deploy.md#variables-de-entorno-de-la-api); la web usa `NEXT_PUBLIC_API_URL` (`http://localhost:3001/api`) y `NEXT_PUBLIC_GOOGLE_ENABLED`.
 
 `PORT` y `DB_PORT` aceptan solo dígitos (1 a 65535), `DB_SSL` y `SCHEDULER_ENABLED` solo `true` o `false`, y `TRUST_PROXY_HOPS` un dígito de 0 a 5: otro valor impide que la API arranque. `TRUST_PROXY_HOPS` queda en `0` (el default) en local, donde no hay proxies delante de la API; detrás del ALB + Nginx de Elastic Beanstalk va `2` y nunca `true` (ver [deploy.md](deploy.md#proxy-ip-del-cliente-y-límites-de-checkout)).
 
@@ -30,7 +30,7 @@ El seed carga los planes, precios y horarios del mockup como valores **provisori
 Los clientes se registran desde la web. El staff se crea por línea de comandos:
 
 ```bash
-read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD   # preferible a pasar --password por argv
+printf 'Contraseña del staff: '; read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD; echo   # preferible a pasar --password por argv
 pnpm --filter @move/api user:create-staff -- --email staff@example.com --name "Nombre Apellido"
 unset CREATE_STAFF_PASSWORD
 ```

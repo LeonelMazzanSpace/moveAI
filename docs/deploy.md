@@ -182,7 +182,7 @@ Con las variables `DB_*` del entorno de producción y la contraseña por variabl
 
 ```bash
 cd /tmp/move-api   # el bundle descomprimido del paso 1
-read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD
+printf 'Contraseña del staff: '; read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD; echo
 DB_HOST=… DB_PORT=5432 DB_USER=… DB_PASSWORD=… DB_NAME=… DB_SSL=true \
 BETTER_AUTH_SECRET=… NODE_ENV=production PORT=8080 \
 WEB_URL=https://move.uy API_PUBLIC_URL=https://api.move.uy \

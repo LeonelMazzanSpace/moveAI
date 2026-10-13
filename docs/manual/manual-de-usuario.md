@@ -33,14 +33,21 @@ Esta sección es el camino más corto para ver la plataforma funcionando en tu c
    cp apps/web/.env.example apps/web/.env.local
    ```
 
-   Si preferís no crear archivos, exportá las mismas variables en **cada consola** (el archivo de ejemplo se puede cargar tal cual; incluye `NODE_ENV=development`, que la API exige):
+   Si preferís no crear archivos, exportá las variables así. **El ejemplo de la API va solo en las consolas de la API (pasos 3 a 7) y en la de `manual:demo-data` (paso 8)**; incluye `NODE_ENV=development`, que la API exige:
 
    ```bash
    set -a; . apps/api/.env.example; set +a
-   export NEXT_PUBLIC_API_URL=http://localhost:3001/api    # solo en la consola de la web (paso 9)
    ```
 
-3. **Postgres.** Levanta Postgres 17 en Docker (contenedor `move-postgres`, base `move`, usuario y clave de desarrollo `move`) y espera a que figure como `healthy` en `docker ps` (unos segundos):
+   **En la consola de la web (paso 9) no cargues ese archivo**: trae `PORT=3001`, y la web toma su puerto de `PORT`, así que intentaría usar el 3001 (el de la API) y fallaría con `EADDRINUSE`. Ahí exportá solamente la URL de la API:
+
+   ```bash
+   export NEXT_PUBLIC_API_URL=http://localhost:3001/api
+   ```
+
+   Si reutilizás una consola donde ya cargaste el ejemplo, corré antes `unset PORT` o levantá la web con `pnpm dev:web -p 3000`.
+
+3. **Postgres.** Levanta Postgres 17 en Docker (contenedor `move-postgres`, base `move`, usuario y clave de desarrollo `move`) y espera a que figure como `healthy` en `docker ps` (unos segundos). Corrélo con los valores del ejemplo (base `move`): si tenés `DB_NAME` exportado con otro nombre, Docker recrearía el contenedor con esa base.
 
    ```bash
    pnpm db:up
@@ -61,7 +68,7 @@ Esta sección es el camino más corto para ver la plataforma funcionando en tu c
 6. **Usuario de staff.** Usá el email `staff@example.com`: es el que esperan los scripts de demostración. La contraseña (8 caracteres o más) se escribe sin eco y **no se guarda en ningún archivo**; anotala, la vas a necesitar de nuevo en el paso 8.
 
    ```bash
-   read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD
+   printf 'Contraseña del staff: '; read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD; echo
    pnpm --filter @move/api user:create-staff -- --email staff@example.com --name "Equipo MOVE"
    unset CREATE_STAFF_PASSWORD
    ```
@@ -79,14 +86,14 @@ Esta sección es el camino más corto para ver la plataforma funcionando en tu c
 8. **Cargar los datos de demostración** (consola 2, con la API del paso 7 corriendo). La contraseña del staff es **la misma** del paso 6; la de los clientes es una nueva, de 8 caracteres o más, común a todos los clientes de demo. Ninguna se imprime ni se escribe en un archivo:
 
    ```bash
-   read -rs MANUAL_STAFF_PASSWORD && export MANUAL_STAFF_PASSWORD
-   read -rs MANUAL_CLIENT_PASSWORD && export MANUAL_CLIENT_PASSWORD
+   printf 'Contraseña del staff: '; read -rs MANUAL_STAFF_PASSWORD && export MANUAL_STAFF_PASSWORD; echo
+   printf 'Contraseña de los clientes: '; read -rs MANUAL_CLIENT_PASSWORD && export MANUAL_CLIENT_PASSWORD; echo
    pnpm manual:demo-data
    ```
 
-   El script comprueba que Docker y la base responden, imprime la **base destino** antes de escribir (`Base destino: move …`) y se **niega a cargar** datos si `DB_HOST` no es local. Tarda unos segundos. Solo se puede cargar **una vez por base**: si ya hay datos de demostración, avisa y no hace nada (para repetirlo, usá una base nueva: ver [Regenerar este manual](#regenerar-este-manual)). Las fechas son relativas al día de la carga (planes que vencen en unos días, asistencias de las últimas semanas, turnos de hoy).
+   El script comprueba que Docker y la base responden, imprime la **base destino** antes de escribir (`Base destino: move …`) y se **niega a cargar** datos si `DB_HOST` o `API_URL` no son locales (localhost, 127.0.0.1 o ::1). Tarda unos segundos. Solo se puede cargar **una vez por base**: si ya hay datos de demostración, avisa y no hace nada (para repetirlo, usá una base nueva: ver [Regenerar este manual](#regenerar-este-manual)). Las fechas son relativas al día de la carga (planes que vencen en unos días, asistencias de las últimas semanas, turnos de hoy).
 
-9. **Levantar la web** (consola 3) y abrir `http://localhost:3000/ingresar`:
+9. **Levantar la web** (consola 3, **sin** `PORT` exportado: ver el paso 2) y abrir `http://localhost:3000/ingresar`:
 
    ```bash
    pnpm dev:web
@@ -114,7 +121,7 @@ Esta sección es el camino más corto para ver la plataforma funcionando en tu c
 
 Las cuentas de los invitados (`paula.rivero` y `mateo.lemos`) **no pueden ingresar** en local: su acceso se define con el link de un email de invitación y, en dry-run, el email no sale ni guarda el link (ver el paso 7 de [Local, paso a paso](#local-paso-a-paso)). Sirven para ver sus compras en **Pagos** y sus turnos en **Turnos y asistencia**.
 
-**Para volver a empezar** con una base limpia sin tocar otras: `docker exec move-postgres createdb -U move move_demo`, exportar `DB_NAME=move_demo` en las consolas de la API y de los scripts, y repetir desde el paso 4. Para frenar todo: `Ctrl+C` en las consolas de la API y de la web, y `pnpm db:down` para apagar Postgres (los datos quedan en el volumen de Docker).
+**Para volver a empezar** con una base limpia sin tocar otras: `docker exec move-postgres createdb -U move move_demo`, exportar `DB_NAME=move_demo` en las consolas de la API y de los scripts, y repetir desde el paso 4. **No corras `pnpm db:up` ni `pnpm db:down` con `DB_NAME` exportado distinto de `move`**: Docker recrearía el contenedor de Postgres con esa base. Para frenar todo: `Ctrl+C` en las consolas de la API y de la web, y `pnpm db:down` para apagar Postgres (los datos quedan en el volumen de Docker).
 
 **Si algo falla:**
 
@@ -642,7 +649,7 @@ Requisitos: Node 24 (`nvm use` lee `.nvmrc`), pnpm 10 (`corepack enable`) y Dock
      cp apps/web/.env.example apps/web/.env.local
      ```
 
-   - O exportar esas mismas variables en el shell, sin crear archivos (la API, las migraciones, el seed y los scripts del manual leen el entorno del proceso): `set -a; . apps/api/.env.example; set +a`. Las variables exportadas tienen prioridad sobre las de un `.env`. Hace falta `NODE_ENV=development`: ya viene en el ejemplo.
+   - O exportar esas mismas variables en el shell, sin crear archivos (la API, las migraciones, el seed y los scripts del manual leen el entorno del proceso): `set -a; . apps/api/.env.example; set +a`. Las variables exportadas tienen prioridad sobre las de un `.env`. Hace falta `NODE_ENV=development`: ya viene en el ejemplo. Cargá el ejemplo **solo en las consolas de la API y de los scripts del manual**, nunca en la de la web: trae `PORT=3001` y la web toma su puerto de `PORT`. En la consola de la web exportá solo `NEXT_PUBLIC_API_URL` (o corré antes `unset PORT`).
 
    La web necesita `NEXT_PUBLIC_API_URL=http://localhost:3001/api` (está en `apps/web/.env.example`). La lista completa de variables está en [Variables por proveedor](#variables-por-proveedor).
 
@@ -657,7 +664,7 @@ Requisitos: Node 24 (`nvm use` lee `.nvmrc`), pnpm 10 (`corepack enable`) y Dock
 4. **Primer usuario de staff.** La contraseña va por variable de entorno, nunca por argumento:
 
    ```bash
-   read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD
+   printf 'Contraseña del staff: '; read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD; echo
    pnpm --filter @move/api user:create-staff -- --email staff@example.com --name "Nombre Apellido"
    unset CREATE_STAFF_PASSWORD
    ```
@@ -678,6 +685,7 @@ Requisitos: Node 24 (`nvm use` lee `.nvmrc`), pnpm 10 (`corepack enable`) y Dock
 
    ```bash
    pnpm dev          # web en :3000 y API en :3001 (o por separado: pnpm dev:api y pnpm dev:web)
+                     # con las variables exportadas en el shell, usá consolas separadas: `pnpm dev` pasaría PORT=3001 también a la web
    curl http://localhost:3001/api/health      # {"status":"ok"}
    ```
 
@@ -823,7 +831,7 @@ No van a ningún ambiente en la nube: `E2E_DATABASE_NAME` (solo tests) y `CREATE
    bash scripts/package-api-eb.sh                       # genera artifacts/move-api-<sha>.zip
    unzip artifacts/move-api-<sha>.zip -d /tmp/move-api && cd /tmp/move-api
    export DB_HOST=<host directo> DB_PORT=5432 DB_USER=<rol> DB_NAME=<base> DB_SSL=true
-   read -rs DB_PASSWORD && export DB_PASSWORD
+   printf 'Contraseña de la base: '; read -rs DB_PASSWORD && export DB_PASSWORD; echo
    node_modules/.bin/typeorm migration:run -d dist/database/data-source.js
    node dist/database/seed.js                            # planes, horarios y configuración provisorios (idempotente)
    ```
@@ -1062,7 +1070,7 @@ Los clientes se registran desde la web; el staff se crea por línea de comandos,
 
 ```bash
 cd /tmp/move-api          # bundle descomprimido: unzip artifacts/move-api-<sha>.zip -d /tmp/move-api
-read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD
+printf 'Contraseña del staff: '; read -rs CREATE_STAFF_PASSWORD && export CREATE_STAFF_PASSWORD; echo
 # exportar también NODE_ENV, PORT, WEB_URL, API_PUBLIC_URL, DB_*, BETTER_AUTH_SECRET, MP_*, BREVO_* del ambiente
 SCHEDULER_ENABLED=false node dist/cli/create-staff.js --email <email> --name "<Nombre Apellido>"
 unset CREATE_STAFF_PASSWORD
@@ -1101,11 +1109,12 @@ Este manual y sus capturas se generan con datos de demostración inventados. Las
 # 1. Base de demostración vacía (migrada y con seed) y un staff creado con user:create-staff (pasos 4 a 6 de "Probar MOVE en local"),
 #    usando como CREATE_STAFF_PASSWORD la misma contraseña que se va a pasar en MANUAL_STAFF_PASSWORD
 # 2. API corriendo (pnpm dev:api) y la web compilada para producción: pnpm --filter @move/web build y pnpm --filter @move/web start.
-#    El script de build ya fija NODE_ENV=production: no hace falta exportarlo ni cambiarlo. Definir DB_NAME (y DB_USER si no es "move"),
+#    El script de build ya fija NODE_ENV=production: no hace falta exportarlo ni cambiarlo. En la consola de la web no debe haber
+#    un PORT exportado (la web toma su puerto de PORT; el del ejemplo de la API es 3001). Definir DB_NAME (y DB_USER si no es "move"),
 #    API_URL (con /api) y WEB_URL (origen de la web); por defecto apuntan a http://localhost:3001/api y http://localhost:3000
 export DB_NAME=move_demo API_URL=http://localhost:3001/api WEB_URL=http://localhost:3000   # ejemplo
-read -rs MANUAL_STAFF_PASSWORD && export MANUAL_STAFF_PASSWORD
-read -rs MANUAL_CLIENT_PASSWORD && export MANUAL_CLIENT_PASSWORD     # mínimo 8 caracteres
+printf 'Contraseña del staff: '; read -rs MANUAL_STAFF_PASSWORD && export MANUAL_STAFF_PASSWORD; echo
+printf 'Contraseña de los clientes: '; read -rs MANUAL_CLIENT_PASSWORD && export MANUAL_CLIENT_PASSWORD; echo     # mínimo 8 caracteres
 pnpm exec playwright install chromium     # una sola vez
 pnpm manual:demo-data       # carga 10 clientes de ejemplo en distintos estados, reservas, pagos, alertas y check-ins
 pnpm manual:screenshots     # una captura por pantalla en docs/manual/img/ (1440×900)
@@ -1115,8 +1124,9 @@ pnpm manual:pdf             # genera docs/manual/manual-de-usuario.pdf (A4, imá
 ```
 
 - Para cambiar solo el texto o el diagrama no hace falta la base ni la API: alcanza con editar el Markdown (o `arquitectura.html` y correr `render-diagram.mjs`) y correr `pnpm manual:pdf`.
-- `manual:demo-data` hace estas comprobaciones **antes de escribir** nada: Docker y la base responden (`SELECT 1`), `DB_HOST` (si está definido) es local, y la base no tiene ya datos de demostración. Imprime la base destino (`Base destino: …`) y, si algo no se cumple, termina con un mensaje claro. La historia (asistencias pasadas y planes que vencen o vencieron) no se puede crear por la API porque no admite reservar ni marcar asistencia en el pasado: esos datos se insertan con SQL en la base de desarrollo mediante `docker exec <contenedor> psql` (contenedor `move-postgres`, o `MANUAL_DB_CONTAINER`), solo para los clientes de demostración.
-- `manual:screenshots` captura primero en un directorio temporal y **reemplaza las imágenes de `docs/manual/img/` solo si todas las capturas salieron bien**; si falla a la mitad, las imágenes actuales quedan intactas. No toca `arquitectura.png`.
+- `manual:demo-data` hace estas comprobaciones **antes de escribir** nada: `API_URL` y `DB_HOST` (si está definido) son locales, Docker y la base responden (`SELECT 1`), y la base no tiene ya datos de demostración. Imprime la base destino (`Base destino: …`) y, si algo no se cumple, termina con un mensaje claro. La historia (asistencias pasadas y planes que vencen o vencieron) no se puede crear por la API porque no admite reservar ni marcar asistencia en el pasado: esos datos se insertan con SQL en la base de desarrollo mediante `docker exec <contenedor> psql` (contenedor `move-postgres`, o `MANUAL_DB_CONTAINER`), solo para los clientes de demostración.
+- `manual:screenshots` captura primero en un directorio temporal y **reemplaza las imágenes de `docs/manual/img/` solo si salieron todas las capturas esperadas (38)**: arma una carpeta nueva al lado y la renombra en el lugar de la actual, así que si algo falla las imágenes actuales quedan intactas y nunca queda un juego a medias. No toca `arquitectura.png`. Al agregar o quitar una pantalla hay que actualizar `EXPECTED_IMAGE_COUNT` en `scripts/manual/capture.mjs`.
+- No corras `pnpm db:up` ni `pnpm db:down` con `DB_NAME=move_demo` exportado: Docker recrearía el contenedor de Postgres con esa base. Crear la base de demostración con `docker exec move-postgres createdb -U move move_demo` alcanza.
 - `manual:screenshots` compra un paquete de Recovery con el cliente de demostración Nicolás Acosta (checkout → simulador → resultado); volver a correrlo agrega otra compra, así que para repetir las capturas conviene recrear la base de demostración. La captura de Recovery (`07`) se toma sin sesión iniciada, como un invitado.
 - Usuarios de la demostración: la tabla de [Probar MOVE en local](#probar-move-en-local). El staff es `staff@example.com` (o `MANUAL_STAFF_EMAIL`) con la contraseña de `MANUAL_STAFF_PASSWORD`; los clientes, con la de `MANUAL_CLIENT_PASSWORD`.
 

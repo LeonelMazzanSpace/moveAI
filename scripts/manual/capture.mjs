@@ -10,11 +10,11 @@
 //   WEB_URL                 (opcional) default http://localhost:3000
 //   API_URL                 (opcional) default http://localhost:3001/api
 //
-// Las capturas se toman primero en un directorio temporal y solo si salieron todas se reemplazan las de
-// docs/manual/img/ (nombres estables; arquitectura.png no es de este script y no se toca). Si algo falla, las imágenes
-// actuales quedan como estaban. La última parte recorre el checkout de un paquete Recovery con un cliente sin paquete
+// Las capturas se toman primero en un directorio temporal. Solo si salieron todas (EXPECTED_IMAGE_COUNT) se arma una
+// carpeta nueva junto a docs/manual/img/ y se la renombra en su lugar (nombres estables; arquitectura.png y cualquier
+// otro archivo que no sea una captura se conservan). Si algo falla, las imágenes actuales quedan como estaban. La última parte recorre el checkout de un paquete Recovery con un cliente sin paquete
 // (Nicolás Acosta): crea una compra y la aprueba con el simulador de pagos.
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +26,8 @@ const STAFF_EMAIL = process.env.MANUAL_STAFF_EMAIL ?? 'staff@example.com';
 const IMG_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../docs/manual/img');
 const VIEWPORT = { width: 1440, height: 900 };
 const KEPT_IMAGES = new Set(['arquitectura.png']);
+// Cantidad de capturas de este script (01–38): actualizarla al agregar o quitar una pantalla.
+const EXPECTED_IMAGE_COUNT = 38;
 
 const CLIENT_EMAILS = {
   sofia: 'sofia.martinez@example.com',
@@ -42,13 +44,39 @@ function requireEnv(name) {
 
 let outputDir;
 
-// Reemplaza las capturas anteriores por las nuevas; se llama solo cuando todas salieron bien.
+// Reemplaza las capturas anteriores por las nuevas sin dejar nunca un juego a medias: arma una carpeta hermana con todo
+// y la renombra en el lugar de la actual (si el segundo renombre falla, vuelve a poner la anterior).
 function publishImages() {
-  mkdirSync(IMG_DIR, { recursive: true });
-  for (const file of readdirSync(IMG_DIR)) {
-    if (file.endsWith('.png') && !KEPT_IMAGES.has(file)) rmSync(resolve(IMG_DIR, file));
+  const captured = readdirSync(outputDir).filter((file) => file.endsWith('.png'));
+  if (captured.length !== EXPECTED_IMAGE_COUNT) {
+    throw new Error(`Se esperaban ${EXPECTED_IMAGE_COUNT} capturas y salieron ${captured.length}.`);
   }
-  for (const file of readdirSync(outputDir)) copyFileSync(resolve(outputDir, file), resolve(IMG_DIR, file));
+  const staging = `${IMG_DIR}.new`;
+  const previous = `${IMG_DIR}.old`;
+  rmSync(staging, { recursive: true, force: true });
+  rmSync(previous, { recursive: true, force: true });
+  mkdirSync(staging, { recursive: true });
+  const hadImages = existsSync(IMG_DIR);
+  try {
+    if (hadImages) {
+      for (const file of readdirSync(IMG_DIR)) {
+        if (!file.endsWith('.png') || KEPT_IMAGES.has(file)) copyFileSync(resolve(IMG_DIR, file), resolve(staging, file));
+      }
+    }
+    for (const file of captured) copyFileSync(resolve(outputDir, file), resolve(staging, file));
+    if (hadImages) renameSync(IMG_DIR, previous);
+  } catch (error) {
+    rmSync(staging, { recursive: true, force: true });
+    throw error;
+  }
+  try {
+    renameSync(staging, IMG_DIR);
+  } catch (error) {
+    if (hadImages) renameSync(previous, IMG_DIR);
+    rmSync(staging, { recursive: true, force: true });
+    throw error;
+  }
+  rmSync(previous, { recursive: true, force: true });
 }
 
 const todayLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Montevideo' }).format(new Date());
