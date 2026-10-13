@@ -1,19 +1,15 @@
-import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module.js';
+import { configureApp } from './app.setup.js';
 import { appConfig } from './config/app.config.js';
 import type { ConfigType } from '@nestjs/config';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   const config = app.get<ConfigType<typeof appConfig>>(appConfig.KEY);
 
-  app.setGlobalPrefix('api');
-  app.enableCors({ origin: config.webUrl, credentials: true });
-  app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
-  );
-  app.enableShutdownHooks();
+  configureApp(app);
 
   await app.listen(config.port);
 }
