@@ -55,7 +55,7 @@ Variables que **no** van a producción: `E2E_DATABASE_NAME` (solo tests) y `CREA
 
 ## 1. Base de datos en Neon
 
-1. En el proyecto Neon existente de MOVE (o uno nuevo con Postgres 17), crear una **base nueva** (por ejemplo `move`) con un rol propio como dueño. No reutilizar ni migrar el esquema anterior. Desarrollo va en otro branch (`development`, sin borrado automático) con **otro rol y otra base**: un branch hereda los roles y contraseñas del padre.
+1. En el proyecto Neon existente de MOVE (o uno nuevo con Postgres 17), crear una **base nueva** (por ejemplo `move`) con un rol propio como dueño. No reutilizar ni migrar el esquema anterior. Desarrollo va en otro branch (`development`, sin borrado automático) con **otro rol y otra base**: un branch hereda los roles y las contraseñas del padre (salvo que el padre sea un *protected branch*: entonces Neon genera contraseñas nuevas para el hijo).
 2. Copiar host directo (en **Connect**, con *Connection pooling* apagado), usuario, contraseña y nombre a las variables `DB_*` y definir `DB_SSL=true`.
 3. Las migraciones se corren **antes** de cambiar el tráfico a la versión nueva, desde el mismo bundle que se va a desplegar (el bundle no incluye el CLI de Nest, por eso se llama a TypeORM directo):
 
@@ -113,6 +113,7 @@ Web y API van bajo el mismo dominio raíz para que la cookie de sesión sea firs
 |---|---|
 | Web (Vercel) | `move.uy` |
 | API (Elastic Beanstalk) | `api.move.uy` |
+| Web y API de desarrollo | Otro dominio registrable: `<dominio-dev>` y `api.<dominio-dev>`, con `COOKIE_DOMAIN=.<dominio-dev>` (ver [Vercel](#4-web-en-vercel), paso 4) |
 
 - `COOKIE_DOMAIN=.move.uy` (con el punto inicial), `WEB_URL=https://move.uy`, `API_PUBLIC_URL=https://api.move.uy`, `NEXT_PUBLIC_API_URL=https://api.move.uy/api`.
 - `api.move.uy`: registro CNAME hacia el entorno de Beanstalk (o alias al balanceador) con certificado HTTPS.
@@ -123,7 +124,7 @@ Web y API van bajo el mismo dominio raíz para que la cookie de sesión sea firs
 1. Importar el repositorio en el proyecto existente de MOVE en Vercel con **Root Directory** `apps/web` (framework Next.js; Vercel detecta pnpm por `packageManager`) y Node 24.
 2. Definir `NEXT_PUBLIC_API_URL` y, si corresponde, `NEXT_PUBLIC_GOOGLE_ENABLED` en el ambiente *Production*.
 3. Producción se publica desde la rama `main`; las demás ramas generan previews.
-4. En el ambiente *Preview* definir `NEXT_PUBLIC_API_URL` apuntando a la API de **desarrollo**. Cada API solo acepta (CORS y cookies) el origen de su `WEB_URL`: los previews con URL automática (`*.vercel.app`) sirven para mirar páginas, y los flujos completos de desarrollo se prueban en un dominio fijo asignado a la rama de desarrollo (por ejemplo `dev.move.uy`, con la API de desarrollo en `api.dev.move.uy` y `COOKIE_DOMAIN=.dev.move.uy`).
+4. En el ambiente *Preview* definir `NEXT_PUBLIC_API_URL` apuntando a la API de **desarrollo**. Cada API solo acepta (CORS y cookies) el origen de su `WEB_URL`: los previews con URL automática (`*.vercel.app`) sirven para mirar páginas, y los flujos completos de desarrollo se prueban en un dominio fijo asignado a la rama de desarrollo. Ese dominio tiene que ser **otro dominio registrable** (`<dominio-dev>`, con la API en `api.<dominio-dev>` y `COOKIE_DOMAIN=.<dominio-dev>`), no un subdominio de producción: con `dev.move.uy`, la cookie de sesión de producción (`.move.uy`, también la del staff) llegaría al código de desarrollo, y `dev.move.uy` sería el mismo sitio que `api.move.uy`, así que `SameSite=Lax` no frenaría un formulario de desarrollo contra la API de producción. Si igual se elige un subdominio, es una decisión abierta con riesgo aceptado y los perfiles de navegador separados son obligatorios (ver [Ambientes separados](manual/manual-de-usuario.md#ambientes-separados-de-desarrollo-y-producción)).
 5. Agregar el dominio `move.uy` al proyecto.
 
 ## 5. Servicios externos
@@ -136,11 +137,15 @@ Web y API van bajo el mismo dominio raíz para que la cookie de sesión sea firs
 
 ### Mercado Pago
 
-1. Primero probar de punta a punta con las **credenciales de prueba** (usuarios y tarjetas de prueba) en un entorno de staging; recién después cambiar a las credenciales de producción.
+1. Primero probar de punta a punta con las **credenciales de prueba** (usuarios y tarjetas de prueba) en el ambiente de **desarrollo**; recién después cambiar a las credenciales de producción. Los pagos con credenciales de prueba pueden no generar avisos: en desarrollo la firma se prueba con **Webhooks → Simular** del panel, y el pago entra por la conciliación (compras pendientes con más de `reconcileAfterMinutes`, cada 10 minutos).
 2. Cargar `MP_ACCESS_TOKEN` con el access token de la aplicación.
 3. En *Tus integraciones → Webhooks*, configurar la URL `https://<api>/api/payments/webhook/mercadopago` con el evento de pagos y copiar la clave secreta a `MP_WEBHOOK_SECRET`.
-4. La API verifica la firma de cada notificación (firma inválida: 401 sin efectos) y es idempotente: repetir una notificación, o recibirla además por la conciliación, no duplica la suscripción ni extiende la vigencia dos veces.
-5. Comportamiento a conocer: los pagos de plan rechazados quedan en `pending` (el cliente puede reintentar); la conciliación periódica también revisa las compras de plan vencidas (`expired`) de los últimos 7 días, porque su preferencia todavía puede pagarse tarde. Si un pago se aprueba cuando la reserva ya venció y el turno no tiene cupo, la compra queda aprobada y marcada para atención del staff (sin reembolso automático).
+4. La API verifica la firma de cada notificación con formato Webhooks (firma inválida: 401 sin efectos) y es idempotente: repetir una notificación, o recibirla además por la conciliación, no duplica la suscripción ni extiende la vigencia dos veces.
+5. Cada preferencia lleva su propia `notification_url`, que tiene prioridad sobre la URL del panel. Mientras sea así (decisión abierta D68, ver [el manual](manual/manual-de-usuario.md#decisión-d68-avisos-de-mercado-pago)):
+   - Los avisos con formato **IPN** (`?topic=…&id=…`) que Mercado Pago mande a esa URL no se pueden firmar y la API los responde **401**: es esperado y sin efectos. **No restablecer `MP_WEBHOOK_SECRET` por eso**: rompería los avisos firmados.
+   - Mercado Pago no documenta si los avisos con formato Webhooks enviados a la `notification_url` de una preferencia traen un `x-signature` válido: confirmarlo con el primer pago real.
+   - D68: antes de producción elegir entre (a) responder 200 sin efectos a los avisos IPN o que no sean de pagos antes de verificar la firma, o (b) quitar la `notification_url` de las preferencias y usar la URL del panel con una aplicación de Mercado Pago por ambiente (cada ambiente con su clave secreta). Recomendada: (b), confirmada con un pago real.
+6. Comportamiento a conocer: los pagos de plan rechazados quedan en `pending` (el cliente puede reintentar); la conciliación periódica también revisa las compras vencidas (`expired`) de cualquier tipo, de plan o de reserva, de los últimos 7 días, porque su preferencia todavía puede pagarse tarde (D60). Si un pago se aprueba cuando la reserva ya venció y el turno no tiene cupo, la compra queda aprobada y marcada para atención del staff (sin reembolso automático).
 
 ### Brevo
 
@@ -188,7 +193,7 @@ Si ya existe una cuenta con ese email, el comando la rechaza y termina con error
 - [ ] IP real detrás del proxy (`TRUST_PROXY_HOPS=2`): desde una red, 11 `POST /api/checkout/booking` seguidos con ids inexistentes (`{"planId":"<uuid>","timeSlotId":"<uuid>","guest":{…}}`): los primeros 10 dan 404 y el 11.º 429; agregar `-H 'X-Forwarded-For: 1.2.3.4'` no lo evita; y en el mismo minuto, desde otra red (por ejemplo datos móviles) la primera request da 404, no 429.
 - [ ] Ingreso del staff y apertura de Dashboard, Clientes y Configuración.
 - [ ] Pago de prueba: compra de un plan con credenciales de prueba de Mercado Pago hasta ver la suscripción activa.
-- [ ] Webhook recibido: en el log de la API aparece `webhook payment=<id>` y la compra pasa a aprobada; reenviar la notificación desde el panel de Mercado Pago no duplica nada.
+- [ ] Webhook: en desarrollo, **Webhooks → Simular** a la URL de pruebas responde 200 (o 502 con un id inventado; nunca 401). En producción, con el primer pago real, en el log aparece `webhook payment=<id>` y la compra pasa a aprobada sin esperar la conciliación; si solo hay 401, resolver D68 antes de seguir. Los 401 a avisos IPN (`?topic=…`) son esperados. Reenviar la notificación desde el panel de Mercado Pago no duplica nada.
 - [ ] Email recibido: restablecer la contraseña de una cuenta de prueba y recibir el correo de Brevo (o ver el envío en el panel de Brevo).
 - [ ] Cron ejecutado en los logs: aparecen líneas `job expire-holds …` y `job reconcile-payments …` (corren solas) y, tras `POST /api/staff/automations/run/followup-detect`, la línea `job followup-detect …`. Con varias instancias, comprobar que solo una registra los jobs.
 - [ ] Neon: las tablas existen en la base nueva y la conexión usa SSL.

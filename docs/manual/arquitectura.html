@@ -30,7 +30,7 @@
 <div id="diagram">
   <h1>MOVE — Arquitectura de producción (objetivo)</h1>
   <p class="sub">Hoy todo corre en local (Postgres en Docker, simulador de pagos y emails en dry-run). Dominios de ejemplo: el dominio final es una decisión pendiente.</p>
-  <svg width="1336" height="830" viewBox="0 0 1336 830" xmlns="http://www.w3.org/2000/svg">
+  <svg width="1336" height="860" viewBox="0 0 1336 860" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
         <path d="M0,0 L10,5 L0,10 z" fill="#1a1a1a" />
@@ -143,9 +143,9 @@
     <path class="arrow dash" d="M170 140 L170 295" />
     <rect class="label-bg" x="60" y="230" width="104" height="20" />
     <text class="label" x="62" y="246">8. Ingreso</text>
-    <path class="arrow dash" d="M320 400 L380 400 Q400 400 400 420 L400 470 L465 470" />
-    <rect class="label-bg" x="300" y="440" width="96" height="20" />
-    <text class="label" x="302" y="456">callback</text>
+    <path class="arrow dash" d="M320 400 L380 400 Q400 400 400 380 L400 330 L465 330" />
+    <rect class="label-bg" x="324" y="406" width="76" height="20" />
+    <text class="label" x="326" y="422">callback</text>
 
     <!-- Leyenda -->
     <text class="legend" x="960" y="640">Línea continua: llamada de la plataforma.</text>
@@ -154,7 +154,8 @@
     <text class="legend" x="960" y="726">Callbacks en la API:</text>
     <text class="mono" x="960" y="750">/api/auth/callback/google</text>
     <text class="mono" x="960" y="774">/api/payments/webhook/mercadopago</text>
-    <text class="mono" x="960" y="798">/api/health (health check)</text>
+    <text class="legend" x="960" y="824">Health check del balanceador:</text>
+    <text class="mono" x="960" y="848">/api/health</text>
   </svg>
 </div>
 </body>
