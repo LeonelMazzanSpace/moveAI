@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConditionalModule, ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CommonModule } from './common/common.module.js';
 import { appConfig } from './config/app.config.js';
@@ -18,6 +18,7 @@ import { CatalogModule } from './modules/catalog/catalog.module.js';
 import { ClientsModule } from './modules/clients/clients.module.js';
 import { FollowupModule } from './modules/followup/followup.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
+import { DevSimulatorModule } from './modules/payments/dev-simulator.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
 import { SettingsModule } from './modules/settings/settings.module.js';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module.js';
@@ -44,6 +45,7 @@ import { UsersModule } from './modules/users/users.module.js';
     SubscriptionsModule,
     BookingsModule,
     PaymentsModule,
+    ConditionalModule.registerWhen(DevSimulatorModule, (env) => env.NODE_ENV !== 'production'),
     FollowupModule,
     ClientsModule,
     AutomationsModule,

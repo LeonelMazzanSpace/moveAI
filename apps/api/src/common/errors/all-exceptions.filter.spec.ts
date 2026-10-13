@@ -36,6 +36,14 @@ describe('toErrorBody', () => {
     expect(toErrorBody(badJson)).toEqual(VALIDATION_FAILED);
   });
 
+  it('keeps the status-specific code for exposed http-errors that Nest would map the same way', () => {
+    const exposed = (status: number) => Object.assign(new Error('x'), { status, expose: true });
+    expect(toErrorBody(exposed(401)).code).toBe('UNAUTHENTICATED');
+    expect(toErrorBody(exposed(403)).code).toBe('FORBIDDEN');
+    expect(toErrorBody(exposed(404))).toEqual({ statusCode: 404, code: 'NOT_FOUND', message: 'No encontrado.' });
+    expect(toErrorBody(exposed(415))).toEqual(VALIDATION_FAILED);
+  });
+
   it('keeps 500 for errors that carry a status but are not exposed 4xx errors', () => {
     expect(toErrorBody(Object.assign(new Error('x'), { status: 413, expose: false }))).toEqual(INTERNAL_ERROR);
     expect(toErrorBody(Object.assign(new Error('x'), { status: 413 }))).toEqual(INTERNAL_ERROR);
