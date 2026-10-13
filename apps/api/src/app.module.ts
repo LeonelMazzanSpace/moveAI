@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { CommonModule } from './common/common.module.js';
 import { appConfig } from './config/app.config.js';
 import { authConfig } from './config/auth.config.js';
@@ -9,6 +10,7 @@ import { mercadoPagoConfig } from './config/mercado-pago.config.js';
 import { schedulerConfig } from './config/scheduler.config.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
+import { AgendaModule } from './modules/schedule/agenda.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { CatalogModule } from './modules/catalog/catalog.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
@@ -24,6 +26,7 @@ import { UsersModule } from './modules/users/users.module.js';
       validate,
       load: [appConfig, databaseConfig, authConfig, mercadoPagoConfig, schedulerConfig],
     }),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     CommonModule,
     HealthModule,
@@ -32,6 +35,7 @@ import { UsersModule } from './modules/users/users.module.js';
     UsersModule,
     AuthModule,
     CatalogModule,
+    AgendaModule,
     SubscriptionsModule,
   ],
 })
