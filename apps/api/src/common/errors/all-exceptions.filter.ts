@@ -19,7 +19,10 @@ const genericBody = (code: ErrorCode): ApiErrorBody => {
 export function toErrorBody(exception: unknown): ApiErrorBody {
   if (exception instanceof AppError) return exception.getResponse() as ApiErrorBody;
   if (exception instanceof HttpException) {
-    return genericBody(CODE_BY_STATUS[exception.getStatus()] ?? 'INTERNAL_ERROR');
+    const status = exception.getStatus();
+    // Client errors without a contract code (413, 409, 429…) are still client errors, not 500s.
+    const fallback: ErrorCode = status < 500 ? 'VALIDATION_FAILED' : 'INTERNAL_ERROR';
+    return genericBody(CODE_BY_STATUS[status] ?? fallback);
   }
   return genericBody('INTERNAL_ERROR');
 }
