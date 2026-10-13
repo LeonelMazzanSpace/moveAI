@@ -9,10 +9,6 @@ interface PlansSectionProps {
   hrefFor: (plan: PlanDto) => string;
 }
 
-export function unitLabelFor(plan: PlanDto): string | undefined {
-  return plan.kind === 'session_pack' ? '/mes' : undefined;
-}
-
 export function PlansUnavailable() {
   return <EmptyState title="Planes no disponibles por el momento" description="Volvé a intentar en unos minutos." />;
 }
@@ -33,7 +29,7 @@ export function PlansSection({ plans, ctaLabel, hrefFor }: PlansSectionProps) {
   return (
     <div className="grid gap-6 md:grid-cols-3">
       {plans.map((plan) => (
-        <PlanCard key={plan.id} plan={plan} ctaHref={hrefFor(plan)} ctaLabel={ctaLabel} unitLabel={unitLabelFor(plan)} />
+        <PlanCard key={plan.id} plan={plan} ctaHref={hrefFor(plan)} ctaLabel={ctaLabel} />
       ))}
     </div>
   );

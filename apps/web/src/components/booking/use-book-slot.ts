@@ -31,6 +31,7 @@ export function useBookSlot() {
     onSettled: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: ['time-slots'] }),
+        queryClient.invalidateQueries({ queryKey: ['availability'] }),
         queryClient.invalidateQueries({ queryKey: ['me', 'bookings'] }),
       ]),
   });

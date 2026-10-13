@@ -70,4 +70,31 @@ describe('ActivityList', () => {
     renderList();
     expect(await screen.findByText('Todavía no tenés actividad')).toBeInTheDocument();
   });
+
+  it('hints that the list is refreshing while the previous filter stays visible, then clears it', async () => {
+    const user = userEvent.setup();
+    let resolvePayments: (value: Paginated<ActivityItemDto>) => void = () => undefined;
+    apiFetch.mockImplementation((_path: string, init: { query: { type: string } }) =>
+      init.query.type === 'payments' ? new Promise((resolve) => (resolvePayments = resolve)) : Promise.resolve(page(items)),
+    );
+    renderList();
+    await screen.findByText('Asistencia — Performance 18:00');
+    expect(screen.queryByText('Actualizando…')).toBeNull();
+
+    await user.click(screen.getByRole('tab', { name: 'Pagos' }));
+
+    expect(await screen.findByText('Actualizando…')).toBeInTheDocument();
+    expect(screen.getByText('Asistencia — Performance 18:00')).toBeInTheDocument();
+
+    resolvePayments(page([items[2]]));
+    await waitFor(() => expect(screen.queryByText('Actualizando…')).toBeNull());
+    expect(screen.queryByText('Asistencia — Performance 18:00')).toBeNull();
+    expect(screen.getByText('Pago — Paquete Recovery 4 sesiones · $ 3.200')).toBeInTheDocument();
+  });
+
+  it('does not show the hint on the first load', () => {
+    apiFetch.mockReturnValue(new Promise(() => undefined));
+    renderList();
+    expect(screen.queryByText('Actualizando…')).toBeNull();
+  });
 });

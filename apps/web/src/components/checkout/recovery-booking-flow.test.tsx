@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api/errors';
@@ -99,12 +99,13 @@ describe('RecoveryBookingFlow', () => {
   });
 
   it('lets a guest pick a single session and keeps the date and slot picker open', async () => {
-    // Un visitante: el primer GET /me falla de inmediato; el segundo (el del flujo de pago al montarse) tarda, como en la red real.
+    // Un visitante: el primer GET /me falla de inmediato; el segundo (el del flujo de pago al montarse) queda pendiente hasta que el test lo resuelve.
     let meCalls = 0;
+    let rejectSecondMe: () => void = () => undefined;
     apiFetch.mockImplementation(async (path: string) => {
       if (path === '/me') {
         meCalls += 1;
-        if (meCalls > 1) await new Promise((resolve) => setTimeout(resolve, 50));
+        if (meCalls > 1) await new Promise<void>((_, reject) => (rejectSecondMe = () => reject(new ApiError(401, 'UNAUTHENTICATED', 'x'))));
         throw new ApiError(401, 'UNAUTHENTICATED', 'x');
       }
       if (path === '/settings/public') return settings;
@@ -118,10 +119,89 @@ describe('RecoveryBookingFlow', () => {
     await userEvent.click(await screen.findByRole('button', { name: String(Number(today.slice(8))) }));
     await userEvent.click(await screen.findByRole('button', { name: '11:00' }));
     await vi.waitFor(() => expect(meCalls).toBeGreaterThan(1));
-    await new Promise((resolve) => setTimeout(resolve, 150));
 
+    // La segunda consulta de /me sigue en vuelo: el selector no se reemplaza por el esqueleto.
     expect(screen.getByRole('button', { name: 'Sesión individual' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: '11:00' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeEnabled();
+
+    expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeDisabled();
+    await act(async () => rejectSecondMe());
+
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeEnabled());
+    expect(screen.getByRole('button', { name: 'Sesión individual' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '11:00' })).toBeInTheDocument();
+  });
+
+  it('takes a guest from the single session to the guest form', async () => {
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path === '/me') throw new ApiError(401, 'UNAUTHENTICATED', 'x');
+      if (path === '/settings/public') return settings;
+      if (path === '/schedule/availability') return [{ date: today, available: 3 }];
+      if (path === '/schedule/time-slots') return [slot];
+      throw new Error(`unexpected request ${path}`);
+    });
+    renderFlow();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sesión individual' }));
+    await userEvent.click(await screen.findByRole('button', { name: String(Number(today.slice(8))) }));
+    await userEvent.click(await screen.findByRole('button', { name: '11:00' }));
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeEnabled());
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar al pago' }));
+
+    expect(await screen.findByLabelText('Nombre')).toBeInTheDocument();
+    expect(screen.getByLabelText('Email')).toBeInTheDocument();
+    expect(screen.getByLabelText('Teléfono')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ir a pagar' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Continuar al pago' })).toBeNull();
+  });
+
+  it('shows an error with retry instead of the options when the session cannot be checked', async () => {
+    let failing = true;
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path === '/me') {
+        if (failing) throw new ApiError(500, 'INTERNAL_ERROR', 'x');
+        return me;
+      }
+      if (path === '/me/subscriptions') return subscriptions(null);
+      throw new Error(`unexpected request ${path}`);
+    });
+    renderFlow();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ocurrió un error inesperado.');
+    expect(screen.queryByRole('button', { name: 'Sesión individual' })).toBeNull();
+
+    failing = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(await screen.findByRole('button', { name: 'Sesión individual' })).toBeInTheDocument();
+  });
+
+  it('shows an error with retry when the subscriptions fail to load', async () => {
+    let failing = true;
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path === '/me') return me;
+      if (path === '/me/subscriptions') {
+        if (failing) throw new ApiError(500, 'INTERNAL_ERROR', 'x');
+        return subscriptions(null);
+      }
+      throw new Error(`unexpected request ${path}`);
+    });
+    renderFlow();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ocurrió un error inesperado.');
+    expect(screen.queryByRole('button', { name: 'Sesión individual' })).toBeNull();
+
+    failing = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(await screen.findByRole('button', { name: 'Sesión individual' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('prices the packs per package', async () => {
+    mockApi(null);
+    renderFlow();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Paquete' }));
+    expect(screen.getByText('/paquete')).toBeInTheDocument();
+    expect(screen.queryByText('/mes')).toBeNull();
   });
 });

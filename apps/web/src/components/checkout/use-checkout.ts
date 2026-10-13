@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { mondayOf } from '@/components/booking/week-selector';
 import { useBusinessToday } from '@/components/booking/day-selector';
 import { apiFetch } from '@/lib/api/client';
+import { ApiError } from '@/lib/api/errors';
 import type {
   AvailabilityDayDto,
   CheckoutResponseDto,
@@ -22,10 +23,20 @@ function redirectToPayment({ initPoint }: CheckoutResponseDto): void {
   window.location.assign(initPoint);
 }
 
-/** Usuario en sesión, o `null` si es un visitante. */
+/**
+ * Usuario en sesión, o `null` si es un visitante. Solo un 401 es un visitante: cualquier otro
+ * error se devuelve en `error` para no pedirle los datos de invitado a alguien con sesión.
+ */
 export function useMe() {
   const query = useQuery({ queryKey: ['me'], queryFn: () => apiFetch<MeDto>('/me'), retry: false });
-  return { me: query.data ?? null, isPending: query.isPending };
+  const isGuest = query.error instanceof ApiError && query.error.status === 401;
+  return {
+    me: query.data ?? null,
+    isPending: query.isPending,
+    isGuest,
+    error: isGuest ? null : query.error,
+    refetch: query.refetch,
+  };
 }
 
 interface BookingCheckoutInput {

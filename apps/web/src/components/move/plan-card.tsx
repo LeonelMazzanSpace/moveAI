@@ -23,7 +23,8 @@ function periodUnit(plan: PlanDto): string {
 }
 
 function defaultUnit(plan: PlanDto): string {
-  return plan.kind === 'period_plan' ? periodUnit(plan) : '/sesión';
+  if (plan.kind === 'period_plan') return periodUnit(plan);
+  return plan.kind === 'session_pack' ? '/paquete' : '/sesión';
 }
 
 function featuredTag(plan: PlanDto): string {

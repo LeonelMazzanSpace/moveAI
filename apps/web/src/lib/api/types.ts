@@ -121,6 +121,7 @@ export interface CheckoutResponseDto {
 export interface PurchaseStatusDto {
   externalReference: string; status: PurchaseStatus; kind: PurchaseKind; itemName: string; service: Service;
   amount: number; bookingId: string | null; startsAt: string | null; needsAttention: boolean;
+  planSlug: string | null;
 }
 
 export interface StaffPaymentDto {

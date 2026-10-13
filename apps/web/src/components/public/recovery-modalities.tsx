@@ -25,7 +25,7 @@ export function RecoveryModalities({ plans }: RecoveryModalitiesProps) {
             plan={plan}
             ctaHref={`/checkout/plan/${plan.slug}`}
             ctaLabel="Contratar paquete"
-            unitLabel="/mes"
+            unitLabel="/paquete"
           />
         ),
       )}

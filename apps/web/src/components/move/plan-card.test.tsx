@@ -30,4 +30,26 @@ describe('PlanCard', () => {
     render(<PlanCard plan={{ ...plan, featured: false }} ctaHref="/x" ctaLabel="Contratar" />);
     expect(screen.queryByText('Más elegido')).not.toBeInTheDocument();
   });
+
+  it('prices a session pack per package', () => {
+    const pack: PlanDto = { ...plan, kind: 'session_pack', service: 'recovery', periodMonths: null, periodDays: 30, sessionsIncluded: 4, price: 3200 };
+    render(<PlanCard plan={pack} ctaHref="/x" ctaLabel="Contratar paquete" />);
+    expect(screen.getByText('/paquete')).toBeInTheDocument();
+    expect(screen.queryByText('/sesión')).not.toBeInTheDocument();
+    expect(screen.queryByText('/mes')).not.toBeInTheDocument();
+  });
+
+  it('prices single sessions and evaluations per session', () => {
+    const single: PlanDto = { ...plan, kind: 'single_session', service: 'recovery', periodMonths: null, price: 900 };
+    const { rerender } = render(<PlanCard plan={single} ctaHref="/x" ctaLabel="Reservar" />);
+    expect(screen.getByText('/sesión')).toBeInTheDocument();
+    rerender(<PlanCard plan={{ ...single, kind: 'evaluation', service: 'rehab' }} ctaHref="/x" ctaLabel="Reservar" />);
+    expect(screen.getByText('/sesión')).toBeInTheDocument();
+  });
+
+  it('lets the caller override the unit', () => {
+    render(<PlanCard plan={plan} ctaHref="/x" ctaLabel="Contratar" unitLabel="/custom" />);
+    expect(screen.getByText('/custom')).toBeInTheDocument();
+    expect(screen.queryByText('/trim')).not.toBeInTheDocument();
+  });
 });
