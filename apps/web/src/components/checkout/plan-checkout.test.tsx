@@ -47,11 +47,15 @@ function mockApi(plan: PlanDto | ApiError, subscriptions: MySubscriptionsDto = n
 
 function renderCheckout(slug = 'performance-trimestral') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <PlanCheckout slug={slug} />
     </QueryClientProvider>,
   );
+  /** Espera a que las suscripciones terminen de cargar: sin eso, "no aparece el aviso" también se cumple mientras carga. */
+  const subscriptionsSettled = () =>
+    vi.waitFor(() => expect(queryClient.getQueryState(['me', 'subscriptions'])?.fetchStatus).toBe('idle'));
+  return { subscriptionsSettled, ...view };
 }
 
 describe('PlanCheckout', () => {
@@ -105,14 +109,16 @@ describe('PlanCheckout', () => {
 
   it('does not announce a renewal after an expired plan or for packs', async () => {
     mockApi(makePlan({}), { ...noSubscriptions, performance: { ...subscription, status: 'expired' } });
-    const { unmount } = renderCheckout();
+    const first = renderCheckout();
     await screen.findByText('Plan Trimestral');
+    await first.subscriptionsSettled();
     expect(screen.queryByText(/Tu nuevo período empieza/)).toBeNull();
-    unmount();
+    first.unmount();
 
     mockApi(pack, { ...noSubscriptions, performance: subscription });
-    renderCheckout('recovery-paquete-4');
+    const second = renderCheckout('recovery-paquete-4');
     await screen.findByText('Paquete 4 sesiones');
+    await second.subscriptionsSettled();
     expect(screen.queryByText(/Tu nuevo período empieza/)).toBeNull();
   });
 

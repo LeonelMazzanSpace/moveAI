@@ -26,6 +26,7 @@ function redirectToPayment({ initPoint }: CheckoutResponseDto): void {
 /**
  * Usuario en sesión, o `null` si es un visitante. Solo un 401 es un visitante: cualquier otro
  * error se devuelve en `error` para no pedirle los datos de invitado a alguien con sesión.
+ * Si ya hay un usuario cargado, un error al refrescarlo no cuenta: el flujo sigue con el último dato conocido.
  */
 export function useMe() {
   const query = useQuery({ queryKey: ['me'], queryFn: () => apiFetch<MeDto>('/me'), retry: false });
@@ -34,7 +35,7 @@ export function useMe() {
     me: query.data ?? null,
     isPending: query.isPending,
     isGuest,
-    error: isGuest ? null : query.error,
+    error: isGuest || query.data ? null : query.error,
     refetch: query.refetch,
   };
 }

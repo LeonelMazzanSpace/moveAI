@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api/errors';
@@ -51,6 +51,7 @@ function renderFlow() {
       <RehabBookingFlow plan={plan} />
     </QueryClientProvider>,
   );
+  return queryClient;
 }
 
 async function pickSlot() {
@@ -142,6 +143,30 @@ describe('RehabBookingFlow', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
     expect(await screen.findByRole('button', { name: 'Continuar al pago' })).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('keeps the flow visible when a background refresh of /me fails for a signed-in client', async () => {
+    let failing = false;
+    mockApi(() => ({ purchaseId: 'p', externalReference: 'ref', initPoint: 'https://mp.test/pay', bookingId: 'b', holdExpiresAt: null }), () => {
+      if (failing) throw new ApiError(500, 'INTERNAL_ERROR', 'x');
+      return client;
+    });
+    const queryClient = renderFlow();
+
+    await pickSlot();
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeEnabled());
+
+    failing = true;
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: ['me'] });
+      // TanStack Query avisa a React con un `setTimeout(0)`: sin este turno el DOM todavía no refleja el error.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(queryClient.getQueryState(['me'])?.status).toBe('error');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: '11:00' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeEnabled();
   });
 
   it('keeps the guest data after the slot turned out to be full', async () => {

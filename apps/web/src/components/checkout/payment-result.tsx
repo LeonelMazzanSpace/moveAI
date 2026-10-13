@@ -117,6 +117,11 @@ export function PaymentResultView({ status, timedOut }: PaymentResultViewProps) 
   );
 }
 
+/** Cada consulta cuenta, salga bien o mal: así los errores persistentes también terminan el polling. */
+function attemptsOf(state: { dataUpdateCount: number; errorUpdateCount: number } | undefined): number {
+  return state ? state.dataUpdateCount + state.errorUpdateCount : 0;
+}
+
 function usePurchaseStatus(reference: string) {
   const queryClient = useQueryClient();
   const queryKey = ['purchase', reference];
@@ -125,12 +130,14 @@ function usePurchaseStatus(reference: string) {
     queryFn: () => apiFetch<PurchaseStatusDto>(`/checkout/purchases/${encodeURIComponent(reference)}`),
     retry: false,
     staleTime: 0,
-    // Las respuestas idénticas no cambian `data`: sin esto el último intento no vuelve a renderizar y `attempts` no se refresca.
-    notifyOnChangeProps: 'all',
-    refetchInterval: (query) =>
-      query.state.data?.status === 'pending' && query.state.dataUpdateCount < MAX_ATTEMPTS ? POLL_INTERVAL_MS : false,
+    refetchInterval: (current) =>
+      current.state.data?.status === 'pending' && attemptsOf(current.state) < MAX_ATTEMPTS ? POLL_INTERVAL_MS : false,
   });
-  return { query, attempts: queryClient.getQueryState(queryKey)?.dataUpdateCount ?? 0 };
+  // Leer estas marcas suscribe el render a cada respuesta o error, aunque `data` sea idéntico (structural sharing);
+  // sin eso el último intento no vuelve a renderizar y `attempts` queda viejo.
+  void query.dataUpdatedAt;
+  void query.errorUpdatedAt;
+  return { query, attempts: attemptsOf(queryClient.getQueryState(queryKey)) };
 }
 
 function PurchaseStatus({ reference }: { reference: string }) {

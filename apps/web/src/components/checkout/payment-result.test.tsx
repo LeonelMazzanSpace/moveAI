@@ -158,6 +158,40 @@ describe('PaymentResult', () => {
     expect(screen.getByText('Tu pago está en proceso. Te avisamos por email cuando se acredite.')).toBeInTheDocument();
   });
 
+  it('counts failed polls too: persistent errors after a pending status end in "Pago en proceso" after 20 calls', async () => {
+    apiFetch.mockResolvedValueOnce({ ...base, status: 'pending' }).mockRejectedValue(new ApiError(0, 'NETWORK_ERROR', 'x'));
+    renderResult();
+    await advance(3000 * 40);
+
+    expect(statusCalls()).toBe(20);
+    expect(screen.getByText('Pago en proceso')).toBeInTheDocument();
+    expect(screen.getByText('Tu pago está en proceso. Te avisamos por email cuando se acredite.')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('offers the plan retry link when persistent errors follow a pending plan purchase', async () => {
+    apiFetch.mockResolvedValueOnce(pendingPlan).mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR', 'x'));
+    renderResult();
+    await advance(3000 * 40);
+
+    expect(statusCalls()).toBe(20);
+    expect(screen.getByText('Si tu pago fue rechazado, podés intentarlo de nuevo.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Intentar de nuevo' })).toHaveAttribute('href', '/checkout/plan/performance-trimestral');
+  });
+
+  it('still waits through a few transient errors before the cap', async () => {
+    apiFetch
+      .mockResolvedValueOnce({ ...base, status: 'pending' })
+      .mockRejectedValueOnce(new ApiError(0, 'NETWORK_ERROR', 'x'))
+      .mockRejectedValueOnce(new ApiError(0, 'NETWORK_ERROR', 'x'))
+      .mockResolvedValue({ ...base, status: 'pending' });
+    renderResult();
+    await advance(3000 * 5);
+
+    expect(statusCalls()).toBe(6);
+    expect(screen.getByText('Confirmando tu pago')).toBeInTheDocument();
+  });
+
   it('uses the plan slug from the API for the retry link of a pending plan purchase', async () => {
     apiFetch.mockResolvedValue(pendingPlan);
     renderResult();

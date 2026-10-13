@@ -43,7 +43,9 @@ function renderWithClient(children: React.ReactNode) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
   const view = render(<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>);
-  return { invalidate, ...view };
+  /** Espera a que `/me` termine (con datos o con error): antes de eso el componente también renderiza `null`. */
+  const meSettled = () => vi.waitFor(() => expect(queryClient.getQueryState(['me'])?.fetchStatus).toBe('idle'));
+  return { invalidate, meSettled, ...view };
 }
 
 async function pickSlot() {
@@ -63,25 +65,28 @@ describe('FollowupCard', () => {
 
   it('renders nothing for visitors', async () => {
     mockApi(new ApiError(401, 'UNAUTHENTICATED', 'x'));
-    const { container } = renderWithClient(<FollowupCard />);
+    const { container, meSettled } = renderWithClient(<FollowupCard />);
 
-    await vi.waitFor(() => expect(apiFetch).toHaveBeenCalledWith('/me'));
+    await meSettled();
     expect(container).toBeEmptyDOMElement();
   });
 
   it('renders nothing for clients without the follow-up enabled', async () => {
     mockApi(makeMe({ rehabFollowupEnabled: false }));
-    const { container } = renderWithClient(<FollowupCard />);
+    const { container, meSettled } = renderWithClient(<FollowupCard />);
 
-    await vi.waitFor(() => expect(apiFetch).toHaveBeenCalledWith('/me'));
+    await meSettled();
+    expect(apiFetch).toHaveBeenCalledWith('/me');
     expect(container).toBeEmptyDOMElement();
   });
 
   it('renders nothing for staff even when the flag is on', async () => {
     mockApi(makeMe({ role: 'staff', rehabFollowupEnabled: true }));
-    const { container } = renderWithClient(<FollowupCard />);
+    const { container, meSettled } = renderWithClient(<FollowupCard />);
 
-    await vi.waitFor(() => expect(apiFetch).toHaveBeenCalledWith('/me'));
+    await meSettled();
+    expect(apiFetch).toHaveBeenCalledWith('/me');
+    expect(screen.queryByRole('link', { name: /Seguimiento/ })).toBeNull();
     expect(container).toBeEmptyDOMElement();
   });
 });

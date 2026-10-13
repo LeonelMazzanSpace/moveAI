@@ -1,22 +1,18 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { DisplayTitle } from '@/components/move/display-title';
 import { PageContainer } from '@/components/move/page-container';
 import { Hero } from '@/components/public/hero';
 import { loadPlans } from '@/components/public/load-plans';
-import { FILTERS, type CatalogService, parseFilter, servicesFor } from '@/components/public/plan-filter';
-import { PlansSection, PlansSkeleton, PlansUnavailable } from '@/components/public/plans-section';
-import { RecoveryModalities } from '@/components/public/recovery-modalities';
-import type { PlanDto } from '@/lib/api/types';
+import { FILTERS, parseFilter, servicesFor } from '@/components/public/plan-filter';
+import { PlansCatalog } from '@/components/public/plans-catalog';
+import { PlansSkeleton } from '@/components/public/plans-section';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
   title: 'Planes',
   description: 'Planes Performance y sesiones y paquetes de Recovery. Elegí el tuyo y contratá online.',
 };
-
-const SECTION_TITLE: Record<CatalogService, string> = { performance: 'Performance.', recovery: 'Recovery.' };
 
 type SearchParams = Promise<{ service?: string | string[] }>;
 
@@ -41,34 +37,10 @@ async function PlanFilters({ searchParams }: { searchParams: SearchParams }) {
   );
 }
 
-function CatalogSection({ service, plans }: { service: CatalogService; plans: PlanDto[] }) {
-  return (
-    <div>
-      <DisplayTitle size="lg">{SECTION_TITLE[service]}</DisplayTitle>
-      <div className="mt-8">
-        {service === 'performance' ? (
-          <PlansSection plans={plans} ctaLabel="Contratar" hrefFor={(plan) => `/checkout/plan/${plan.slug}`} />
-        ) : (
-          <RecoveryModalities plans={plans} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-async function PlansCatalog({ searchParams }: { searchParams: SearchParams }) {
+async function LoadedCatalog({ searchParams }: { searchParams: SearchParams }) {
   const services = servicesFor(parseFilter((await searchParams).service));
   const sections = await Promise.all(services.map(async (service) => ({ service, plans: await loadPlans(service) })));
-
-  if (sections.every(({ plans }) => plans.length === 0)) return <PlansUnavailable />;
-
-  return (
-    <div className="space-y-16">
-      {sections.map(({ service, plans }) => (
-        <CatalogSection key={service} service={service} plans={plans} />
-      ))}
-    </div>
-  );
+  return <PlansCatalog sections={sections} />;
 }
 
 export default function PlanesPage({ searchParams }: { searchParams: SearchParams }) {
@@ -86,7 +58,7 @@ export default function PlanesPage({ searchParams }: { searchParams: SearchParam
           </Suspense>
           <div className="mt-10">
             <Suspense fallback={<PlansSkeleton />}>
-              <PlansCatalog searchParams={searchParams} />
+              <LoadedCatalog searchParams={searchParams} />
             </Suspense>
           </div>
         </PageContainer>

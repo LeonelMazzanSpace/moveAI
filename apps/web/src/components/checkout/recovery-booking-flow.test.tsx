@@ -60,6 +60,7 @@ function renderFlow() {
       <RecoveryBookingFlow plans={plans} />
     </QueryClientProvider>,
   );
+  return queryClient;
 }
 
 describe('RecoveryBookingFlow', () => {
@@ -153,6 +154,38 @@ describe('RecoveryBookingFlow', () => {
     expect(screen.getByLabelText('Teléfono')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ir a pagar' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: 'Continuar al pago' })).toBeNull();
+  });
+
+  it('keeps the chosen mode when a background refresh of /me fails for a signed-in client', async () => {
+    let failing = false;
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path === '/me') {
+        if (failing) throw new ApiError(500, 'INTERNAL_ERROR', 'x');
+        return me;
+      }
+      if (path === '/me/subscriptions') return subscriptions(null);
+      if (path === '/settings/public') return settings;
+      if (path === '/schedule/availability') return [{ date: today, available: 3 }];
+      if (path === '/schedule/time-slots') return [slot];
+      throw new Error(`unexpected request ${path}`);
+    });
+    const queryClient = renderFlow();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sesión individual' }));
+    await userEvent.click(await screen.findByRole('button', { name: String(Number(today.slice(8))) }));
+    await userEvent.click(await screen.findByRole('button', { name: '11:00' }));
+
+    failing = true;
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: ['me'] });
+      // TanStack Query avisa a React con un `setTimeout(0)`: sin este turno el DOM todavía no refleja el error.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(queryClient.getQueryState(['me'])?.status).toBe('error');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Sesión individual' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '11:00' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('shows an error with retry instead of the options when the session cannot be checked', async () => {
