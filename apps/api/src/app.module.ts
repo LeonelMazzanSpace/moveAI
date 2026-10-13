@@ -12,6 +12,7 @@ import { HealthModule } from './health/health.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { SettingsModule } from './modules/settings/settings.module.js';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 
 @Module({
@@ -29,6 +30,7 @@ import { UsersModule } from './modules/users/users.module.js';
     NotificationsModule,
     UsersModule,
     AuthModule,
+    SubscriptionsModule,
   ],
 })
 export class AppModule {}
