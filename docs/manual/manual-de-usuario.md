@@ -50,11 +50,9 @@ Recovery Room by MOVE está abierta a todo público, sin plan previo. Podés pag
 
 ![Recovery](img/06-recovery.png)
 
-En **Reservá tu sesión** elegís la modalidad (**Sesión individual** o **Paquete**), el día y el horario. La sesión individual se paga en el momento. Los paquetes duran 30 días desde la compra y las sesiones que no uses vencen al final.
+En **Reservá tu sesión** elegís la modalidad (**Sesión individual** o **Paquete**), el día y el horario. La sesión individual se paga en el momento y se puede reservar sin tener cuenta (la captura está tomada sin sesión iniciada). Los paquetes duran 30 días desde la compra y las sesiones que no uses vencen al final.
 
 ![Recovery: reservar una sesión](img/07-recovery-reserva.png)
-
-> **Importante (estado actual).** Para reservar una *sesión individual* de Recovery conviene **ingresar primero**. Con la sesión cerrada, el botón "Sesión individual" no abre el calendario (ver [Problemas conocidos](#problemas-conocidos-detectados-al-armar-este-manual)).
 
 #### Planes
 
@@ -92,9 +90,11 @@ La pantalla de acceso tiene dos pestañas: **Iniciar sesión** (email y contrase
 
 ![Crear cuenta](img/13-registro.png)
 
-Si querés reservar Rehab o Recovery sin ser alumno, no hace falta registrarte antes: la cuenta se crea durante el proceso de reserva. Si ya tenés una cuenta con ese email, la plataforma te pide **ingresar** para continuar (así nadie reserva a nombre de otra persona).
+Si querés reservar Rehab o Recovery sin ser alumno, no hace falta registrarte antes: la cuenta se crea durante el proceso de reserva. Si ya tenés una cuenta con ese email, la plataforma te avisa "Ya tenés una cuenta con ese email: ingresá para continuar" y te pide **ingresar** (así nadie reserva a nombre de otra persona); al ingresar, la operación queda vinculada a tu perfil.
 
-> El botón de ingreso con Google está oculto: Google es una integración pendiente (ver la Parte 3).
+**Volvés a donde estabas.** Si te piden ingresar cuando querías abrir una página (por ejemplo, el checkout de un plan o tu historial), después de ingresar la plataforma te lleva a **esa misma página**, con su dirección exacta, y no al inicio de tu perfil. Solo se vuelve a páginas internas permitidas para tu tipo de cuenta: un cliente nunca termina en el panel de staff, ni al revés.
+
+> El botón de ingreso con Google está oculto: Google es una integración pendiente (ver la Parte 3). Cuando esté activo, si intentás entrar con Google con un email que ya tiene una cuenta con contraseña, la pantalla de ingreso muestra **"Ya tenés una cuenta con ese email. Ingresá con tu contraseña."**: ingresá con tu contraseña.
 
 #### Recuperar y restablecer la contraseña
 
@@ -126,13 +126,17 @@ Cuando el pago se aprueba, ves el resultado y podés ir a tu perfil: el plan que
 
 ![Resultado del pago](img/24-checkout-resultado.png)
 
+Si el pago de un plan todavía no se confirmó (por ejemplo, fue rechazado), la pantalla te muestra "Confirmando tu pago" mientras espera y, pasado un minuto aproximadamente, **"Pago en proceso"**: "Tu pago está en proceso. Te avisamos por email cuando se acredite." Debajo aparece **Intentar de nuevo**, que te lleva otra vez al checkout de ese plan para probar con otro medio de pago. Si el pago no se completó, el botón **Intentar de nuevo** también aparece en "Pago no completado".
+
+**Límites del checkout.** Para evitar abusos, cada persona puede tener como máximo **2 reservas pendientes de pago** a la vez: si intentás una tercera, ves "Ya tenés reservas pendientes de pago. Completá el pago o esperá a que venzan." (las retenidas vencen a los 15 minutos). Además, el checkout acepta hasta 10 intentos por minuto desde una misma conexión: si lo superás, ves "Hiciste demasiados intentos. Esperá un minuto y probá de nuevo."
+
 ### Mi perfil
 
 Es tu pantalla principal. Muestra:
 
 - **Tu plan de Performance** (estado Activo, Por vencer o Vencido), desde cuándo está vigente, cuándo vence, el progreso del período y el botón **Renovar plan**.
 - **Paquetes Recovery**: cuántas sesiones te quedan y cuándo vence el paquete.
-- **Próximas reservas**, cada una con su botón **Cancelar**.
+- **Próximas reservas**, cada una con su botón **Cancelar**. Una reserva que está retenida esperando el pago (por ejemplo, una evaluación de Rehab que todavía no pagaste) muestra el aviso **Pago pendiente**; si no se completa el pago a tiempo, la reserva se libera sola.
 - **Reservar**: accesos directos a Performance y Recovery.
 - **Avisos** (también desde la campana de arriba): plan por vencer o vencido, check-in pendiente o respondido y paquete con pocas sesiones.
 - **Tu mes en MOVE**: asistencias del mes y veces por semana.
@@ -321,7 +325,7 @@ MOVE es un monorepo con la web (Next.js) y la API (NestJS + PostgreSQL). **No ha
 
 | Pieza | Estado actual | Qué hace en su lugar |
 |---|---|---|
-| Mercado Pago | Sin credenciales | Simulador de pagos (solo fuera de producción y sin `MP_ACCESS_TOKEN`): el checkout lleva a una pantalla para aprobar o rechazar la compra |
+| Mercado Pago | Sin credenciales | Simulador de pagos (sin `MP_ACCESS_TOKEN`): el checkout lleva a una pantalla para aprobar o rechazar la compra. El simulador solo existe fuera de producción: con `NODE_ENV=production` la API ni siquiera lo monta (aunque `NODE_ENV` se defina solo en el `.env`) |
 | Brevo (email) | Sin credenciales | Modo *dry-run*: no envía nada; cada email queda registrado en la tabla `email_logs` con estado `skipped` (y como línea de log con ids, sin datos personales) |
 | Google OAuth | Sin credenciales | El botón de Google está oculto (`NEXT_PUBLIC_GOOGLE_ENABLED=false`): integración pendiente |
 | Deploy | No existe | Solo el runbook [`docs/deploy.md`](../deploy.md) |
@@ -358,7 +362,11 @@ Requisitos: Node 24 (`nvm use` lee `.nvmrc`), pnpm 10 (`corepack enable`) y Dock
    unset CREATE_STAFF_PASSWORD
    ```
 
-   El comando imprime solo el id. Si el email ya existe, esa cuenta pasa a ser staff. La contraseña debe tener al menos 8 caracteres.
+   El comando imprime solo el id. La contraseña debe tener al menos 8 caracteres. Si ya existe una cuenta con ese email, el comando **se niega** y avisa "Ya existe una cuenta con ese email; usá --promote-existing para convertirla en staff". Con `--promote-existing` esa cuenta se convierte en staff, se le fija la contraseña indicada, se marca su email como verificado y se cierran todas sus sesiones abiertas; el comando avisa que reutilizó una cuenta existente.
+
+   ```bash
+   pnpm --filter @move/api user:create-staff -- --email persona@ejemplo.com --name "Nombre Apellido" --promote-existing
+   ```
 
 4. **Levantar la API y la web.**
 
@@ -380,11 +388,15 @@ Las variables de entorno y los proveedores están descritos en [`docs/developmen
 
 Este manual y sus capturas se generan con datos de demostración inventados. Las contraseñas **nunca** van en el manual, en los scripts ni en los logs: se pasan por variables de entorno.
 
+Los scripts **no necesitan archivos `.env`**: toman todo del entorno del proceso. `manual:demo-data` usa `DB_NAME` y `DB_USER` del entorno (para la historia por SQL) y solo si faltan los lee de `apps/api/.env`, si ese archivo existe; si no hay ni entorno ni archivo, falla con un mensaje claro.
+
 ```bash
 # 1. Base de demostración vacía (migrada y con seed) y un staff creado con user:create-staff (paso 3 de arriba),
 #    usando como CREATE_STAFF_PASSWORD la misma contraseña que se va a pasar en MANUAL_STAFF_PASSWORD
-# 2. API y web corriendo (API_URL default http://localhost:3128/api y WEB_URL default http://localhost:3228;
-#    para otros puertos, definir API_URL y WEB_URL)
+# 2. API y web corriendo, con la web compilada para producción (pnpm --filter @move/web build, con NODE_ENV=production
+#    si el shell tiene otro valor, y pnpm --filter @move/web start). Definir DB_NAME (y DB_USER si no es "move"),
+#    API_URL (con /api) y WEB_URL (origen de la web); por defecto apuntan a http://localhost:3001/api y http://localhost:3000
+export DB_NAME=move_demo API_URL=http://localhost:3001/api WEB_URL=http://localhost:3000   # ejemplo
 read -rs MANUAL_STAFF_PASSWORD && export MANUAL_STAFF_PASSWORD
 read -rs MANUAL_CLIENT_PASSWORD && export MANUAL_CLIENT_PASSWORD     # mínimo 8 caracteres
 pnpm exec playwright install chromium     # una sola vez
@@ -395,7 +407,7 @@ pnpm manual:pdf             # genera docs/manual/manual-de-usuario.pdf (A4, imá
 ```
 
 - `manual:demo-data` falla con un mensaje claro si la base ya tiene datos de demostración. La historia (asistencias pasadas y planes que vencen o vencieron) no se puede crear por la API porque no admite reservar ni marcar asistencia en el pasado: esos datos se insertan con SQL en la base de desarrollo mediante `docker exec <contenedor> psql` (contenedor `move-postgres`, o `MANUAL_DB_CONTAINER`), solo para los clientes de demostración.
-- `manual:screenshots` compra un paquete de Recovery con el cliente de demostración Nicolás Acosta (checkout → simulador → resultado); volver a correrlo agrega otra compra.
+- `manual:screenshots` compra un paquete de Recovery con el cliente de demostración Nicolás Acosta (checkout → simulador → resultado); volver a correrlo agrega otra compra, así que para repetir las capturas conviene recrear la base de demostración. La captura de Recovery (`07`) se toma sin sesión iniciada, como un invitado.
 - Usuarios de la demostración: staff `staff@example.com` (o `MANUAL_STAFF_EMAIL`) con la contraseña de `MANUAL_STAFF_PASSWORD`; clientes `sofia.martinez@example.com`, `martin.rodriguez@example.com`, `lucia.pereira@example.com`, `andres.silva@example.com`, `camila.fernandez@example.com`, `joaquin.techera@example.com`, `valentina.gomez@example.com`, `federico.alvarez@example.com`, `diego.machado@example.com` y `nicolas.acosta@example.com`, todos con la contraseña de `MANUAL_CLIENT_PASSWORD`.
 
 ### Pasos faltantes para el deploy
@@ -438,13 +450,6 @@ En producción (`NODE_ENV=production`) la API exige las credenciales de proveedo
 #### Dominio y cookies
 
 Ver el paso 6 del deploy. Si la web y la API quedaran en dominios distintos, la cookie de sesión dejaría de ser first-party y el login no funcionaría como está diseñado.
-
-### Problemas conocidos detectados al armar este manual
-
-Al recorrer cada pantalla para las capturas se encontraron dos fallas en la web. No se corrigieron acá (fuera del alcance de esta tarea); hay que resolverlas antes de usar este manual como guía de una versión publicada.
-
-1. **`/staff/pagos` falla con error 500.** La página (un Server Component) importa `clampPage` desde `payments-view.tsx`, que es un módulo de cliente (`'use client'`); Next responde "Attempted to call clampPage() from the server but clampPage is on the client". La captura de **Pagos** de este manual se tomó con esa función definida de forma local en un build de prueba (cambio descartado, no incluido en el repositorio). Solución sugerida: mover `clampPage` a un módulo sin `'use client'`.
-2. **`/recovery` sin sesión: "Sesión individual" no abre el calendario.** `RecoveryBookingFlow` muestra un esqueleto mientras `GET /me` está pendiente; al elegir "Sesión individual" se monta el flujo de pago, que vuelve a consultar `/me`, la consulta (con error 401 y sin datos) pasa a pendiente y el selector se desmonta y se reinicia. Con sesión iniciada funciona. Solución sugerida: no condicionar el selector de modalidad al estado pendiente de `/me`.
 
 ### Valores provisorios y decisiones abiertas
 

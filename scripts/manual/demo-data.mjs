@@ -7,23 +7,25 @@
 //   MANUAL_STAFF_PASSWORD   (obligatoria) contraseña del staff de demostración
 //   MANUAL_CLIENT_PASSWORD  (obligatoria) contraseña común de los clientes de demostración (mínimo 8 caracteres)
 //   MANUAL_STAFF_EMAIL      (opcional) default staff@example.com
-//   API_URL                 (opcional) default http://localhost:3128/api
-//   WEB_URL                 (opcional) origen de la web, default http://localhost:3228
+//   API_URL                 (opcional) default http://localhost:3001/api
+//   WEB_URL                 (opcional) origen de la web, default http://localhost:3000
 //   MANUAL_DB_CONTAINER     (opcional) contenedor de Postgres, default move-postgres
+//   DB_NAME, DB_USER        base y usuario de Postgres para la historia por SQL. Se toman del entorno del proceso y,
+//                           solo si faltan, de apps/api/.env (si existe). Si no hay ni entorno ni archivo, falla.
 //
 // Las contraseñas nunca se imprimen. Falla con un mensaje claro si ya hay datos de demostración.
 //
 // Parte de la historia (asistencias pasadas, vigencias que vencen o vencieron) no se puede crear por HTTP porque
 // la API no permite reservar ni marcar asistencia en el pasado: esos datos se insertan con SQL en la base de
-// desarrollo (apps/api/.env → DB_NAME) a través de `docker exec <contenedor> psql`. Solo toca filas de los
+// desarrollo (DB_NAME) a través de `docker exec <contenedor> psql`. Solo toca filas de los
 // clientes de demostración (emails @example.com definidos acá).
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const API_URL = (process.env.API_URL ?? 'http://localhost:3128/api').replace(/\/$/, '');
-const WEB_URL = process.env.WEB_URL ?? 'http://localhost:3228';
+const API_URL = (process.env.API_URL ?? 'http://localhost:3001/api').replace(/\/$/, '');
+const WEB_URL = process.env.WEB_URL ?? 'http://localhost:3000';
 const STAFF_EMAIL = process.env.MANUAL_STAFF_EMAIL ?? 'staff@example.com';
 const DB_CONTAINER = process.env.MANUAL_DB_CONTAINER ?? 'move-postgres';
 const BUSINESS_TZ = 'America/Montevideo';
@@ -84,11 +86,20 @@ function requireEnv(name) {
 
 function readEnvFile(file) {
   const values = {};
+  if (!existsSync(file)) return values;
   for (const line of readFileSync(file, 'utf8').split('\n')) {
     const match = /^([A-Z_]+)=(.*)$/.exec(line.trim());
     if (match) values[match[1]] = match[2].replace(/^["']|["']$/g, '');
   }
   return values;
+}
+
+// DB_NAME / DB_USER: primero el entorno del proceso; solo si faltan, apps/api/.env (si existe).
+let envFileValues;
+function databaseSetting(name) {
+  if (process.env[name]) return process.env[name];
+  envFileValues ??= readEnvFile(resolve(ROOT, 'apps/api/.env'));
+  return envFileValues[name];
 }
 
 // ---------- fechas de negocio (America/Montevideo) ----------
@@ -296,8 +307,10 @@ async function main() {
   const clientPassword = requireEnv('MANUAL_CLIENT_PASSWORD');
   if (clientPassword.length < 8) throw new Error('MANUAL_CLIENT_PASSWORD debe tener al menos 8 caracteres.');
 
-  const apiEnv = readEnvFile(resolve(ROOT, 'apps/api/.env'));
-  const sql = createSql(apiEnv.DB_NAME, apiEnv.DB_USER ?? 'move');
+  const dbName = databaseSetting('DB_NAME');
+  const dbUser = databaseSetting('DB_USER') ?? 'move';
+  if (!dbName) throw new Error('No se sabe qué base usar: definí DB_NAME en el entorno (o creá apps/api/.env con DB_NAME).');
+  const sql = createSql(dbName, dbUser);
   const today = businessDate();
 
   step('Ingresando como staff');

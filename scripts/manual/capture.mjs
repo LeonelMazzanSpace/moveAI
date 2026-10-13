@@ -7,8 +7,8 @@
 //   MANUAL_STAFF_PASSWORD   (obligatoria) contraseña del staff de demostración
 //   MANUAL_CLIENT_PASSWORD  (obligatoria) contraseña de los clientes de demostración
 //   MANUAL_STAFF_EMAIL      (opcional) default staff@example.com
-//   WEB_URL                 (opcional) default http://localhost:3228
-//   API_URL                 (opcional) default http://localhost:3128/api
+//   WEB_URL                 (opcional) default http://localhost:3000
+//   API_URL                 (opcional) default http://localhost:3001/api
 //
 // Las capturas van a docs/manual/img/ con nombres estables (se borran las anteriores). La última parte recorre el
 // checkout de un paquete Recovery con un cliente sin paquete (Nicolás Acosta): crea una compra y la aprueba con el
@@ -18,8 +18,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
-const WEB_URL = (process.env.WEB_URL ?? 'http://localhost:3228').replace(/\/$/, '');
-const API_URL = (process.env.API_URL ?? 'http://localhost:3128/api').replace(/\/$/, '');
+const WEB_URL = (process.env.WEB_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+const API_URL = (process.env.API_URL ?? 'http://localhost:3001/api').replace(/\/$/, '');
 const STAFF_EMAIL = process.env.MANUAL_STAFF_EMAIL ?? 'staff@example.com';
 const IMG_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../docs/manual/img');
 const VIEWPORT = { width: 1440, height: 900 };
@@ -133,12 +133,11 @@ async function main() {
     await pickDayAndSlot(anonPage, anonPage.getByRole('heading', { name: /Reservá tu evaluación/i }));
     await shot(anonPage, '05-rehab-reserva');
     await visit(anonPage, '06-recovery', '/recovery');
-    // Con sesión: sin sesión, "Sesión individual" no abre el calendario (ver el reporte de T-028).
-    await nicolasPage.goto(`${WEB_URL}/recovery`, { waitUntil: 'domcontentloaded' });
-    await settle(nicolasPage);
-    await clickUntilVisible(nicolasPage.getByRole('button', { name: 'Sesión individual' }), enabledButton(nicolasPage, /^\d{1,2}$/));
-    await pickDayAndSlot(nicolasPage, nicolasPage.getByRole('button', { name: 'Sesión individual' }));
-    await shot(nicolasPage, '07-recovery-reserva');
+    // Sin sesión (flujo de invitado).
+    await settle(anonPage);
+    await clickUntilVisible(anonPage.getByRole('button', { name: 'Sesión individual' }), enabledButton(anonPage, /^\d{1,2}$/));
+    await pickDayAndSlot(anonPage, anonPage.getByRole('button', { name: 'Sesión individual' }));
+    await shot(anonPage, '07-recovery-reserva');
     await visit(anonPage, '08-planes', '/planes');
     await visit(anonPage, '09-planes-recovery', '/planes?service=recovery');
     await visit(anonPage, '10-reservar-sin-sesion', '/reservar');
