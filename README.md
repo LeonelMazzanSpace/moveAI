@@ -50,6 +50,7 @@ El `.env.example` de la API trae valores de desarrollo. Sin credenciales de prov
 | `pnpm dev:web` / `pnpm dev:api` | Una sola app |
 | `pnpm build` / `pnpm lint` / `pnpm test` | Corre el script en todas las apps |
 | `pnpm test:e2e` | E2E de la API contra Postgres (requiere `E2E_DATABASE_NAME`, ver [docs/development.md](docs/development.md#tests)) |
+| `pnpm e2e:reset` / `pnpm test:e2e:web` | Reinicia la base `move_e2e` y corre las pruebas end to end de la web con Playwright, en desktop y mobile (requiere `E2E_STAFF_PASSWORD` y `E2E_CLIENT_PASSWORD`, ver [docs/development.md](docs/development.md#pruebas-end-to-end)) |
 | `pnpm db:up` / `pnpm db:down` / `pnpm db:logs` | Postgres local |
 | `pnpm manual:demo-data` | Carga datos de demostración inventados por HTTP contra la API local (ver [Manual de usuario](#manual-de-usuario)) |
 | `pnpm manual:screenshots` | Captura una imagen de cada pantalla de la web en `docs/manual/img/` |

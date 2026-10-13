@@ -16,11 +16,14 @@
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",
     "test:e2e": "pnpm --filter @move/api test:e2e",
+    "test:e2e:web": "playwright test",
+    "e2e:reset": "node scripts/e2e/reset.mjs",
     "manual:demo-data": "node scripts/manual/demo-data.mjs",
     "manual:screenshots": "node scripts/manual/capture.mjs",
     "manual:pdf": "node scripts/manual/build-pdf.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.0",
     "marked": "18.1.1",
     "playwright": "1.64.0"
   }
