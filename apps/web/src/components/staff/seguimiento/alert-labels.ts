@@ -14,7 +14,7 @@ export const ALERT_LABEL: Record<AlertType, string> = {
 export const ALERT_ORDER = Object.keys(ALERT_LABEL) as AlertType[];
 
 export function isAlertType(value: string | null): value is AlertType {
-  return value !== null && value in ALERT_LABEL;
+  return value !== null && ALERT_ORDER.some((type) => type === value);
 }
 
 export const REASON_LABEL: Record<InactivityReasonCode, string> = {

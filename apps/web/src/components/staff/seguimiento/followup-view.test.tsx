@@ -134,3 +134,30 @@ describe('FollowupView', () => {
     expect(apiFetch).toHaveBeenCalledWith('/staff/automations/run/followup-detect', { method: 'POST' });
   });
 });
+
+describe('isAlertType', () => {
+  it('accepts real alert types and rejects inherited property names', async () => {
+    const { isAlertType } = await import('./alert-labels');
+    expect(isAlertType('expiring')).toBe(true);
+    expect(isAlertType('constructor')).toBe(false);
+    expect(isAlertType('toString')).toBe(false);
+    expect(isAlertType(null)).toBe(false);
+  });
+});
+
+describe('FollowupView with an unknown filter', () => {
+  beforeEach(() => {
+    apiFetch.mockReset();
+    search = 'tipo=constructor';
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-12T15:00:00.000Z') });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('falls back to all the alerts', async () => {
+    mockApi();
+    renderView();
+    expect(await screen.findByText('Federico Álvez')).toBeInTheDocument();
+    expect(apiFetch).toHaveBeenCalledWith('/staff/alerts', { query: { status: 'open' } });
+    expect(screen.getByRole('button', { name: 'Todas · 23' })).toHaveAttribute('aria-pressed', 'true');
+  });
+});

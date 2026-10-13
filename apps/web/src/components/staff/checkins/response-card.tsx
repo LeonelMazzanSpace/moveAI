@@ -34,9 +34,10 @@ interface ResponseCardProps {
   onRefer: (response: CheckinResponseDto) => void;
   onHandle: (response: CheckinResponseDto) => void;
   busy?: boolean;
+  referred?: boolean;
 }
 
-export function ResponseCard({ response, today, onContact, onRefer, onHandle, busy = false }: ResponseCardProps) {
+export function ResponseCard({ response, today, onContact, onRefer, onHandle, busy = false, referred = false }: ResponseCardProps) {
   const badge = FLAG_BADGE[response.flag];
   const alertOpen = response.alertId !== null && response.alertStatus === 'open';
   const plan = response.planName ? `plan ${response.planName}` : 'sin plan vigente';
@@ -62,8 +63,8 @@ export function ResponseCard({ response, today, onContact, onRefer, onHandle, bu
             </Button>
           ) : null}
           {response.flag === 'pain' ? (
-            <Button variant="outline" className={ACTION_CLASS} disabled={busy} onClick={() => onRefer(response)}>
-              Derivar a Rehab
+            <Button variant="outline" className={ACTION_CLASS} disabled={busy || referred} onClick={() => onRefer(response)}>
+              {referred ? 'Derivado a Rehab' : 'Derivar a Rehab'}
             </Button>
           ) : null}
           {response.flag === 'goals' && alertOpen ? (

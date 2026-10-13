@@ -58,6 +58,7 @@ function useReferToRehab() {
 
 function ResponseList({ today }: { today: string | null }) {
   const [contact, setContact] = useState<ContactTarget | null>(null);
+  const [referred, setReferred] = useState<ReadonlySet<string>>(new Set());
   const handle = useHandleAlert();
   const refer = useReferToRehab();
   const responses = useQuery({
@@ -81,7 +82,8 @@ function ResponseList({ today }: { today: string | null }) {
             today={today}
             busy={(handle.isPending && handle.variables === response.alertId) || (refer.isPending && refer.variables === response.id)}
             onContact={(item) => item.alertId && setContact({ alertId: item.alertId, clientName: item.client.name })}
-            onRefer={(item) => refer.mutate(item.id)}
+            referred={referred.has(response.id)}
+            onRefer={(item) => refer.mutate(item.id, { onSuccess: () => setReferred((ids) => new Set(ids).add(item.id)) })}
             onHandle={(item) => item.alertId && handle.mutate(item.alertId)}
           />
         ))}

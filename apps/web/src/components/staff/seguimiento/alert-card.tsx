@@ -2,13 +2,13 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { StatusBadge, type StatusTone } from '@/components/move/status-badge';
 import { Button, buttonVariants } from '@/components/ui/button';
-import type { AlertDto } from '@/lib/api/types';
+import type { AlertDto, AlertType } from '@/lib/api/types';
 import { formatDate, formatDayMonth } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { ALERT_LABEL, expiringLabel, PAUSE_LABEL } from './alert-labels';
 
 const ACTION_CLASS = 'h-auto px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em]';
-const REASON_TYPES = ['expiring', 'expired', 'no_attendance', 'prolonged_inactivity', 'frequency_drop'];
+const REASON_TYPES: readonly AlertType[] = ['expiring', 'expired', 'no_attendance', 'prolonged_inactivity', 'frequency_drop'];
 
 interface Badge {
   tone: StatusTone;
