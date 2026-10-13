@@ -1,0 +1,58 @@
+# CI gate (D27): lint -> test -> API e2e -> build. There are no deploy steps until the AWS, Neon and Vercel accesses exist.
+# Repository variable required: CI_BETTER_AUTH_SECRET (secured, 32+ characters). Nothing else is secret in CI.
+image: node:24
+
+definitions:
+  caches:
+    pnpm: .pnpm-store
+  services:
+    postgres:
+      image: postgres:17-alpine
+      variables:
+        POSTGRES_USER: move
+        POSTGRES_PASSWORD: move
+        POSTGRES_DB: move
+  steps:
+    - step: &verify
+        name: Lint, test, e2e and build
+        size: 2x
+        caches:
+          - pnpm
+        services:
+          - postgres
+        script:
+          - corepack enable
+          - pnpm config set store-dir "$BITBUCKET_CLONE_DIR/.pnpm-store"
+          - pnpm install --frozen-lockfile
+          # Development values only; the one secret comes from a secured repository variable.
+          - |
+            cat > apps/api/.env <<EOF
+            NODE_ENV=development
+            PORT=3001
+            WEB_URL=http://localhost:3000
+            API_PUBLIC_URL=http://localhost:3001
+            DB_HOST=localhost
+            DB_PORT=5432
+            DB_USER=move
+            DB_PASSWORD=move
+            DB_NAME=move
+            DB_SSL=false
+            BETTER_AUTH_SECRET=$CI_BETTER_AUTH_SECRET
+            SCHEDULER_ENABLED=false
+            EOF
+          - pnpm lint
+          - pnpm test
+          - apt-get update && apt-get install -y --no-install-recommends postgresql-client
+          - PGPASSWORD=move psql -h localhost -U move -d move -c "CREATE DATABASE move_ci_test"
+          - E2E_DATABASE_NAME=move_ci_test pnpm --filter @move/api test:e2e
+          - pnpm build
+
+pipelines:
+  pull-requests:
+    '**':
+      - step: *verify
+  branches:
+    main:
+      - step: *verify
+    'feature/*':
+      - step: *verify
