@@ -4,6 +4,7 @@ import { Between, DataSource, IsNull, type EntityManager, type Repository } from
 import { AppError } from '../../../common/errors/app-error.js';
 import { businessDateTime } from '../../../common/time/business-time.js';
 import type { Service } from '../../catalog/entities/plan.entity.js';
+import { CAPACITY } from '../dto/schedule-fields.js';
 import { buildSlotsFromTemplates, hasValidRehabShape } from '../domain/slot-generation.js';
 import { Professional } from '../entities/professional.entity.js';
 import { ScheduleTemplate } from '../entities/schedule-template.entity.js';
@@ -74,7 +75,8 @@ export class ScheduleService {
 
   async updateCapacity(manager: EntityManager, slotId: string, capacity: number): Promise<TimeSlotModel> {
     const slot = await this.lockEntity(manager, slotId);
-    if (!Number.isInteger(capacity) || capacity < 1 || !hasValidRehabShape(slot.service, capacity, slot.professionalId)) {
+    const inRange = Number.isInteger(capacity) && capacity >= CAPACITY.min && capacity <= CAPACITY.max;
+    if (!inRange || !hasValidRehabShape(slot.service, capacity, slot.professionalId)) {
       throw new AppError('TEMPLATE_INVALID');
     }
     slot.capacity = capacity;
@@ -92,7 +94,7 @@ export class ScheduleService {
   }): Promise<TimeSlotModel> {
     const professionalId = input.professionalId ?? null;
     if (!hasValidRehabShape(input.service, input.capacity, professionalId)) throw new AppError('TEMPLATE_INVALID');
-    if (professionalId) await this.professionals.assertExists(professionalId);
+    if (professionalId) await this.professionals.assertAssignable(professionalId);
 
     const startsAt = businessDateTime(input.date, input.startTime);
     const saved = await this.slots.save(
@@ -109,12 +111,21 @@ export class ScheduleService {
     return toModel(saved, await this.loadProfessional(this.dataSource.manager, professionalId));
   }
 
-  // Idempotent: `UQ_time_slots_template_start` ignores slots that already exist. Only future slots are created.
-  async generateSlots(fromDate: string, days: number, templateId?: string): Promise<number> {
-    const templates = await this.templates.find({ where: { active: true, ...(templateId ? { id: templateId } : {}) } });
+  // Idempotent: `UQ_time_slots_template_start` ignores slots that already exist. Only future slots are created,
+  // and templates of an inactive professional are skipped. Pass `manager` to run inside a caller's transaction.
+  async generateSlots(
+    fromDate: string,
+    days: number,
+    templateId?: string,
+    manager: EntityManager = this.dataSource.manager,
+  ): Promise<number> {
+    const templates = await manager.getRepository(ScheduleTemplate).find({
+      where: { active: true, ...(templateId ? { id: templateId } : {}) },
+      relations: { professional: true },
+    });
     const now = Date.now();
     const specs = buildSlotsFromTemplates(
-      templates.map((t) => ({
+      templates.filter((t) => t.professionalId === null || t.professional?.active === true).map((t) => ({
         id: t.id,
         service: t.service,
         weekday: t.weekday,
@@ -128,7 +139,7 @@ export class ScheduleService {
     ).filter((spec) => spec.startsAt.getTime() > now);
     if (specs.length === 0) return 0;
 
-    const inserted: { id: string }[] = await this.dataSource.query(
+    const inserted: { id: string }[] = await manager.query(
       `INSERT INTO time_slots (service, starts_at, ends_at, capacity, professional_id, template_id)
        SELECT * FROM unnest($1::text[], $2::timestamptz[], $3::timestamptz[], $4::smallint[], $5::uuid[], $6::uuid[])
        ON CONFLICT (template_id, starts_at) WHERE template_id IS NOT NULL DO NOTHING

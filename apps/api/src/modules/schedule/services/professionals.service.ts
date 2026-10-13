@@ -28,7 +28,8 @@ export class ProfessionalsService {
     return toModel(await this.professionals.save(professional));
   }
 
-  async assertExists(id: string): Promise<void> {
-    if (!(await this.professionals.exists({ where: { id } }))) throw new AppError('PROFESSIONAL_NOT_FOUND');
+  // An inactive professional cannot be assigned: it is answered like a missing one (D42).
+  async assertAssignable(id: string): Promise<void> {
+    if (!(await this.professionals.exists({ where: { id, active: true } }))) throw new AppError('PROFESSIONAL_NOT_FOUND');
   }
 }

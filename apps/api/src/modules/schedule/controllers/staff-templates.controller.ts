@@ -1,18 +1,10 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
-import { IsIn, IsOptional } from 'class-validator';
 import { Roles } from '../../../common/auth/roles.decorator.js';
-import type { Service } from '../../catalog/entities/plan.entity.js';
 import { CreateTemplateDto } from '../dto/create-template.dto.js';
-import { SERVICES } from '../dto/schedule-fields.js';
+import { ListTemplatesQuery } from '../dto/list-templates.query.js';
 import { UpdateTemplateDto } from '../dto/update-template.dto.js';
 import type { ScheduleTemplateModel } from '../models/time-slot.model.js';
 import { TemplatesService } from '../services/templates.service.js';
-
-class ListTemplatesQuery {
-  @IsOptional()
-  @IsIn(SERVICES)
-  service?: Service;
-}
 
 @Roles('staff')
 @Controller('staff/schedule/templates')

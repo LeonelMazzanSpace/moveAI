@@ -1,7 +1,10 @@
 import request from 'supertest';
-import { addDays, businessDateTime, businessDayEnd, businessDayStart, businessToday, isoWeekday } from '../src/common/time/business-time.js';
+import { vi } from 'vitest';
+import { addDays, businessDateTime, businessDayEnd, businessDayStart, businessToday, isoWeekday, toBusinessDate } from '../src/common/time/business-time.js';
 import { JobRunner } from '../src/common/scheduling/job-runner.service.js';
+import { GenerateSlotsJob } from '../src/modules/schedule/jobs/generate-slots.job.js';
 import { ScheduleService } from '../src/modules/schedule/services/schedule.service.js';
+import { SettingsService } from '../src/modules/settings/services/settings.service.js';
 import { createTestApp, type TestApp } from './utils/app.js';
 import { signUpClient, signUpStaff, type TestAgent } from './utils/auth.js';
 import { resetDb } from './utils/db.js';
@@ -386,6 +389,136 @@ describe('schedule (e2e)', () => {
     });
   });
 
+  describe('GenerateSlotsJob', () => {
+    const everyWeekday = async (agent: TestAgent): Promise<void> => {
+      for (let weekday = 1; weekday <= 7; weekday += 1) {
+        await agent.post('/api/staff/schedule/templates')
+          .send({ service: 'performance', weekday, startTime: '19:00', durationMinutes: 60, capacity: 14 }).expect(201);
+      }
+    };
+    const slotDates = async (): Promise<string[]> => {
+      const rows: { starts_at: Date }[] = await ctx.dataSource.query(`SELECT starts_at FROM time_slots ORDER BY starts_at`);
+      return rows.map((r) => toBusinessDate(r.starts_at));
+    };
+
+    it('does nothing without force while the scheduler is disabled', async () => {
+      const { agent } = await signUpStaff(ctx.app, ctx.dataSource);
+      await everyWeekday(agent);
+      await ctx.dataSource.query(`DELETE FROM time_slots`);
+
+      expect(await ctx.app.get(GenerateSlotsJob).execute()).toEqual({ ran: false, result: {} });
+      expect(await countSlots()).toBe(0);
+    });
+
+    it('covers today through today + bookingWindowDays by default and no further', async () => {
+      const { agent } = await signUpStaff(ctx.app, ctx.dataSource);
+      await everyWeekday(agent);
+      await ctx.dataSource.query(`DELETE FROM time_slots`);
+      const windowDays = await ctx.app.get(SettingsService).get('bookingWindowDays');
+      const lastBookable = addDays(businessToday(), windowDays);
+
+      const job = ctx.app.get(GenerateSlotsJob);
+      const run = await job.execute({ force: true });
+      expect(run.ran).toBe(true);
+      const dates = await slotDates();
+      expect(dates).toContain(lastBookable);
+      expect(dates).not.toContain(addDays(lastBookable, 1));
+      expect(run.result.created).toBe(dates.length);
+      expect(await job.execute({ force: true })).toEqual({ ran: true, result: { created: 0 } });
+    });
+
+    it('takes an explicit number of days over the default', async () => {
+      const { agent } = await signUpStaff(ctx.app, ctx.dataSource);
+      await everyWeekday(agent);
+      await ctx.dataSource.query(`DELETE FROM time_slots`);
+
+      await ctx.app.get(GenerateSlotsJob).execute({ days: 3, force: true });
+      const dates = await slotDates();
+      expect(dates.length).toBeGreaterThan(0);
+      expect(dates.every((d) => d < addDays(businessToday(), 3))).toBe(true);
+    });
+  });
+
+  describe('inactive professionals', () => {
+    const rehabTemplate = (professionalId: string) => ({
+      service: 'rehab', weekday: isoWeekday(tomorrow()), startTime: '10:00', durationMinutes: 60, capacity: 1, professionalId,
+    });
+    const deactivate = (agent: TestAgent, id: string) => agent.patch(`/api/staff/professionals/${id}`).send({ active: false }).expect(200);
+
+    it('answers PROFESSIONAL_NOT_FOUND when assigning one to a template or a slot', async () => {
+      const { agent } = await signUpStaff(ctx.app, ctx.dataSource);
+      const active = await createProfessional(agent, 'Fisio Activa');
+      const inactive = await createProfessional(agent, 'Fisio Inactiva');
+      const template = await agent.post('/api/staff/schedule/templates').send(rehabTemplate(active)).expect(201);
+      await deactivate(agent, inactive);
+
+      await agent.post('/api/staff/schedule/templates').send(rehabTemplate(inactive)).expect(404).expect(expectCode('PROFESSIONAL_NOT_FOUND'));
+      await agent.patch(`/api/staff/schedule/templates/${template.body.id}`).send({ professionalId: inactive })
+        .expect(404).expect(expectCode('PROFESSIONAL_NOT_FOUND'));
+      await agent.post('/api/staff/time-slots')
+        .send({ service: 'rehab', date: tomorrow(), startTime: '12:00', durationMinutes: 60, capacity: 1, professionalId: inactive })
+        .expect(404).expect(expectCode('PROFESSIONAL_NOT_FOUND'));
+      await agent.get('/api/staff/schedule/templates').expect(200)
+        .expect((r) => expect(r.body).toEqual([expect.objectContaining({ id: template.body.id, professionalId: active })]));
+    });
+
+    it('stops generating slots for a template of an inactive professional until reactivated', async () => {
+      const { agent } = await signUpStaff(ctx.app, ctx.dataSource);
+      const pro = await createProfessional(agent);
+      await agent.post('/api/staff/schedule/templates').send(rehabTemplate(pro)).expect(201);
+      expect(await countSlots()).toBeGreaterThan(0);
+      await ctx.dataSource.query(`DELETE FROM time_slots`);
+
+      await deactivate(agent, pro);
+      await agent.post('/api/staff/schedule/generate').send({ days: 60 }).expect(201).expect((r) => expect(r.body).toEqual({ created: 0 }));
+      expect(await countSlots()).toBe(0);
+
+      await agent.patch(`/api/staff/professionals/${pro}`).send({ active: true }).expect(200);
+      const again = await agent.post('/api/staff/schedule/generate').send({ days: 60 }).expect(201);
+      expect(again.body.created).toBeGreaterThan(0);
+    });
+  });
+
+  describe('template write and generation share one transaction', () => {
+    const failGenerationOnce = (): void => {
+      const schedule = ctx.app.get(ScheduleService);
+      const real = schedule.generateSlots.bind(schedule);
+      vi.spyOn(schedule, 'generateSlots').mockImplementationOnce(async (...args) => {
+        await real(...args);
+        throw new Error('generation failed');
+      });
+    };
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    const countTemplates = async (): Promise<number> => {
+      const [{ count }] = await ctx.dataSource.query(`SELECT count(*)::int AS count FROM schedule_templates`);
+      return count as number;
+    };
+    const body = () => ({ service: 'performance', weekday: isoWeekday(tomorrow()), startTime: '19:00', durationMinutes: 60, capacity: 14 });
+
+    it('keeps neither the template nor its slots when generation fails on create', async () => {
+      const { agent } = await signUpStaff(ctx.app, ctx.dataSource);
+      failGenerationOnce();
+      await agent.post('/api/staff/schedule/templates').send(body()).expect(500).expect(expectCode('INTERNAL_ERROR'));
+      expect(await countTemplates()).toBe(0);
+      expect(await countSlots()).toBe(0);
+      await agent.post('/api/staff/schedule/templates').send(body()).expect(201);
+      expect(await countTemplates()).toBe(1);
+    });
+
+    it('keeps the stored template and its slots when generation fails on edit', async () => {
+      const { agent } = await signUpStaff(ctx.app, ctx.dataSource);
+      const created = await agent.post('/api/staff/schedule/templates').send(body()).expect(201);
+      const slots = await countSlots();
+      failGenerationOnce();
+      await agent.patch(`/api/staff/schedule/templates/${created.body.id}`).send({ startTime: '20:00', capacity: 5 })
+        .expect(500).expect(expectCode('INTERNAL_ERROR'));
+      expect(await countSlots()).toBe(slots);
+      await agent.get('/api/staff/schedule/templates').expect(200)
+        .expect((r) => expect(r.body).toEqual([expect.objectContaining({ id: created.body.id, startTime: '19:00', capacity: 14 })]));
+    });
+  });
+
   describe('ScheduleService', () => {
     let schedule: ScheduleService;
     beforeAll(() => { schedule = ctx.app.get(ScheduleService); });
@@ -462,6 +595,10 @@ describe('schedule (e2e)', () => {
       await expect(ctx.dataSource.transaction((m) => schedule.updateCapacity(m, rehab, 2))).rejects.toMatchObject({ code: 'TEMPLATE_INVALID' });
       expect((await ctx.dataSource.transaction((m) => schedule.updateCapacity(m, rehab, 1))).capacity).toBe(1);
       await expect(ctx.dataSource.transaction((m) => schedule.updateCapacity(m, performance, 0))).rejects.toMatchObject({ code: 'TEMPLATE_INVALID' });
+      expect((await ctx.dataSource.transaction((m) => schedule.updateCapacity(m, performance, 100))).capacity).toBe(100);
+      await expect(ctx.dataSource.transaction((m) => schedule.updateCapacity(m, performance, 101))).rejects.toMatchObject({ code: 'TEMPLATE_INVALID' });
+      await expect(ctx.dataSource.transaction((m) => schedule.updateCapacity(m, performance, 40_000))).rejects.toMatchObject({ code: 'TEMPLATE_INVALID' });
+      expect((await schedule.getSlot(performance)).capacity).toBe(100);
       await expect(ctx.dataSource.transaction((m) => schedule.updateCapacity(m, '00000000-0000-0000-0000-000000000000', 5)))
         .rejects.toMatchObject({ code: 'SLOT_NOT_FOUND' });
     });

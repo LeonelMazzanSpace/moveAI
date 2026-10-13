@@ -26,6 +26,11 @@ export class GenerateSlotsJob implements OnApplicationBootstrap {
     await this.safeRun();
   }
 
+  // The HTTP contract defaults a manual run to `bookingWindowDays` days, one fewer than the scheduled run.
+  async executeManually(days?: number): Promise<JobRunResult> {
+    return this.execute({ days: days ?? (await this.settings.get('bookingWindowDays')), force: true });
+  }
+
   // `days` defaults to the bookable window: today through `today + bookingWindowDays`, both included.
   async execute(options: { days?: number; force?: boolean } = {}): Promise<JobRunResult> {
     return this.runner.run(

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { Repository, SelectQueryBuilder } from 'typeorm';
+import { DataSource, type EntityManager, type Repository, type SelectQueryBuilder } from 'typeorm';
 import { AppError } from '../../../common/errors/app-error.js';
 import { businessToday } from '../../../common/time/business-time.js';
 import type { Service } from '../../catalog/entities/plan.entity.js';
@@ -47,6 +47,7 @@ export class TemplatesService {
     private readonly professionals: ProfessionalsService,
     private readonly schedule: ScheduleService,
     private readonly settings: SettingsService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async list(service?: Service): Promise<ScheduleTemplateModel[]> {
@@ -63,21 +64,26 @@ export class TemplatesService {
   async create(input: CreateTemplateInput): Promise<ScheduleTemplateModel> {
     const professionalId = input.professionalId ?? null;
     if (!hasValidRehabShape(input.service, input.capacity, professionalId)) throw new AppError('TEMPLATE_INVALID');
-    if (professionalId) await this.professionals.assertExists(professionalId);
+    if (professionalId) await this.professionals.assertAssignable(professionalId);
 
-    const saved = await this.templates.save(
-      this.templates.create({
-        service: input.service,
-        weekday: input.weekday,
-        startTime: input.startTime,
-        durationMinutes: input.durationMinutes,
-        capacity: input.capacity,
-        professionalId,
-        active: true,
-      }),
-    );
-    await this.generateWithinWindow(saved.id);
-    return this.get(saved.id);
+    const windowDays = await this.settings.get('bookingWindowDays');
+    const id = await this.dataSource.transaction(async (manager) => {
+      const repository = manager.getRepository(ScheduleTemplate);
+      const saved = await repository.save(
+        repository.create({
+          service: input.service,
+          weekday: input.weekday,
+          startTime: input.startTime,
+          durationMinutes: input.durationMinutes,
+          capacity: input.capacity,
+          professionalId,
+          active: true,
+        }),
+      );
+      await this.generateWithinWindow(manager, saved.id, windowDays);
+      return saved.id;
+    });
+    return this.get(id);
   }
 
   // Editing only changes what is generated from now on: slots that already exist are left as they are.
@@ -94,11 +100,14 @@ export class TemplatesService {
     };
     if (!hasValidRehabShape(template.service, next.capacity, next.professionalId)) throw new AppError('TEMPLATE_INVALID');
     if (next.professionalId && next.professionalId !== template.professionalId) {
-      await this.professionals.assertExists(next.professionalId);
+      await this.professionals.assertAssignable(next.professionalId);
     }
 
-    await this.templates.update({ id }, next);
-    await this.generateWithinWindow(id);
+    const windowDays = await this.settings.get('bookingWindowDays');
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(ScheduleTemplate).update({ id }, next);
+      await this.generateWithinWindow(manager, id, windowDays);
+    });
     return this.get(id);
   }
 
@@ -123,9 +132,7 @@ export class TemplatesService {
   }
 
   // The bookable window covers today through `today + bookingWindowDays`, both included.
-  private async generateWithinWindow(templateId: string): Promise<void> {
-    const windowDays = await this.settings.get('bookingWindowDays');
-    const today = businessToday();
-    await this.schedule.generateSlots(today, windowDays + 1, templateId);
+  private async generateWithinWindow(manager: EntityManager, templateId: string, windowDays: number): Promise<void> {
+    await this.schedule.generateSlots(businessToday(), windowDays + 1, templateId, manager);
   }
 }
