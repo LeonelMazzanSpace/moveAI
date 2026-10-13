@@ -305,9 +305,12 @@ export class PaymentsService {
       await this.flag(manager, purchase.id);
       return null;
     }
+    // A bare UPDATE … RETURNING resolves to [rows, rowCount]; the CTE returns the moved rows only.
     const moved: { id: string }[] = await manager.query(
-      `UPDATE purchases SET status = 'approved', approved_at = now(), updated_at = now()
-       WHERE id = $1 AND status IN ('pending','expired') RETURNING id`,
+      `WITH moved AS (
+         UPDATE purchases SET status = 'approved', approved_at = now(), updated_at = now()
+         WHERE id = $1 AND status IN ('pending','expired') RETURNING id
+       ) SELECT id FROM moved`,
       [purchase.id],
     );
     if (moved.length === 0) return null;
@@ -400,12 +403,15 @@ export class PaymentsService {
     }
   }
 
+  // Booking purchases expire once their hold is gone: expired, or cancelled by staff or the system.
   private async expireStale(now: Date): Promise<number> {
     const [{ count }]: { count: number }[] = await this.dataSource.query(
       `WITH expired AS (
          UPDATE purchases pu SET status = 'expired', updated_at = now()
          WHERE pu.status = 'pending' AND pu.deleted_at IS NULL AND (
-           (pu.kind = 'booking' AND EXISTS (SELECT 1 FROM bookings b WHERE b.id = pu.booking_id AND b.status = 'expired'))
+           (pu.kind = 'booking' AND EXISTS (
+             SELECT 1 FROM bookings b WHERE b.id = pu.booking_id AND b.status IN ('expired','cancelled')
+           ))
            OR (pu.kind = 'plan' AND pu.created_at < $1)
          )
          RETURNING pu.id
