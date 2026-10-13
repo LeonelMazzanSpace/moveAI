@@ -33,6 +33,20 @@ const STATUS_OPTIONS: { value: PaymentStatusFilter; label: string }[] = [
 
 const METHODS = Object.keys(METHOD_LABEL) as PaymentMethod[];
 
+const MAX_PAGE = 10_000;
+
+export function clampPage(raw: string | undefined): number {
+  const page = Number(raw);
+  if (!Number.isInteger(page) || page < 1) return 1;
+  return Math.min(page, MAX_PAGE);
+}
+
+function findOption<T extends string>(values: readonly T[], raw: string): T | null {
+  return values.find((value) => value === raw) ?? null;
+}
+
+const STATUS_VALUES = STATUS_OPTIONS.map((option) => option.value);
+
 function pageHref(filters: PaymentFilters): string {
   const params = new URLSearchParams();
   if (filters.status) params.set('estado', filters.status);
@@ -75,7 +89,7 @@ export function PaymentsView({ filters }: { filters: PaymentFilters }) {
                 id={`${uid}-status`}
                 className={SELECT_CLASS}
                 value={filters.status ?? ''}
-                onChange={(event) => navigate({ status: (event.target.value || null) as PaymentStatusFilter | null })}
+                onChange={(event) => navigate({ status: findOption(STATUS_VALUES, event.target.value) })}
               >
                 <option value="">Todos</option>
                 {STATUS_OPTIONS.map((option) => (
@@ -92,7 +106,7 @@ export function PaymentsView({ filters }: { filters: PaymentFilters }) {
                 id={`${uid}-method`}
                 className={SELECT_CLASS}
                 value={filters.method ?? ''}
-                onChange={(event) => navigate({ method: (event.target.value || null) as PaymentMethod | null })}
+                onChange={(event) => navigate({ method: findOption(METHODS, event.target.value) })}
               >
                 <option value="">Todos</option>
                 {METHODS.map((method) => (
@@ -125,31 +139,29 @@ export function PaymentsView({ filters }: { filters: PaymentFilters }) {
       {data && data.items.length === 0 ? (
         <EmptyState title="Sin pagos" description="No hay operaciones que coincidan con los filtros." />
       ) : null}
-      {data && data.items.length > 0 ? (
-        <>
-          <PaymentsTable payments={data.items} />
-          <nav aria-label="Paginación" className="flex items-center justify-end gap-3">
-            <span className="text-xs text-muted-foreground">
-              Página {data.page} de {totalPages}
-            </span>
-            <button
-              type="button"
-              className={BUTTON_OUTLINE}
-              disabled={data.page <= 1}
-              onClick={() => navigate({ page: data.page - 1 })}
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              className={BUTTON_OUTLINE}
-              disabled={data.page >= totalPages}
-              onClick={() => navigate({ page: data.page + 1 })}
-            >
-              Siguiente
-            </button>
-          </nav>
-        </>
+      {data && data.items.length > 0 ? <PaymentsTable payments={data.items} /> : null}
+      {data && (data.items.length > 0 || data.page > 1) ? (
+        <nav aria-label="Paginación" className="flex items-center justify-end gap-3">
+          <span className="text-xs text-muted-foreground">
+            Página {data.page} de {totalPages}
+          </span>
+          <button
+            type="button"
+            className={BUTTON_OUTLINE}
+            disabled={data.page <= 1}
+            onClick={() => navigate({ page: Math.min(data.page - 1, totalPages) })}
+          >
+            Anterior
+          </button>
+          <button
+            type="button"
+            className={BUTTON_OUTLINE}
+            disabled={data.page >= totalPages}
+            onClick={() => navigate({ page: data.page + 1 })}
+          >
+            Siguiente
+          </button>
+        </nav>
       ) : null}
 
       <ManualPaymentDialog open={dialogOpen} onOpenChange={setDialogOpen} />

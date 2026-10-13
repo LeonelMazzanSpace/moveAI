@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { StaffPageHeader } from '@/components/move/staff-page-header';
-import { PaymentsView, type PaymentFilters, type PaymentStatusFilter } from '@/components/staff/pagos/payments-view';
+import { clampPage, PaymentsView, type PaymentFilters, type PaymentStatusFilter } from '@/components/staff/pagos/payments-view';
 import type { PaymentMethod } from '@/lib/api/types';
 
 export const metadata: Metadata = { title: 'Pagos' };
@@ -16,12 +16,11 @@ function first(value: string | string[] | undefined): string | undefined {
 }
 
 function parseFilters(params: Awaited<SearchParams>): PaymentFilters {
-  const page = Number(first(params.pagina));
   return {
     status: STATUSES.find((status) => status === first(params.estado)) ?? null,
     method: METHODS.find((method) => method === first(params.metodo)) ?? null,
     needsAttention: first(params.atencion) === '1',
-    page: Number.isInteger(page) && page >= 1 ? page : 1,
+    page: clampPage(first(params.pagina)),
   };
 }
 

@@ -21,11 +21,13 @@ import {
   MANUAL_METHODS,
   MANUAL_METHOD_LABEL,
   manualPaymentSchema,
+  MAX_AMOUNT,
   type ManualPaymentInput,
   type ManualPaymentPayload,
 } from './manual-payment.schema';
 
 const PAYMENTS_KEY = ['staff', 'payments'] as const;
+const CLIENTS_KEY = ['staff', 'clients'] as const;
 const PAYABLE_PLANS_KEY = ['staff', 'plans', 'payable'] as const;
 
 interface ManualPaymentDialogProps {
@@ -57,7 +59,10 @@ function ManualPaymentForm({ onDone }: ManualPaymentFormProps) {
     onSuccess: async () => {
       toast.success('Pago registrado');
       onDone();
-      await queryClient.invalidateQueries({ queryKey: PAYMENTS_KEY });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: PAYMENTS_KEY }),
+        queryClient.invalidateQueries({ queryKey: CLIENTS_KEY }),
+      ]);
     },
   });
 
@@ -111,7 +116,7 @@ function ManualPaymentForm({ onDone }: ManualPaymentFormProps) {
           </select>
         </FormField>
         <FormField id={id('amount')} label="Monto (UYU)" error={errors.amount?.message}>
-          <Input id={id('amount')} type="number" inputMode="decimal" min={0} {...register('amount')} />
+          <Input id={id('amount')} type="number" inputMode="decimal" min={0} max={MAX_AMOUNT} {...register('amount')} />
         </FormField>
       </div>
       <FormField id={id('note')} label="Nota (opcional)" error={errors.note?.message}>

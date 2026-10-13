@@ -32,7 +32,7 @@ export function ClientPicker({ id, selected, invalid = false, onSelect }: Client
   const [text, setText] = useState('');
   const term = useDebouncedValue(text).trim();
   const searching = selected === null && term.length >= MIN_QUERY_LENGTH;
-  const { data, isFetching } = useQuery({
+  const { data, isFetching, isError } = useQuery({
     queryKey: ['staff', 'clients', 'picker', term],
     queryFn: () => apiFetch<Paginated<ClientRowDto>>('/staff/clients', { query: { q: term, pageSize: RESULTS_PAGE_SIZE } }),
     enabled: searching,
@@ -78,6 +78,11 @@ export function ClientPicker({ id, selected, invalid = false, onSelect }: Client
             </li>
           ))}
         </ul>
+      ) : null}
+      {searching && isError ? (
+        <p role="alert" className="text-xs text-danger">
+          No pudimos buscar clientes. Probá de nuevo.
+        </p>
       ) : null}
       {searching && data && data.items.length === 0 && !isFetching ? (
         <p className="text-xs text-muted-foreground">No encontramos clientes con esa búsqueda.</p>

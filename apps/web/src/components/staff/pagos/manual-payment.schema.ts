@@ -11,6 +11,11 @@ export const MANUAL_METHOD_LABEL: Record<ManualPaymentMethod, string> = {
 export const MANUAL_METHODS = Object.keys(MANUAL_METHOD_LABEL) as ManualPaymentMethod[];
 
 const MAX_NOTE_LENGTH = 500;
+export const MAX_AMOUNT = 10_000_000;
+
+function hasMoreThanTwoDecimals(amount: number): boolean {
+  return Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-6;
+}
 
 export interface ManualPaymentPayload {
   userId: string;
@@ -39,7 +44,17 @@ export const manualPaymentSchema = z
       ctx.addIssue({ code: 'custom', path: ['amount'], message: 'Ingresá un monto.' });
       return;
     }
-    if (amount < 0) ctx.addIssue({ code: 'custom', path: ['amount'], message: 'El monto no puede ser negativo.' });
+    if (amount < 0) {
+      ctx.addIssue({ code: 'custom', path: ['amount'], message: 'El monto no puede ser negativo.' });
+      return;
+    }
+    if (amount > MAX_AMOUNT) {
+      ctx.addIssue({ code: 'custom', path: ['amount'], message: 'El monto no puede superar $ 10.000.000.' });
+      return;
+    }
+    if (hasMoreThanTwoDecimals(amount)) {
+      ctx.addIssue({ code: 'custom', path: ['amount'], message: 'Usá hasta 2 decimales.' });
+    }
   })
   .transform((values): ManualPaymentPayload => {
     const payload: ManualPaymentPayload = {
