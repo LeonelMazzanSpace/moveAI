@@ -12,8 +12,9 @@
 //
 // Las capturas se toman primero en un directorio temporal. Solo si salieron todas (EXPECTED_IMAGE_COUNT) se arma una
 // carpeta nueva junto a docs/manual/img/ y se la renombra en su lugar (nombres estables; arquitectura.png y cualquier
-// otro archivo que no sea una captura se conservan). Si algo falla, las imágenes actuales quedan como estaban. La última parte recorre el checkout de un paquete Recovery con un cliente sin paquete
-// (Nicolás Acosta): crea una compra y la aprueba con el simulador de pagos.
+// otro archivo que no sea una captura se conservan). Si algo falla, las imágenes actuales quedan como estaban.
+// La última parte recorre el checkout de un paquete Recovery con un cliente sin paquete (Nicolás Acosta): crea una
+// compra y la aprueba con el simulador de pagos.
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
@@ -53,6 +54,8 @@ function publishImages() {
   }
   const staging = `${IMG_DIR}.new`;
   const previous = `${IMG_DIR}.old`;
+  // Si una corrida anterior murió entre los dos renombres, las imágenes viejas están en img.old: se recuperan antes de limpiar.
+  if (!existsSync(IMG_DIR) && existsSync(previous)) renameSync(previous, IMG_DIR);
   rmSync(staging, { recursive: true, force: true });
   rmSync(previous, { recursive: true, force: true });
   mkdirSync(staging, { recursive: true });
