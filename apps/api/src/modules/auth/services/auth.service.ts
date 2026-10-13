@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { AppError } from '../../../common/errors/app-error.js';
 import { appConfig } from '../../../config/app.config.js';
 import { NotificationsService } from '../../notifications/services/notifications.service.js';
@@ -10,6 +10,7 @@ import { cleanText, EMAIL_LENGTH, NAME_LENGTH, PHONE_LENGTH } from '../../users/
 import { BETTER_AUTH } from '../auth.constants.js';
 import type { BetterAuthInstance } from '../better-auth.factory.js';
 import { AuthAccount } from '../entities/auth-account.entity.js';
+import { AuthSession } from '../entities/auth-session.entity.js';
 
 const PG_UNIQUE_VIOLATION = '23505';
 
@@ -39,6 +40,7 @@ export class AuthService {
     @Inject(appConfig.KEY) private readonly app: ConfigType<typeof appConfig>,
     @InjectRepository(AuthAccount) private readonly accounts: Repository<AuthAccount>,
     private readonly notifications: NotificationsService,
+    @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
   // Includes soft-deleted users, like the UNIQUE email and Better Auth's own sign-up check:
@@ -77,6 +79,29 @@ export class AuthService {
       userId: user.id,
       idempotencyKey: `${template}:${tokenDigest(token)}`,
       params: { name: user.name, url },
+    });
+  }
+
+  // D54, only for `user:create-staff --promote-existing`: makes an existing account staff in one transaction.
+  // Sets the given password on its credential account (creating it if missing), revokes every session and marks
+  // the email verified, so whoever registered the address first keeps no access.
+  async promoteExistingToStaff(userId: string, password: string): Promise<void> {
+    const ctx = await this.auth.$context;
+    const { minPasswordLength, maxPasswordLength } = ctx.password.config;
+    if (password.length < minPasswordLength || password.length > maxPasswordLength) {
+      throw new AppError('VALIDATION_FAILED');
+    }
+    const hash = await ctx.password.hash(password);
+    await this.dataSource.transaction(async (manager) => {
+      const accounts = manager.getRepository(AuthAccount);
+      const credential = await accounts.findOneBy({ userId, providerId: 'credential' });
+      if (credential) await accounts.update({ id: credential.id }, { password: hash });
+      else await accounts.insert({ userId, providerId: 'credential', accountId: userId, password: hash });
+      await manager.delete(AuthSession, { userId });
+      await manager.query(
+        `UPDATE users SET role = 'staff', email_verified = true, updated_at = now() WHERE id = $1`,
+        [userId],
+      );
     });
   }
 }
