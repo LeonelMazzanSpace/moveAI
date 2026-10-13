@@ -1,5 +1,6 @@
 // Pasos de reserva y pago compartidos por las specs.
 import { expect, type Locator, type Page } from '@playwright/test';
+import type { Ui } from '../fixtures';
 import { weeksAhead } from './time';
 
 // Grilla de Performance: elige el día en el selector nativo y devuelve la tarjeta del turno de esa hora.
@@ -27,19 +28,24 @@ export async function pickDayAndTime(scope: Locator, date: string, time: string)
   await expect(slot).toHaveAttribute('aria-pressed', 'true');
 }
 
-// Simulador de pagos (desarrollo): aprueba o rechaza y espera la página de resultado.
-export async function settlePayment(page: Page, outcome: 'Aprobar' | 'Rechazar'): Promise<void> {
+// Simulador de pagos (desarrollo): aprueba o rechaza y espera la página de resultado. Mide las dos pantallas en mobile.
+export async function settlePayment(ui: Ui, outcome: 'Aprobar' | 'Rechazar'): Promise<void> {
+  const { page } = ui;
   await page.waitForURL(/\/checkout\/simulado\?ref=/);
   await expect(page.getByText('Simulador de pagos (desarrollo)')).toBeVisible();
+  await ui.expectFits();
   await page.getByRole('button', { name: outcome }).click();
   await page.waitForURL(/\/checkout\/resultado\?ref=/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Tu pago.' })).toBeVisible();
+  await ui.expectFits();
 }
 
-// Checkout de un plan o paquete: paga con el simulador y aprueba.
-export async function payPlan(page: Page, outcome: 'Aprobar' | 'Rechazar' = 'Aprobar'): Promise<void> {
-  await expect(page.getByRole('heading', { level: 1, name: 'Confirmá tu plan.' })).toBeVisible();
-  await page.getByRole('button', { name: 'Pagar con Mercado Pago' }).click();
-  await settlePayment(page, outcome);
+// Checkout de un plan o paquete: paga con el simulador.
+export async function payPlan(ui: Ui, outcome: 'Aprobar' | 'Rechazar' = 'Aprobar'): Promise<void> {
+  await expect(ui.page.getByRole('heading', { level: 1, name: 'Confirmá tu plan.' })).toBeVisible();
+  await ui.expectFits();
+  await ui.page.getByRole('button', { name: 'Pagar con Mercado Pago' }).click();
+  await settlePayment(ui, outcome);
 }
 
 export const approvedTitle = (page: Page) => page.getByText('¡Listo! Tu pago fue aprobado.');

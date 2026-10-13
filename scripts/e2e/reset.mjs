@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import {
   apiEnv,
   assertE2eDatabase,
+  assertLocalDatabaseHost,
   E2E_API_URL,
   E2E_DB_CONTAINER,
   E2E_DB_NAME,
@@ -70,20 +71,19 @@ function stopApi(child) {
   });
 }
 
-async function request(cookie, method, path, body) {
-  const headers = { origin: E2E_WEB_URL };
+async function post(cookie, path, body) {
+  const headers = { origin: E2E_WEB_URL, 'content-type': 'application/json' };
   if (cookie) headers.cookie = cookie;
-  if (body !== undefined) headers['content-type'] = 'application/json';
-  const response = await fetch(`${E2E_API_URL}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-  if (!response.ok) throw new Error(`${method} ${path} → ${response.status}`);
+  const response = await fetch(`${E2E_API_URL}${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+  if (!response.ok) throw new Error(`POST ${path} → ${response.status}`);
   return response;
 }
 
 async function loadMinimalData(staffPassword) {
-  const signIn = await request(null, 'POST', '/auth/sign-in/email', { email: E2E_STAFF_EMAIL, password: staffPassword });
+  const signIn = await post(null, '/auth/sign-in/email', { email: E2E_STAFF_EMAIL, password: staffPassword });
   const cookie = signIn.headers.getSetCookie().map((header) => header.split(';')[0]).join('; ');
-  await request(cookie, 'POST', '/staff/professionals', { name: E2E_PROFESSIONAL_NAME });
-  const generated = await (await request(cookie, 'POST', '/staff/schedule/generate', {})).json();
+  await post(cookie, '/staff/professionals', { name: E2E_PROFESSIONAL_NAME });
+  const generated = await (await post(cookie, '/staff/schedule/generate', {})).json();
   step(`Profesional de E2E creado y ${generated.created} turnos generados desde las plantillas`);
 }
 
@@ -91,6 +91,7 @@ async function main() {
   const staffPassword = requireEnv('E2E_STAFF_PASSWORD');
   if (staffPassword.length < 8) throw new Error('E2E_STAFF_PASSWORD debe tener al menos 8 caracteres.');
   assertE2eDatabase();
+  assertLocalDatabaseHost();
   if (await apiIsUp()) throw new Error(`Ya hay una API respondiendo en ${E2E_API_URL}: detenela antes de reiniciar la base.`);
 
   step(`Reiniciando la base ${E2E_DB_NAME}`);

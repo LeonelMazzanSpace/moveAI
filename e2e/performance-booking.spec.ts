@@ -1,4 +1,5 @@
 // Flujo 4: reservas de Performance. Reserva, límite de cupo, cancelación dentro y fuera del plazo, y plan vencido.
+import type { BookingDto } from '../apps/web/src/lib/api/types';
 import { expect, test } from './fixtures';
 import { expireSubscription } from './support/sql';
 import { performanceSlotCard } from './support/booking';
@@ -59,12 +60,14 @@ test.describe('Reservas Performance', () => {
     const soonStart = new Date(Date.now() + 75 * 60_000);
     const soon = await createSlot({ service: 'performance', capacity: 2, date: businessDate(soonStart), time: businessTime(soonStart) });
     await client.api.call('POST', '/bookings', { timeSlotId: later.id });
-    await client.api.call('POST', '/bookings', { timeSlotId: soon.id });
+    const soonBooking = await client.api.call<BookingDto>('POST', '/bookings', { timeSlotId: soon.id });
     await login(page, client);
 
     await ui.visit('/perfil');
     await expect(page.getByText(`Performance — ${soon.time}`).first()).toBeVisible();
     await expect(page.getByRole('button', { name: `Cancelar reserva del ${displayDate(soon.date)} a las ${soon.time}` })).toHaveCount(0);
+    // La regla también la aplica la API, no solo la pantalla.
+    await expect(client.api.call('POST', `/bookings/${soonBooking.id}/cancel`)).rejects.toThrow('409 CANCEL_WINDOW_CLOSED');
 
     await page.getByRole('button', { name: `Cancelar reserva del ${displayDate(later.date)} a las ${later.time}` }).click();
     const dialog = page.getByRole('dialog', { name: `¿Cancelar la reserva del ${displayDate(later.date)} a las ${later.time}?` });

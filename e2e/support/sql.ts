@@ -1,12 +1,13 @@
 // SQL directo contra la base de E2E, solo para lo que la API no permite crear (como scripts/manual/demo-data.mjs):
 // planes vencidos y turnos de hoy ya empezados para marcar asistencia.
 import { spawnSync } from 'node:child_process';
-import { E2E_DB_CONTAINER, E2E_DB_NAME } from '../../scripts/e2e/env.mjs';
+import { assertE2eDatabase, E2E_DB_CONTAINER, E2E_DB_NAME } from '../../scripts/e2e/env.mjs';
 
 const UUID = /^[0-9a-f-]{36}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function sql(statement: string): string {
+  assertE2eDatabase();
   const result = spawnSync(
     'docker',
     ['exec', '-i', E2E_DB_CONTAINER, 'psql', '-U', process.env.DB_USER ?? 'move', '-d', E2E_DB_NAME, '-v', 'ON_ERROR_STOP=1', '-At', '-f', '-'],

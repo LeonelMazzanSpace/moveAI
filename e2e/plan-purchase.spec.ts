@@ -14,7 +14,7 @@ test.describe('Compra de plan Performance', () => {
     await expect(page).toHaveURL('/checkout/plan/performance-mensual');
     await expect(page.getByText('Plan Mensual', { exact: true }).first()).toBeVisible();
     await ui.expectFits();
-    await payPlan(page);
+    await payPlan(ui);
 
     await expect(approvedTitle(page)).toBeVisible();
     await expect(page.getByText('$ 3.900')).toBeVisible();
@@ -22,6 +22,7 @@ test.describe('Compra de plan Performance', () => {
     await page.getByRole('link', { name: 'Ir a mi perfil' }).click();
     await page.waitForURL('/perfil');
     await expect(page.getByRole('heading', { name: 'Plan Mensual — Performance' })).toBeVisible();
+    await ui.expectFits();
     await expect(page.getByText('Activo', { exact: true })).toBeVisible();
     await expect(page.getByRole('progressbar', { name: 'Progreso del período' })).toBeVisible();
   });
@@ -33,7 +34,7 @@ test.describe('Compra de plan Performance', () => {
     await login(page, client);
 
     await ui.visit('/checkout/plan/performance-mensual');
-    await payPlan(page, 'Rechazar');
+    await payPlan(ui, 'Rechazar');
     await expect(page.getByText('Confirmando tu pago')).toBeVisible();
     await expect(page.getByText('Pago en proceso')).toBeVisible({ timeout: 120_000 });
     await expect(page.getByText('Si tu pago fue rechazado, podés intentarlo de nuevo.')).toBeVisible();
@@ -42,7 +43,8 @@ test.describe('Compra de plan Performance', () => {
     const retry = page.getByRole('link', { name: 'Intentar de nuevo' });
     await expect(retry).toHaveAttribute('href', '/checkout/plan/performance-mensual');
     await retry.click();
-    await payPlan(page);
+    await expect(page).toHaveURL('/checkout/plan/performance-mensual');
+    await payPlan(ui);
     await expect(approvedTitle(page)).toBeVisible();
 
     await ui.visit('/perfil');

@@ -1,11 +1,12 @@
 // Flujo 7: panel de staff. Dashboard, clientes (búsqueda, alta, detalle, pausa), turnos y asistencia, pagos (filtros y
 // pago manual), seguimiento (alertas y contacto), check-ins (derivar a Rehab) y configuración.
 import type { Locator, Page } from '@playwright/test';
-import type { ClientDetailDto, StaffTimeSlotDto } from '../apps/web/src/lib/api/types';
-import { type Client, expect, staffCredentials, test, uniquePerson } from './fixtures';
+import type { ClientDetailDto, ScheduleTemplateDto, StaffTimeSlotDto } from '../apps/web/src/lib/api/types';
+import { type Client, expect, rowOf, staffCredentials, test, uniquePerson } from './fixtures';
 import type { ApiClient } from './support/api';
+import { pickDayAndTime } from './support/booking';
 import { moveSlotBack } from './support/sql';
-import { businessDate } from './support/time';
+import { businessDate, businessTime } from './support/time';
 
 // Tarjeta (alerta o respuesta de check-in) del cliente: el bloque más interno que tiene su nombre y el botón pedido.
 function cardOf(page: Page, name: string, button: string): Locator {
@@ -66,6 +67,8 @@ test.describe('Staff', () => {
     await ui.visit('/staff/clientes');
     await page.getByRole('searchbox', { name: 'Buscar clientes' }).fill(client.name);
     await expect(page).toHaveURL(/q=/);
+    await expect(page.getByRole('link', { name: client.name })).toBeVisible();
+    await ui.expectFits();
     await page.getByRole('link', { name: client.name }).click();
     await page.waitForURL(`/staff/clientes/${client.id}`);
     await expect(page.getByRole('heading', { level: 2, name: client.name })).toBeVisible();
@@ -83,6 +86,8 @@ test.describe('Staff', () => {
 
     await page.getByRole('button', { name: 'Finalizar pausa' }).click();
     const dialog = page.getByRole('dialog', { name: 'Finalizar pausa' });
+    await expect(dialog).toBeVisible();
+    await ui.expectFits();
     await dialog.getByRole('button', { name: 'Sí, finalizar' }).click();
     await expect(page.getByText('Pausa finalizada')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Registrar motivo' })).toBeVisible();
@@ -104,6 +109,8 @@ test.describe('Staff', () => {
     await expect(page.getByText('Cliente creado. Le enviamos un email para activar su cuenta.')).toBeVisible();
     await page.waitForURL(/\/staff\/clientes\/[0-9a-f-]{36}$/);
     await expect(page.getByRole('heading', { level: 2, name: person.name })).toBeVisible();
+    await expect(page.getByText('Sin plan Performance vigente.')).toBeVisible();
+    await ui.expectFits();
   });
 
   test('turnos y asistencia: presente, ausente y no show', async ({ page, ui, createClient, createSlot, staff }) => {
@@ -117,22 +124,23 @@ test.describe('Staff', () => {
     await ui.visit(`/staff/turnos?fecha=${today}&servicio=performance&turno=${slot.id}`);
     await expect(page.getByRole('heading', { name: `Turno ${slot.time} — Performance` })).toBeVisible();
     const marks = [
-      { client: clients[0], status: 'Presente', badge: 'Presente' },
-      { client: clients[1], status: 'Ausente', badge: 'Ausente' },
-      { client: clients[2], status: 'No show', badge: 'No show' },
+      { client: clients[0], status: 'Presente' },
+      { client: clients[1], status: 'Ausente' },
+      { client: clients[2], status: 'No show' },
     ];
     for (const mark of marks) {
-      const row = page.getByRole('row', { name: new RegExp(mark.client.name) });
-      await row.getByRole('button', { name: mark.status, exact: true }).click();
-      await expect(row.getByRole('button', { name: mark.status, exact: true })).toHaveAttribute('aria-pressed', 'true');
+      const button = rowOf(page, mark.client.name).getByRole('button', { name: mark.status, exact: true });
+      await button.click();
+      await expect(button).toHaveAttribute('aria-pressed', 'true');
     }
     await ui.expectFits();
 
     await page.reload();
     for (const mark of marks) {
-      const row = page.getByRole('row', { name: new RegExp(mark.client.name) });
-      await expect(row.getByRole('button', { name: mark.status, exact: true })).toHaveAttribute('aria-pressed', 'true');
+      const button = rowOf(page, mark.client.name).getByRole('button', { name: mark.status, exact: true });
+      await expect(button).toHaveAttribute('aria-pressed', 'true');
     }
+    await ui.expectFits();
     const slots = await staff.call<StaffTimeSlotDto[]>('GET', `/staff/time-slots?date=${today}&service=performance`);
     const marked = slots.find((item) => item.id === slot.id);
     expect(marked).toMatchObject({ booked: 3, present: 1, absent: 1, noShow: 1, pendingAttendance: 0 });
@@ -163,10 +171,18 @@ test.describe('Staff', () => {
     await expect(page).toHaveURL(/metodo=transfer/);
     await page.getByLabel('Estado').selectOption('approved');
     await expect(page).toHaveURL(/estado=approved/);
-    await expect(page.getByRole('row', { name: new RegExp(client.name) })).toContainText('Transferencia');
+    const payment = rowOf(page, client.name);
+    await expect(payment).toContainText('Transferencia');
+    await expect(payment).toContainText('$ 3.900');
+    await ui.expectFits();
+
+    // Con "Efectivo" la tabla termina en un estado conocido (vacía o solo con pagos en efectivo) y sin este pago.
     await page.getByLabel('Método').selectOption('cash');
     await expect(page).toHaveURL(/metodo=cash/);
-    await expect(page.getByRole('row', { name: new RegExp(client.name) })).toHaveCount(0);
+    const cashRows = page.getByRole('main').locator('tbody tr');
+    await expect(page.getByText('Sin pagos', { exact: true }).or(cashRows.filter({ hasText: 'Efectivo' }).first())).toBeVisible();
+    await expect(cashRows.filter({ hasText: 'Transferencia' })).toHaveCount(0);
+    await expect(payment).toHaveCount(0);
   });
 
   test('seguimiento: contacto y alerta gestionada', async ({ page, ui, staff, createClient }) => {
@@ -176,6 +192,8 @@ test.describe('Staff', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Seguimiento y retención' })).toBeVisible();
     await expect(page.getByRole('group', { name: 'Filtrar alertas' }).getByRole('button', { name: /^Molestia reportada/ })).toHaveAttribute('aria-pressed', 'true');
     const card = cardOf(page, client.name, 'Contactar');
+    await expect(card).toBeVisible();
+    await ui.expectFits();
     await card.getByRole('button', { name: 'Contactar', exact: true }).click();
 
     const dialog = page.getByRole('dialog', { name: `Contactar a ${client.name}` });
@@ -195,28 +213,41 @@ test.describe('Staff', () => {
     expect(detail.contacts[0]).toMatchObject({ channel: 'phone', outcome: 'no_answer', note: 'Llamado sin respuesta' });
   });
 
-  test('check-ins: derivar a Rehab habilita el seguimiento', async ({ page, ui, staff, createClient }) => {
+  test('check-ins: derivar a Rehab habilita el seguimiento fisioterapéutico', async ({ page, ui, staff, createClient, createSlot, login }) => {
     const client = await clientWithPainCheckin(staff, () => createClient({ plan: 'performance-mensual' }));
+    const slot = await createSlot({ service: 'rehab' });
 
     await ui.visit('/staff/seguimiento/check-in');
     await expect(page.getByRole('heading', { level: 1, name: 'Check-in de clientes' })).toBeVisible();
     await expect(page.getByRole('group', { name: 'Respondidos' })).toBeVisible();
     const card = cardOf(page, client.name, 'Derivar a Rehab');
     await expect(card).toContainText('Molestia en el hombro');
+    await ui.expectFits();
     await card.getByRole('button', { name: 'Derivar a Rehab' }).click();
     await expect(page.getByText('Derivado a Rehab').first()).toBeVisible();
     await expect(card.getByRole('button', { name: 'Derivado a Rehab' })).toBeDisabled();
-    await ui.expectFits();
 
     const detail = await staff.call<ClientDetailDto>('GET', `/staff/clients/${client.id}`);
     expect(detail.client.rehabFollowupEnabled).toBe(true);
+
+    // El cliente derivado ya puede reservar su seguimiento (D6).
+    await login(page, client);
+    await ui.visit('/reservar/fisioterapia');
+    await expect(page.getByRole('heading', { level: 1, name: 'Seguimiento.' })).toBeVisible();
+    const main = page.getByRole('main');
+    await pickDayAndTime(main, slot.date, slot.time);
+    await ui.expectFits();
+    await main.getByRole('button', { name: 'Reservar', exact: true }).click();
+    await expect(page.getByText('Reserva confirmada', { exact: true })).toBeVisible();
+    await ui.visit('/perfil');
+    await expect(page.getByText(new RegExp(`— ${slot.time}$`))).toBeVisible();
   });
 
-  test('configuración: planes, horarios, profesionales y reglas', async ({ page, ui, staff }) => {
+  test('configuración: planes, horarios, profesionales y reglas', async ({ page, ui, staff, isMobile }) => {
     const tag = uniquePerson().email.split('.')[1].split('@')[0];
+    const tabs = page.getByRole('navigation', { name: 'Secciones de configuración' });
 
     await ui.visit('/staff/configuracion?tab=planes');
-    const tabs = page.getByRole('navigation', { name: 'Secciones de configuración' });
     const planDialog = page.getByRole('dialog', { name: 'Nuevo plan' });
     await ui.clickUntil(page.getByRole('button', { name: 'Nuevo plan' }), planDialog);
     await planDialog.getByLabel('Servicio').selectOption('performance');
@@ -228,19 +259,45 @@ test.describe('Staff', () => {
     await ui.expectFits();
     await planDialog.getByRole('button', { name: 'Guardar' }).click();
     await expect(page.getByText('Plan creado.')).toBeVisible();
-    const planRow = page.getByRole('row', { name: new RegExp(`Plan E2E ${tag}`) });
+    const planRow = rowOf(page, `Plan E2E ${tag}`);
     await expect(planRow).toContainText('Inactivo');
     await planRow.getByRole('button', { name: 'Eliminar' }).click();
     await page.getByRole('dialog', { name: 'Eliminar plan' }).getByRole('button', { name: 'Eliminar' }).click();
     await expect(page.getByText('Plan eliminado.')).toBeVisible();
     await expect(planRow).toHaveCount(0);
 
+    // Horarios: un horario semanal (creado, desactivado y borrado) y un turno puntual. Horas propias de cada proyecto,
+    // así desktop y mobile no comparten filas ni turnos.
     await tabs.getByRole('link', { name: 'Horarios' }).click();
     await expect(page).toHaveURL(/tab=horarios/);
+    await expect(page.getByRole('button', { name: 'Nuevo horario' })).toBeVisible();
+    await ui.expectFits();
+    const templateTime = isMobile ? '04:43' : '04:17';
+    const templateDialog = page.getByRole('dialog', { name: 'Nuevo horario' });
+    await ui.clickUntil(page.getByRole('button', { name: 'Nuevo horario' }), templateDialog);
+    await templateDialog.getByLabel('Servicio').selectOption('performance');
+    await templateDialog.getByLabel('Día').selectOption('7');
+    await templateDialog.getByLabel('Hora').fill(templateTime);
+    await ui.expectFits();
+    await templateDialog.getByRole('button', { name: 'Guardar' }).click();
+    await expect(page.getByText('Horario creado.')).toBeVisible();
+    const templateRow = rowOf(page, templateTime);
+    await expect(templateRow).toContainText('Dom');
+    await expect(templateRow).toContainText('Activo');
+    await templateRow.getByRole('button', { name: 'Desactivar' }).click();
+    await expect(templateRow).toContainText('Inactivo');
+    const templates = await staff.call<ScheduleTemplateDto[]>('GET', '/staff/schedule/templates?service=performance');
+    const template = templates.find((item) => item.weekday === 7 && item.startTime.startsWith(templateTime));
+    expect(template?.active).toBe(false);
+    await staff.call('DELETE', `/staff/schedule/templates/${template?.id}`);
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Nuevo horario' })).toBeVisible();
+    await expect(templateRow).toHaveCount(0);
+
     const slotDialog = page.getByRole('dialog', { name: 'Turno puntual' });
     await ui.clickUntil(page.getByRole('button', { name: 'Turno puntual' }), slotDialog);
     const date = businessDate(new Date(Date.now() + 3 * 86_400_000));
-    const time = `05:${String(10 + Math.floor(Math.random() * 49)).padStart(2, '0')}`;
+    const time = isMobile ? '05:37' : '05:13';
     await slotDialog.getByLabel('Servicio').selectOption('performance');
     await slotDialog.getByLabel('Fecha').fill(date);
     await slotDialog.getByLabel('Hora').fill(time);
@@ -248,18 +305,22 @@ test.describe('Staff', () => {
     await slotDialog.getByRole('button', { name: 'Guardar' }).click();
     await expect(page.getByText('Turno creado.')).toBeVisible();
     const slots = await staff.call<StaffTimeSlotDto[]>('GET', `/staff/time-slots?date=${date}&service=performance`);
-    expect(slots.some((slot) => slot.capacity === 6)).toBe(true);
+    const created = slots.find((slot) => businessTime(new Date(slot.startsAt)) === time);
+    expect(created?.capacity).toBe(6);
 
     await tabs.getByRole('link', { name: 'Profesionales' }).click();
     await expect(page).toHaveURL(/tab=profesionales/);
     const professional = `Profesional ${tag}`;
+    await expect(page.getByLabel('Nombre del profesional')).toBeVisible();
+    await ui.expectFits();
     await page.getByLabel('Nombre del profesional').fill(professional);
     await page.getByRole('button', { name: 'Agregar' }).click();
     await expect(page.getByText('Profesional agregado.')).toBeVisible();
-    const professionalRow = page.getByRole('row', { name: new RegExp(professional) });
+    const professionalRow = rowOf(page, professional);
     await expect(professionalRow).toContainText('Activo');
     await professionalRow.getByRole('button', { name: 'Desactivar' }).click();
     await expect(professionalRow).toContainText('Inactivo');
+    await ui.expectFits();
 
     await tabs.getByRole('link', { name: 'Reglas' }).click();
     await expect(page).toHaveURL(/tab=reglas/);

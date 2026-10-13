@@ -13,10 +13,21 @@ export const E2E_STAFF_NAME = 'Staff E2E';
 export const E2E_PROFESSIONAL_NAME = 'Profesional E2E';
 export const E2E_DB_CONTAINER = process.env.E2E_DB_CONTAINER ?? 'move-postgres';
 
-// Nunca se reinicia una base que no sea de E2E.
+// Nunca se usa (ni se reinicia) una base que no sea de E2E. Corre al cargar este módulo, así toda entrada
+// (playwright.config.ts, reset.mjs, las specs) se niega antes de tocar nada.
 export function assertE2eDatabase() {
   if (!/^move_e2e\w*$/.test(E2E_DB_NAME)) {
     throw new Error(`E2E_DB_NAME debe empezar con move_e2e (recibido: ${E2E_DB_NAME}).`);
+  }
+}
+
+assertE2eDatabase();
+
+// El reset borra la base en el contenedor local: las migraciones, el seed y la API tienen que ir al mismo Postgres.
+export function assertLocalDatabaseHost() {
+  const host = process.env.DB_HOST ?? 'localhost';
+  if (!['localhost', '127.0.0.1', '::1'].includes(host)) {
+    throw new Error(`Las pruebas end to end solo usan el Postgres local (DB_HOST recibido: ${host}).`);
   }
 }
 

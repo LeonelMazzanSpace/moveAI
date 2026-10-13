@@ -62,7 +62,7 @@ Desde la raíz del repo:
 | `pnpm test` | Unit tests de la API (Vitest) y de la web (Vitest + Testing Library) |
 | `pnpm test:e2e` | E2E de la API (Vitest + supertest) contra Postgres real |
 | `pnpm --filter @move/api test` / `pnpm --filter @move/web test` | Unit tests de una sola app |
-| `pnpm lint` | oxlint (API) y ESLint (web) |
+| `pnpm lint` | oxlint (API), ESLint (web) y `pnpm lint:e2e` (tsc estricto y oxlint sobre `e2e/`, `playwright.config.ts` y `scripts/e2e`) |
 | `pnpm build` | Build de la API y de la web |
 
 Los e2e de la API necesitan el Postgres local levantado y la variable `E2E_DATABASE_NAME` con el nombre de una base de test dedicada (distinta de la de desarrollo), que la suite migra sola y vacía con `resetDb` en cada test:
@@ -109,11 +109,13 @@ pnpm e2e:reset                                               # borra y recrea mo
 pnpm test:e2e:web                                            # las dos suites; --project=desktop o --project=mobile para una
 ```
 
-- `pnpm e2e:reset` (`scripts/e2e/reset.mjs`) solo acepta bases que empiezan con `move_e2e` (`E2E_DB_NAME`), crea el staff `staff.e2e@example.com` (`E2E_STAFF_EMAIL`) y, por la API, el profesional "Profesional E2E" y los turnos de la ventana de reserva. Usa el contenedor `move-postgres` (`E2E_DB_CONTAINER`).
+- Toda entrada (`pnpm e2e:reset`, `pnpm test:e2e:web` y el SQL de las specs) se niega antes de tocar nada si `E2E_DB_NAME` no empieza con `move_e2e`, y el reset y la suite solo aceptan un Postgres local (`DB_HOST` `localhost`, `127.0.0.1` o `::1`).
+- `pnpm e2e:reset` (`scripts/e2e/reset.mjs`) crea el staff `staff.e2e@example.com` (`E2E_STAFF_EMAIL`) y, por la API, el profesional "Profesional E2E" y los turnos de la ventana de reserva. Usa el contenedor `move-postgres` (`E2E_DB_CONTAINER`).
 - Cada prueba crea sus propios clientes, turnos (en un día y minuto únicos) y compras por la API, así que no depende del orden ni de las otras pruebas, y las fechas se calculan desde hoy en la zona de Uruguay. Lo que la API no permite (un plan vencido, un turno de hoy para marcar asistencia) se ajusta con SQL en `move_e2e`, como `scripts/manual/demo-data.mjs`.
 - La API de E2E corre con `TRUST_PROXY_HOPS=1` y cada prueba manda su propio `X-Forwarded-For`, así el throttling por IP del checkout (D53/D58) no mezcla pruebas que corren en paralelo. No cambia nada de la app.
 - El reporte HTML queda en `artifacts/e2e/report` (`pnpm exec playwright show-report artifacts/e2e/report`) y las capturas y trazas, solo de las pruebas que fallan, en `artifacts/e2e/results`. `artifacts/` está ignorado por git.
-- La suite no corre en Bitbucket Pipelines.
+- `E2E_WORKERS` (entero de 1 a 99, default 4) fija los workers de Playwright.
+- La suite no corre en Bitbucket Pipelines; su código sí se revisa con `pnpm lint:e2e`, incluido en `pnpm lint`.
 
 ## Correr un job a mano
 

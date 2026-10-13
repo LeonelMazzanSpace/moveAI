@@ -56,13 +56,15 @@ export function uniquePerson(firstName = 'Ana') {
 }
 
 // Horario único por prueba (día y minuto) para que dos pruebas en paralelo nunca compartan turno ni se confundan al
-// elegirlo por hora: días 2–11 desde hoy, entre las 06:01 y las 20:59, nunca en punto (las plantillas son en punto).
+// elegirlo por hora: días 2–11 desde hoy, entre las 06:01 y las 20:59, nunca en :00 ni en :30 (las plantillas del seed
+// son en punto, y Recovery también a las 18:30 y 19:30).
+const SLOT_MINUTES = Array.from({ length: 59 }, (_, index) => index + 1).filter((minute) => minute !== 30);
 let slotCounter = 0;
 function uniqueSlotMoment(): { date: string; time: string } {
   const key = base.info().workerIndex * 211 + slotCounter++;
-  const minute = 1 + (key % 59);
-  const hour = 6 + (Math.floor(key / 59) % 15);
-  const day = 2 + (Math.floor(key / (59 * 15)) % 10);
+  const minute = SLOT_MINUTES[key % SLOT_MINUTES.length];
+  const hour = 6 + (Math.floor(key / SLOT_MINUTES.length) % 15);
+  const day = 2 + (Math.floor(key / (SLOT_MINUTES.length * 15)) % 10);
   return { date: addDays(businessDate(), day), time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}` };
 }
 
@@ -199,3 +201,9 @@ export const test = base.extend<Fixtures>({
     await use(new Ui(page, isMobile));
   },
 });
+
+// Fila de una tabla del staff por su texto. Usa el elemento <tr> y no el rol: debajo de `md` las tablas de turnos y pagos
+// pasan a tarjetas (T-052) y pueden perder la semántica de tabla, pero siguen siendo filas del DOM.
+export function rowOf(page: Page, text: string): Locator {
+  return page.getByRole('main').locator('tr').filter({ hasText: text });
+}

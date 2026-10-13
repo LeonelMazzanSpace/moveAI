@@ -27,7 +27,7 @@ test.describe('Rehab', () => {
     await fillGuest(page, guest);
     await ui.expectFits();
     await flow.getByRole('button', { name: 'Ir a pagar' }).click();
-    await settlePayment(page, 'Aprobar');
+    await settlePayment(ui, 'Aprobar');
 
     await expect(approvedTitle(page)).toBeVisible();
     await expect(page.getByText('Evaluación y Diagnóstico').first()).toBeVisible();
@@ -48,6 +48,7 @@ test.describe('Rehab', () => {
     const error = flow.getByRole('alert').filter({ hasText: 'Ya tenés una cuenta con ese email: ingresá para continuar.' });
     await expect(error).toBeVisible();
     await expect(error.getByRole('link', { name: 'Ingresar' })).toHaveAttribute('href', '/ingresar?next=%2Frehab');
+    await ui.expectFits();
   });
 
   test('con cuenta: pago rechazado, reintento y aprobado', async ({ page, ui, createClient, createSlot, login }) => {
@@ -59,7 +60,7 @@ test.describe('Rehab', () => {
     const flow = page.locator('#reservar');
     await pickDayAndTime(flow, slot.date, slot.time);
     await flow.getByRole('button', { name: 'Continuar al pago' }).click();
-    await settlePayment(page, 'Rechazar');
+    await settlePayment(ui, 'Rechazar');
     await expect(page.getByText('Pago no completado')).toBeVisible();
     await expect(page.getByText('El pago no se completó.')).toBeVisible();
     await ui.expectFits();
@@ -68,10 +69,11 @@ test.describe('Rehab', () => {
     await expect(retry).toHaveAttribute('href', '/rehab#reservar');
     await retry.click();
     await expect(page).toHaveURL('/rehab#reservar');
+    await ui.expectFits();
     // El rechazo liberó el turno: se puede volver a elegir.
     await pickDayAndTime(page.locator('#reservar'), slot.date, slot.time);
     await page.locator('#reservar').getByRole('button', { name: 'Continuar al pago' }).click();
-    await settlePayment(page, 'Aprobar');
+    await settlePayment(ui, 'Aprobar');
     await expect(approvedTitle(page)).toBeVisible();
 
     await ui.visit('/perfil');
@@ -92,7 +94,7 @@ test.describe('Recovery', () => {
     await flow.getByRole('button', { name: 'Continuar al pago' }).click();
     await fillGuest(page, guest);
     await flow.getByRole('button', { name: 'Ir a pagar' }).click();
-    await settlePayment(page, 'Aprobar');
+    await settlePayment(ui, 'Aprobar');
 
     await expect(approvedTitle(page)).toBeVisible();
     await expect(page.getByText('Sesión individual').first()).toBeVisible();
@@ -112,7 +114,7 @@ test.describe('Recovery', () => {
     await ui.expectFits();
     await flow.locator('a[href="/checkout/plan/recovery-paquete-4"]').click();
     await expect(page.getByText('Las sesiones no usadas vencen al final del período.')).toBeVisible();
-    await payPlan(page);
+    await payPlan(ui);
     await expect(approvedTitle(page)).toBeVisible();
 
     await ui.visit('/recovery');
