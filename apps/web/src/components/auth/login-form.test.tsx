@@ -3,14 +3,17 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const push = vi.fn();
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push, replace: push }), useSearchParams: () => new URLSearchParams('next=/performance') }));
+let search = 'next=/performance';
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push, replace: push }), useSearchParams: () => new URLSearchParams(search) }));
 const signInEmail = vi.fn();
-vi.mock('@/lib/auth-client', () => ({ authClient: { signIn: { email: signInEmail } } }));
+const signInSocial = vi.fn();
+vi.mock('@/lib/auth-client', () => ({ authClient: { signIn: { email: signInEmail, social: signInSocial } } }));
+vi.stubEnv('NEXT_PUBLIC_GOOGLE_ENABLED', 'true');
 
 const { LoginForm } = await import('./login-form');
 
 describe('LoginForm', () => {
-  beforeEach(() => { push.mockReset(); signInEmail.mockReset(); });
+  beforeEach(() => { push.mockReset(); signInEmail.mockReset(); signInSocial.mockReset(); search = 'next=/performance'; });
 
   it('validates before submitting', async () => {
     render(<LoginForm />);
@@ -37,5 +40,33 @@ describe('LoginForm', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Ingresar' }));
     expect(await screen.findByText('Email o contraseña incorrectos.')).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it('explains that the email already has an account when Google cannot link it', () => {
+    search = 'next=/performance&error=account_not_linked';
+    render(<LoginForm />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Ya tenés una cuenta con ese email. Ingresá con tu contraseña.');
+  });
+
+  it('shows a generic message for any other sign-in error in the URL', () => {
+    search = 'error=something_else';
+    render(<LoginForm />);
+    expect(screen.getByRole('alert')).toHaveTextContent('No pudimos ingresar con Google. Probá de nuevo.');
+  });
+
+  it('shows no alert without an error in the URL', () => {
+    render(<LoginForm />);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('sends Google errors back to the login page keeping next', async () => {
+    signInSocial.mockResolvedValue({ data: null, error: null });
+    render(<LoginForm />);
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar con Google' }));
+    expect(signInSocial).toHaveBeenCalledWith({
+      provider: 'google',
+      callbackURL: `${window.location.origin}/continuar?next=%2Fperformance`,
+      errorCallbackURL: `${window.location.origin}/ingresar?next=%2Fperformance`,
+    });
   });
 });

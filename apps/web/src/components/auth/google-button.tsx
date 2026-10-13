@@ -33,6 +33,7 @@ export function GoogleButton() {
       const { error } = await authClient.signIn.social({
         provider: 'google',
         callbackURL: `${window.location.origin}${withNext('/continuar', next)}`,
+        errorCallbackURL: `${window.location.origin}${withNext('/ingresar', next)}`,
       });
       if (error) throw new Error('google-sign-in-failed');
     } catch {

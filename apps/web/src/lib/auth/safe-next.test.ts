@@ -29,6 +29,18 @@ describe('safeNextPath', () => {
     expect(safeNextPath('/perfilx', 'staff')).toBe('/perfilx');
   });
 
+  it('normalizes dot-segments before checking the role', () => {
+    expect(safeNextPath('/perfil/../staff', 'client')).toBeNull();
+    expect(safeNextPath('/foo/%2e%2E/staff/turnos', 'client')).toBeNull();
+    expect(safeNextPath('/staff/../perfil', 'staff')).toBeNull();
+    expect(safeNextPath('/staff/./turnos?fecha=2026-10-12', 'staff')).toBe('/staff/turnos?fecha=2026-10-12');
+    expect(safeNextPath('/a/b/../c#x', 'client')).toBe('/a/c#x');
+  });
+
+  it('never returns a protocol-relative path after normalizing', () => {
+    expect(safeNextPath('/a/..//evil.com', 'client')).toBeNull();
+  });
+
   it('keeps client-only routes away from staff', () => {
     expect(safeNextPath('/historial', 'staff')).toBeNull();
     expect(safeNextPath('/check-in', 'staff')).toBeNull();
