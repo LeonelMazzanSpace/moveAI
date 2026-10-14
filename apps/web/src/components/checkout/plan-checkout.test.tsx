@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { RADIO_CLASS } from '@/components/move/radio-styles';
 import { ApiError } from '@/lib/api/errors';
 import type { AutoDebitDto, MySubscriptionsDto, PlanDto, SubscriptionDto } from '@/lib/api/types';
 
@@ -216,10 +217,58 @@ const payButtonEnabled = () =>
   vi.waitFor(() => expect(screen.getByRole('button', { name: 'Pagar con Mercado Pago' })).toBeEnabled());
 const debitRadio = () => screen.getByRole('radio', { name: 'Débito automático' });
 const onceRadio = () => screen.getByRole('radio', { name: 'Pago único' });
+/** The bordered card that wraps a radio and its text. */
+const optionCard = (radio: HTMLElement) => {
+  const card = radio.closest('label');
+  if (!card) throw new Error('the radio is not inside a card');
+  return card;
+};
 const ACTIVE_NOTICE = 'Ya tenés débito automático activo para Performance.';
 
 describe('PlanCheckout automatic debit', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it('highlights the card of the chosen payment mode and moves the highlight when the other card is clicked', async () => {
+    mockDebitApi(debitPlan);
+    renderCheckout();
+
+    await screen.findByRole('radio', { name: 'Débito automático' });
+    expect(optionCard(onceRadio())).toHaveClass('border-foreground');
+    expect(optionCard(onceRadio())).not.toHaveClass('border-border');
+    expect(optionCard(debitRadio())).toHaveClass('border-border');
+    expect(optionCard(debitRadio())).not.toHaveClass('border-foreground');
+
+    await userEvent.click(screen.getByText(/Se cobra automáticamente/));
+
+    expect(debitRadio()).toBeChecked();
+    expect(onceRadio()).not.toBeChecked();
+    expect(optionCard(debitRadio())).toHaveClass('border-foreground');
+    expect(optionCard(onceRadio())).toHaveClass('border-border');
+    expect(screen.getByRole('button', { name: 'Activar débito automático' })).toBeInTheDocument();
+  });
+
+  it('chooses a payment mode by clicking anywhere on its card, not only on the circle', async () => {
+    mockDebitApi(debitPlan);
+    renderCheckout();
+
+    await screen.findByRole('radio', { name: 'Débito automático' });
+    await userEvent.click(optionCard(debitRadio()));
+    expect(debitRadio()).toBeChecked();
+
+    await userEvent.click(screen.getByText('Pago único'));
+    expect(onceRadio()).toBeChecked();
+    expect(debitRadio()).not.toBeChecked();
+  });
+
+  it('draws both payment radios with the shared radio style', async () => {
+    mockDebitApi(debitPlan);
+    renderCheckout();
+
+    await screen.findByRole('radio', { name: 'Débito automático' });
+    for (const radio of [onceRadio(), debitRadio()]) {
+      expect(radio.className).toContain(RADIO_CLASS);
+    }
+  });
 
   it('offers the payment mode only when the plan allows automatic debit', async () => {
     mockDebitApi(makePlan({ autoDebitEnabled: false }));

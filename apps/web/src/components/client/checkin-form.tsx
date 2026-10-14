@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { EmptyState } from '@/components/move/empty-state';
 import { ErrorState } from '@/components/move/error-state';
 import { moveButtonSize } from '@/components/move/button-styles';
+import { RADIO_CLASS } from '@/components/move/radio-styles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,22 +31,31 @@ interface ChoicesProps {
   legend: string;
   options: ChoiceOption[];
   registration: UseFormRegisterReturn;
+  /** The chosen option, to highlight its card. */
+  value: string | undefined;
   error?: string;
 }
 
-function Choices({ legend, options, registration, error }: ChoicesProps) {
+function Choices({ legend, options, registration, value, error }: ChoicesProps) {
   return (
     <fieldset className="mt-6">
       <legend className="text-xs font-medium">{legend}</legend>
-      <div className={cn('mt-3 grid gap-2 text-center text-xs', options.length === 3 ? 'grid-cols-3' : 'grid-cols-2')}>
-        {options.map((option) => (
-          <label key={option.value} className="cursor-pointer">
-            <input type="radio" value={option.value} className="peer sr-only" {...registration} />
-            <span className="block rounded border border-border py-2 text-muted-foreground peer-checked:border-transparent peer-checked:bg-primary peer-checked:font-semibold peer-checked:text-primary-foreground peer-focus-visible:ring-3 peer-focus-visible:ring-ring/50">
+      <div className={cn('mt-3 grid gap-2 text-xs', options.length === 3 ? 'grid-cols-3' : 'grid-cols-2')}>
+        {options.map((option) => {
+          const chosen = value === option.value;
+          return (
+            <label
+              key={option.value}
+              className={cn(
+                'flex cursor-pointer items-center justify-center gap-2 rounded border px-2 py-2.5',
+                chosen ? 'border-foreground font-semibold text-foreground' : 'border-border text-muted-foreground',
+              )}
+            >
+              <input type="radio" value={option.value} className={RADIO_CLASS} {...registration} />
               {option.label}
-            </span>
-          </label>
-        ))}
+            </label>
+          );
+        })}
       </div>
       {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
     </fieldset>
@@ -85,6 +95,7 @@ export function CheckinForm({ firstName, onSubmit }: CheckinFormProps) {
     resolver: zodResolver(checkinSchema),
     defaultValues: { painDetail: '', goalsDetail: '' },
   });
+  const feeling = useWatch({ control, name: 'feeling' });
   const pain = useWatch({ control, name: 'pain' });
   const goals = useWatch({ control, name: 'goals' });
 
@@ -105,9 +116,9 @@ export function CheckinForm({ firstName, onSubmit }: CheckinFormProps) {
         Check-in mensual · te toma 1 minuto y nos ayuda a acompañarte mejor.
       </p>
 
-      <Choices legend="¿Cómo te sentís con el entrenamiento?" options={FEELING_OPTIONS} registration={register('feeling')} error={errors.feeling?.message} />
+      <Choices legend="¿Cómo te sentís con el entrenamiento?" options={FEELING_OPTIONS} registration={register('feeling')} value={feeling} error={errors.feeling?.message} />
 
-      <Choices legend="¿Sentiste alguna molestia o dolor?" options={PAIN_OPTIONS} registration={register('pain')} error={errors.pain?.message} />
+      <Choices legend="¿Sentiste alguna molestia o dolor?" options={PAIN_OPTIONS} registration={register('pain')} value={pain} error={errors.pain?.message} />
       {pain === 'mild' ? (
         <div className="mt-3">
           <Label htmlFor="checkin-pain-detail" className="text-xs text-muted-foreground">
@@ -125,7 +136,7 @@ export function CheckinForm({ firstName, onSubmit }: CheckinFormProps) {
         </div>
       ) : null}
 
-      <Choices legend="¿Cambiaron tus objetivos?" options={GOALS_OPTIONS} registration={register('goals')} error={errors.goals?.message} />
+      <Choices legend="¿Cambiaron tus objetivos?" options={GOALS_OPTIONS} registration={register('goals')} value={goals} error={errors.goals?.message} />
       {goals === 'adjust' ? (
         <div className="mt-3">
           <Label htmlFor="checkin-goals-detail" className="text-xs text-muted-foreground">

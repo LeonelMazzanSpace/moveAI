@@ -7,16 +7,17 @@ import { frequencyLabel, useMyAutoDebits } from '@/components/client/use-auto-de
 import { EmptyState } from '@/components/move/empty-state';
 import { ErrorState } from '@/components/move/error-state';
 import { moveButtonSize } from '@/components/move/button-styles';
+import { RADIO_CLASS } from '@/components/move/radio-styles';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
 import { ApiError, errorMessage } from '@/lib/api/errors';
 import type { AutoDebitDto, MySubscriptionsDto, PlanDto } from '@/lib/api/types';
 import { addDaysWeb, formatDate, formatUYU, SERVICE_LABEL } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import { useAutoDebitCheckout, usePlanCheckout } from './use-checkout';
 
 const HIDDEN_TEXT = /prioridad de horarios/i;
-const RADIO_CLASS = 'mt-0.5 size-4 shrink-0 accent-primary';
 
 type PaymentMode = 'one_time' | 'auto_debit';
 
@@ -100,9 +101,11 @@ function PaymentModeOption({
   children?: React.ReactNode;
 }) {
   const id = `${name}-${value}`;
+  const labelId = `${id}-label`;
   const descriptionId = children ? `${id}-description` : undefined;
+  // The label covers the whole card so a click anywhere chooses the option; the name comes from the label text only.
   return (
-    <div className="flex items-start gap-3 rounded border border-border bg-card p-4">
+    <label htmlFor={id} className={cn('flex cursor-pointer items-start gap-3 rounded border bg-card p-4', checked ? 'border-foreground' : 'border-border')}>
       <input
         id={id}
         type="radio"
@@ -110,20 +113,21 @@ function PaymentModeOption({
         value={value}
         checked={checked}
         onChange={() => onSelect(value)}
+        aria-labelledby={labelId}
         aria-describedby={descriptionId}
-        className={RADIO_CLASS}
+        className={cn(RADIO_CLASS, 'mt-2')}
       />
       <div className="space-y-1.5">
-        <label htmlFor={id} className="flex min-h-8 items-center text-sm font-medium">
+        <span id={labelId} className="flex min-h-8 items-center text-sm font-medium">
           {label}
-        </label>
+        </span>
         {children ? (
           <div id={descriptionId} className="space-y-1.5">
             {children}
           </div>
         ) : null}
       </div>
-    </div>
+    </label>
   );
 }
 
