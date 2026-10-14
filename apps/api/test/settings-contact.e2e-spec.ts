@@ -121,7 +121,30 @@ describe('contact settings (e2e)', () => {
     ['a lone surrogate in maps url', { mapsUrl: 'https://x.com/\ud800' }],
     ['a lone surrogate in staff email', { staffNotificationsEmail: 'a\udc00@b.com' }],
     ['an unknown field', { nope: 'x' }],
+    // M-4: only a plain local@domain address; no quoted local part, line breaks or characters that change a mailto: link.
+    ['a quoted email with a line break', { email: '"a\r\nb"@example.com' }],
+    ['a quoted email that adds mailto parameters', { email: '"x?cc=a@evil.com&body=hola"@move.uy' }],
+    ['an email in angle brackets', { email: '<hola@move.uy>' }],
+    ['an email with ?', { email: 'hola?cc=a@move.uy' }],
+    ['an email with &', { email: 'a&b@move.uy' }],
+    ['a staff email with a line break', { staffNotificationsEmail: 'avisos\n@move.uy' }],
+    ['a quoted staff email', { staffNotificationsEmail: '"avisos"@move.uy' }],
+    ['a line break in the address', { address: 'Máximo Tajes 6397\nesquina Beranger' }],
+    ['a tab in the hours', { hours: 'Lunes\t7:00' }],
+    ['a DEL in the address', { address: 'a\u007fb' }],
   ];
+
+  it('accepts plain email addresses (M-4)', async () => {
+    const { agent } = await signUpStaff(ctx.app, ctx.dataSource);
+    const body = { email: 'hola.move+web@move.com.uy', staffNotificationsEmail: 'avisos_staff-1@sub.move.uy' };
+    expect((await agent.patch('/api/staff/settings/contact').send(body).expect(200)).body).toMatchObject(body);
+  });
+
+  it('reports a lone surrogate in an email once (T-058 M-4)', async () => {
+    const { agent } = await signUpStaff(ctx.app, ctx.dataSource);
+    const res = await agent.patch('/api/staff/settings/contact').send({ email: 'a\ud800@b.com' }).expect(400);
+    expect(res.body.details).toEqual([{ field: 'email', messages: [expect.any(String)] }]);
+  });
 
   it.each(INVALID_BODIES)('rejects %s with 400 VALIDATION_FAILED and details', async (_label, body) => {
     const { agent } = await signUpStaff(ctx.app, ctx.dataSource);

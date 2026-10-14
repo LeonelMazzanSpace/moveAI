@@ -139,6 +139,60 @@ describe('automatic debit with Mercado Pago (e2e, fake provider)', () => {
       expect(fake.cancelPreapproval).toHaveBeenCalledWith(first.preapprovalId);
       expect(await debitRow(first.ref)).toMatchObject({ status: 'cancelled', cancelReason: 'client' });
     });
+
+    // M-1. Barrier: the first checkout waits inside `createPreapproval` while the debit is closed by another request.
+    const holdFirstPreapproval = () => {
+      let arrived = (): void => undefined;
+      let release = (): void => undefined;
+      const reached = new Promise<void>((resolve) => { arrived = resolve; });
+      const released = new Promise<void>((resolve) => { release = resolve; });
+      const create = fake.createPreapproval.getMockImplementation()!;
+      fake.createPreapproval.mockImplementationOnce(async (input) => {
+        arrived();
+        await released;
+        return create(input);
+      });
+      return { reached, release };
+    };
+    const onlyPending = async (userId: string) =>
+      (await ds.query(`SELECT id, external_reference AS ref FROM auto_debits WHERE user_id = $1 AND status = 'pending'`, [userId]))[0] as
+        { id: string; ref: string };
+
+    it('does not hand out the link of a debit replaced while Mercado Pago was creating it, and cancels it there (M-1)', async () => {
+      const { agent, userId } = await signUpClient(app);
+      const gate = holdFirstPreapproval();
+      const first = agent.post('/api/checkout/auto-debit').send({ planSlug: 'performance-mensual' }).then((res) => res);
+      await gate.reached;
+      const replaced = await onlyPending(userId);
+      const second = await startDebit(agent);
+      gate.release();
+
+      const res = await first;
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('AUTO_DEBIT_ACTIVE');
+      const a = await debitRow(replaced.ref);
+      expect(a).toMatchObject({ status: 'cancelled', cancelReason: 'client' });
+      expect(fake.cancelPreapproval).toHaveBeenCalledWith(a.preapprovalId);
+      expect(preapprovals.get(a.preapprovalId!)!.status).toBe('cancelled');
+      expect(await debitRow(second.ref)).toMatchObject({ status: 'pending' });
+    });
+
+    it('does not hand out the link of a debit the client cancelled while Mercado Pago was creating it (M-1)', async () => {
+      const { agent, userId } = await signUpClient(app);
+      const gate = holdFirstPreapproval();
+      const first = agent.post('/api/checkout/auto-debit').send({ planSlug: 'performance-mensual' }).then((res) => res);
+      await gate.reached;
+      const debit = await onlyPending(userId);
+      await agent.post(`/api/me/auto-debits/${debit.id}/cancel`).expect(200);
+      gate.release();
+
+      const res = await first;
+      expect(res.status).toBe(404);
+      expect(res.body.code).toBe('AUTO_DEBIT_NOT_FOUND');
+      const row = await debitRow(debit.ref);
+      expect(row).toMatchObject({ status: 'cancelled', cancelReason: 'client' });
+      expect(preapprovals.get(row.preapprovalId!)!.status).toBe('cancelled');
+    });
   });
 
   describe('notifications', () => {
@@ -364,6 +418,52 @@ describe('automatic debit with Mercado Pago (e2e, fake provider)', () => {
       await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 0 });
       expect(fake.getPayment).toHaveBeenCalledTimes(1);
       expect(await count('subscriptions')).toBe(1);
+    });
+
+    it('keeps a charge flagged for its amount pending for staff instead of expiring it after 24 h (M-2)', async () => {
+      const { preapprovalId } = await startDebit();
+      authorizeInProvider(preapprovalId);
+      chargeInProvider({ chargeId: '9510', preapprovalId, paymentId: '551', amount: 100 });
+      await notify('subscription_authorized_payment', '9510').expect(200);
+      await ds.query(`UPDATE purchases SET created_at = now() - interval '25 hours'`);
+      await app.get(PaymentsService).reconcilePending(new Date());
+      expect(await ds.query(`SELECT status, needs_attention FROM purchases`)).toEqual([{ status: 'pending', needs_attention: true }]);
+    });
+
+    it('does not read again a charge whose payment was finally rejected, but reads its retry (T-062 M-2)', async () => {
+      const { preapprovalId } = await startDebit();
+      authorizeInProvider(preapprovalId);
+      chargeInProvider({ chargeId: '9610', preapprovalId, paymentId: '562', status: 'rejected' });
+      await app.get(PaymentsService).reconcilePending(new Date());
+      await app.get(PaymentsService).reconcilePending(new Date());
+      expect(fake.getPayment).toHaveBeenCalledTimes(1);
+      expect(await count(`email_logs WHERE template = 'auto-debit-charge-failed'`)).toBe(1);
+
+      chargeInProvider({ chargeId: '9610', preapprovalId, paymentId: '563' });
+      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 1, expired: 0 });
+      expect(fake.getPayment).toHaveBeenLastCalledWith('563');
+    });
+
+    it('keeps reading a charge whose payment is still in process', async () => {
+      const { preapprovalId } = await startDebit();
+      authorizeInProvider(preapprovalId);
+      chargeInProvider({ chargeId: '9630', preapprovalId, paymentId: '566', status: 'in_process' });
+      await app.get(PaymentsService).reconcilePending(new Date());
+      await app.get(PaymentsService).reconcilePending(new Date());
+      expect(fake.getPayment).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not email a rejected charge of a debit already cancelled in MOVE (T-062 M-5)', async () => {
+      const { agent, ref, preapprovalId } = await startDebit();
+      authorizeInProvider(preapprovalId);
+      await notify('subscription_preapproval', preapprovalId).expect(200);
+      chargeInProvider({ chargeId: '9620', preapprovalId, paymentId: '567', status: 'rejected' });
+      const { id } = await debitRow(ref);
+      await agent.post(`/api/me/auto-debits/${id}/cancel`).expect(200);
+      await app.get(PaymentsService).reconcilePending(new Date());
+      await notify('subscription_authorized_payment', '9620').expect(200);
+      expect(fake.getPayment).toHaveBeenCalledWith('567');
+      expect(await count(`email_logs WHERE template = 'auto-debit-charge-failed'`)).toBe(0);
     });
 
     it('records a cancellation made in Mercado Pago', async () => {

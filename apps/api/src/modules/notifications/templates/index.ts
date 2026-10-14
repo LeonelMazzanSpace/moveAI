@@ -9,7 +9,11 @@ export type EmailTemplate =
 export interface TemplateParams {
   'password-reset': { name: string; url: string };
   'account-invitation': { name: string; url: string };
-  'booking-confirmed': { name: string; serviceName: string; label: string; date: string; time: string; professionalName?: string };
+  'booking-confirmed': {
+    name: string; serviceName: string; label: string; date: string; time: string; professionalName?: string;
+    // T-060 M-2: a late payment confirmed the booking after its hold expired.
+    afterExpiredHold?: boolean;
+  };
   'booking-cancelled': { name: string; serviceName: string; date: string; time: string };
   'purchase-approved': { name: string; itemName: string; amount: number; endsOn: string | null; sessionsTotal: number | null };
   'plan-expiring': { name: string; planName: string; endsOn: string; renewUrl: string };
@@ -85,6 +89,12 @@ const buildContent = (input: RenderInput): EmailContent => {
           `${input.params.serviceName} · ${input.params.label}`,
           ...(input.params.professionalName ? [`Profesional: ${input.params.professionalName}`] : []),
           `Te esperamos el ${input.params.date} a las ${input.params.time}.`,
+          ...(input.params.afterExpiredHold
+            ? [
+                'Tu pago llegó después de que venció el tiempo para completarlo, pero el lugar seguía libre.',
+                'Si te llegó un aviso de que la reserva no se confirmó, no lo tengas en cuenta.',
+              ]
+            : []),
         ],
       };
     case 'booking-cancelled':

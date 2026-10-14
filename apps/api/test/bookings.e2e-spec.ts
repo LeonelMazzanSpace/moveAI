@@ -112,7 +112,7 @@ describe('bookings (e2e)', () => {
     const hold = await ctx.dataSource.transaction((m) =>
       service.holdForPayment(m, { userId: a.userId, timeSlotId: slotId, expectedService: 'recovery', holdMinutes: 15 }));
     await ctx.dataSource.query(`UPDATE bookings SET hold_expires_at = now() - interval '1 minute' WHERE id = $1`, [hold.id]);
-    expect(await service.expireHolds(new Date())).toBe(1);
+    expect(await service.expireHoldsWithIds(new Date())).toHaveLength(1);
     await givePack(ctx.dataSource, b.userId, { startsOn: businessToday(), endsOn: addDays(businessToday(), 29), total: 4 });
     await b.agent.post('/api/bookings').send({ timeSlotId: slotId }).expect(201);
     await expect(ctx.dataSource.transaction((m) => service.confirmPaid(m, hold.id))).rejects.toMatchObject({ code: 'SLOT_FULL' });
@@ -252,7 +252,7 @@ describe('bookings (e2e)', () => {
       const hold = (minutes: number) => ctx.dataSource.transaction((m) =>
         service.holdForPayment(m, { userId, timeSlotId: slotId, expectedService: 'recovery', holdMinutes: minutes }));
       const first = await hold(15);
-      expect(await service.expireHolds(new Date(Date.now() + 16 * 60_000))).toBe(1);
+      expect(await service.expireHoldsWithIds(new Date(Date.now() + 16 * 60_000))).toHaveLength(1);
       const retry = await hold(15);
 
       await expect(ctx.dataSource.transaction((m) => service.confirmPaid(m, first.id))).rejects.toMatchObject({ code: 'SLOT_FULL' });
@@ -267,7 +267,7 @@ describe('bookings (e2e)', () => {
       const slotId = await createSlot(ctx.dataSource, { service: 'recovery', startsAt: businessDateTime(tomorrow(), '17:00'), capacity: 2 });
       const hold = await ctx.dataSource.transaction((m) =>
         service.holdForPayment(m, { userId, timeSlotId: slotId, expectedService: 'recovery', holdMinutes: 15 }));
-      expect(await service.expireHolds(new Date(Date.now() + 16 * 60_000))).toBe(1);
+      expect(await service.expireHoldsWithIds(new Date(Date.now() + 16 * 60_000))).toHaveLength(1);
       await ctx.dataSource.query(
         `UPDATE time_slots SET starts_at = now() - interval '10 minutes', ends_at = now() + interval '35 minutes' WHERE id = $1`, [slotId]);
 
@@ -282,8 +282,8 @@ describe('bookings (e2e)', () => {
       const slotId = await createSlot(ctx.dataSource, { service: 'recovery', startsAt: businessDateTime(tomorrow(), '17:00'), capacity: 1 });
       const hold = await ctx.dataSource.transaction((m) =>
         service.holdForPayment(m, { userId, timeSlotId: slotId, expectedService: 'recovery', holdMinutes: 15 }));
-      expect(await service.expireHolds(new Date(Date.now() + 16 * 60_000))).toBe(1);
-      expect(await service.expireHolds(new Date(Date.now() + 16 * 60_000))).toBe(0);
+      expect(await service.expireHoldsWithIds(new Date(Date.now() + 16 * 60_000))).toHaveLength(1);
+      expect(await service.expireHoldsWithIds(new Date(Date.now() + 16 * 60_000))).toHaveLength(0);
       const [expired] = await ctx.dataSource.query(`SELECT status, cancelled_by FROM bookings WHERE id = $1`, [hold.id]);
       expect(expired).toEqual({ status: 'expired', cancelled_by: 'system' });
       const confirmed = await ctx.dataSource.transaction((m) => service.confirmPaid(m, hold.id));
@@ -293,8 +293,10 @@ describe('bookings (e2e)', () => {
       const second = await createSlot(ctx.dataSource, { service: 'recovery', startsAt: businessDateTime(tomorrow(), '18:30'), capacity: 1 });
       const pending = await ctx.dataSource.transaction((m) =>
         service.holdForPayment(m, { userId: other.userId, timeSlotId: second, expectedService: 'recovery', holdMinutes: 15 }));
-      await ctx.dataSource.transaction((m) => service.releaseHold(m, pending.id, 'cancelled'));
-      await ctx.dataSource.transaction((m) => service.releaseHold(m, confirmed.id, 'cancelled'));
+      // T-060 M-1: only a hold still pending is released, and the caller is told whether it was.
+      await expect(ctx.dataSource.transaction((m) => service.releaseHold(m, pending.id, 'cancelled'))).resolves.toBe(true);
+      await expect(ctx.dataSource.transaction((m) => service.releaseHold(m, pending.id, 'cancelled'))).resolves.toBe(false);
+      await expect(ctx.dataSource.transaction((m) => service.releaseHold(m, confirmed.id, 'cancelled'))).resolves.toBe(false);
       const rows: { id: string; status: string }[] = await ctx.dataSource.query(
         `SELECT id, status FROM bookings WHERE id = ANY($1::uuid[])`, [[pending.id, confirmed.id]]);
       expect(Object.fromEntries(rows.map((r) => [r.id, r.status]))).toEqual({ [pending.id]: 'cancelled', [confirmed.id]: 'confirmed' });
@@ -404,7 +406,7 @@ describe('bookings (e2e)', () => {
       expect(await keysOf()).toEqual([`booking-cancelled:${hold.id}`]);
     });
 
-    it('lists the holds it expires, and expireHolds keeps answering the count', async () => {
+    it('lists the holds it expires, through a single method (T-060 M-3)', async () => {
       const service = ctx.app.get(BookingsService);
       const { userId } = await signUpClient(ctx.app);
       const slotId = await createSlot(ctx.dataSource, { service: 'recovery', startsAt: businessDateTime(tomorrow(), '18:30'), capacity: 2 });
@@ -413,7 +415,7 @@ describe('bookings (e2e)', () => {
       const later = new Date(Date.now() + 16 * 60_000);
       expect(await service.expireHoldsWithIds(later)).toEqual([hold.id]);
       expect(await service.expireHoldsWithIds(later)).toEqual([]);
-      expect(await service.expireHolds(later)).toBe(0);
+      expect(BookingsService.prototype).not.toHaveProperty('expireHolds');
       expect(await keysOf()).toEqual([]);
     });
   });

@@ -16,7 +16,13 @@ const SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
 ];
+// M-7: without both calendar scopes MOVE can neither list the calendars nor write events (granular consent lets staff
+// untick them).
+export const REQUIRED_CALENDAR_SCOPES = SCOPES.filter((scope) => scope.startsWith('https://www.googleapis.com/auth/calendar'));
 const WRITABLE_ROLES = ['owner', 'writer'];
+// M-6: at most MAX_PAGES pages per list (events.list: 10 × 250).
+const MAX_PAGES = 10;
+const EVENTS_PAGE_SIZE = 250;
 
 export type GoogleCalendarErrorKind = 'invalid_grant' | 'not_found' | 'conflict' | 'transient' | 'other';
 
@@ -31,7 +37,8 @@ export class GoogleCalendarError extends Error {
   }
 }
 
-export interface GoogleTokens { accessToken: string; refreshToken: string }
+// `scopes`: what staff actually granted, which can be less than what MOVE asked for.
+export interface GoogleTokens { accessToken: string; refreshToken: string; scopes: string[] }
 
 export interface NewCalendarEvent {
   id: string;
@@ -102,7 +109,7 @@ export class GoogleCalendarService {
     const accessToken = str(body.access_token);
     const refreshToken = str(body.refresh_token);
     if (!accessToken || !refreshToken) throw new GoogleCalendarError('other', 200);
-    return { accessToken, refreshToken };
+    return { accessToken, refreshToken, scopes: str(body.scope)?.split(' ').filter(Boolean) ?? [] };
   }
 
   async refreshAccessToken(refreshToken: string): Promise<string> {
@@ -140,7 +147,7 @@ export class GoogleCalendarService {
     const items = await this.paginate(
       'events.list',
       this.eventsUrl(calendarId),
-      { timeMin: timeMin.toISOString(), timeMax: timeMax.toISOString(), singleEvents: 'true', maxResults: '2500' },
+      { timeMin: timeMin.toISOString(), timeMax: timeMax.toISOString(), singleEvents: 'true', maxResults: String(EVENTS_PAGE_SIZE) },
       accessToken,
     );
     return items.filter((item) => typeof item.id === 'string') as unknown as GoogleEvent[];
@@ -187,8 +194,9 @@ export class GoogleCalendarService {
     accessToken: string,
   ): Promise<Record<string, unknown>[]> {
     const items: Record<string, unknown>[] = [];
+    const seen = new Set<string>();
     let pageToken: string | null = null;
-    do {
+    for (let page = 0; page < MAX_PAGES; page += 1) {
       const query = new URLSearchParams({ ...params, ...(pageToken ? { pageToken } : {}) });
       const { status, body } = await this.send({ op, url: `${url}?${query.toString()}`, accessToken });
       // Google always sends `items` (empty when there is nothing). Without it the body was not read (cut or not JSON):
@@ -199,8 +207,14 @@ export class GoogleCalendarService {
       }
       items.push(...(body.items as Record<string, unknown>[]));
       pageToken = str(body.nextPageToken);
-    } while (pageToken);
-    return items;
+      if (!pageToken) return items;
+      if (seen.has(pageToken)) break;
+      seen.add(pageToken);
+    }
+    // M-6: an endless or repeated page token never keeps a pass (and its job lock) busy. A partial list would release
+    // blocks of the pages not read, so it fails like a transient error and the last blocks are kept.
+    this.logger.warn(`google ${op} failed: too many pages`);
+    throw new GoogleCalendarError('transient', 200);
   }
 
   private async request(call: Call): Promise<Record<string, unknown>> {

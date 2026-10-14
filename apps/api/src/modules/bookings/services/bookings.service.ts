@@ -142,12 +142,16 @@ export class BookingsService {
     return { ...booking, status: 'confirmed', cancelledAt: null };
   }
 
-  async releaseHold(manager: EntityManager, bookingId: string, reason: 'expired' | 'cancelled'): Promise<void> {
-    await manager.query(
-      `UPDATE bookings SET status = $2, cancelled_at = now(), cancelled_by = 'system', updated_at = now()
-       WHERE id = $1 AND status = 'pending_payment'`,
+  // Returns whether this call released the hold (a hold already cancelled, expired or confirmed is left as it is).
+  async releaseHold(manager: EntityManager, bookingId: string, reason: 'expired' | 'cancelled'): Promise<boolean> {
+    const rows: { id: string }[] = await manager.query(
+      `WITH released AS (
+         UPDATE bookings SET status = $2, cancelled_at = now(), cancelled_by = 'system', updated_at = now()
+         WHERE id = $1 AND status = 'pending_payment' RETURNING id
+       ) SELECT id FROM released`,
       [bookingId, reason],
     );
+    return rows.length > 0;
   }
 
   // The ids of the holds that just expired, so the caller can tell their clients (D93).
@@ -161,10 +165,6 @@ export class BookingsService {
       [now],
     );
     return rows.map((row) => row.id);
-  }
-
-  async expireHolds(now: Date): Promise<number> {
-    return (await this.expireHoldsWithIds(now)).length;
   }
 
   // R7 (client). Another client's booking answers BOOKING_NOT_FOUND, like a missing one.

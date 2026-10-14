@@ -13,6 +13,8 @@ import type {
 const MP_API_URL = 'https://api.mercadopago.com';
 const MP_TIMEOUT_MS = 10_000;
 const DAY_MS = 86_400_000;
+const CHARGE_SEARCH_PAGE_SIZE = 100;
+const CHARGE_SEARCH_MAX_PAGES = 10;
 const PREAPPROVAL_STATUSES: ProviderPreapprovalStatus[] = ['pending', 'authorized', 'paused', 'cancelled'];
 
 // Mercado Pago statuses outside the stored set are folded into their closest stored state.
@@ -187,15 +189,24 @@ export class MercadoPagoService {
     );
   }
 
-  // Charges of a subscription created in the last `sinceDays` days (those without a creation date are kept).
+  // Charges of a subscription created in the last `sinceDays` days (those without a creation date are kept). Latest
+  // first (M-9), page after page until a page is not full or reaches an older charge, at most CHARGE_SEARCH_MAX_PAGES.
   async searchAuthorizedPayments(preapprovalId: string, sinceDays: number): Promise<ProviderAuthorizedPayment[]> {
-    const query = new URLSearchParams({ preapproval_id: preapprovalId, limit: '100' });
-    const body = await this.request<{ results?: unknown }>('GET', `/authorized_payments/search?${query.toString()}`);
-    if (!Array.isArray(body.results)) throw new AppError('PAYMENT_PROVIDER_ERROR');
     const since = Date.now() - sinceDays * DAY_MS;
-    return (body.results as MpAuthorizedPayment[])
-      .filter((charge) => (instantOf(charge.date_created)?.getTime() ?? since) >= since)
-      .map(toProviderAuthorizedPayment);
+    const recent: MpAuthorizedPayment[] = [];
+    for (let page = 0; page < CHARGE_SEARCH_MAX_PAGES; page += 1) {
+      const query = new URLSearchParams({
+        preapproval_id: preapprovalId, sort: 'date_created', criteria: 'desc',
+        limit: String(CHARGE_SEARCH_PAGE_SIZE), offset: String(page * CHARGE_SEARCH_PAGE_SIZE),
+      });
+      const body = await this.request<{ results?: unknown }>('GET', `/authorized_payments/search?${query.toString()}`);
+      if (!Array.isArray(body.results)) throw new AppError('PAYMENT_PROVIDER_ERROR');
+      const results = body.results as MpAuthorizedPayment[];
+      const inWindow = results.filter((charge) => (instantOf(charge.date_created)?.getTime() ?? since) >= since);
+      recent.push(...inWindow);
+      if (results.length < CHARGE_SEARCH_PAGE_SIZE || inWindow.length < results.length) break;
+    }
+    return recent.map(toProviderAuthorizedPayment);
   }
 
   private async request<T>(method: 'GET' | 'POST' | 'PUT', path: string, payload?: object): Promise<T> {

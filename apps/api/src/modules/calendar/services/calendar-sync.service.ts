@@ -13,6 +13,8 @@ import { GoogleCalendarError, GoogleCalendarService } from './google-calendar.se
 const DAY_MS = 86_400_000;
 // Items per pass; the rest go in the next pass.
 const BATCH = 200;
+// M-5: pulls run every 5 minutes, so 6 failures in a row are about 30 minutes.
+const PERSISTENT_FAILED_PULLS = 6;
 
 type SyncResult = Record<string, number>;
 
@@ -57,6 +59,7 @@ const isInvalidGrant = (error: unknown): boolean => error instanceof GoogleCalen
 @Injectable()
 export class CalendarSyncService {
   private readonly logger = new Logger(CalendarSyncService.name);
+  private failedPulls: { connectionId: string | null; count: number } = { connectionId: null, count: 0 };
 
   constructor(
     private readonly dataSource: DataSource,
@@ -120,21 +123,36 @@ export class CalendarSyncService {
     try {
       const { result, errorCode, stale } = await run(connection, await this.connections.accessToken(connection));
       if (!stale) await this.connections.recordRun(connection.id, stamp, errorCode);
+      if (stamp === 'pull') this.trackPull(connection.id, false);
       return result;
     } catch (error) {
+      const persistent = error instanceof GoogleCalendarError && error.kind !== 'transient' && error.kind !== 'invalid_grant';
+      const failedPulls = stamp === 'pull' ? this.trackPull(connection.id, persistent) : 0;
       if (error instanceof CalendarLostError) {
-        const changed = await this.connections.markNeedsReconnect(connection.id, { kind: error.code, calendarId: connection.calendarId });
+        const changed = await this.connections.markNeedsReconnect(connection, { kind: error.code, calendarId: connection.calendarId });
         return changed ? { reconnect: 1 } : { stale: 1 };
       }
       if (!(error instanceof GoogleCalendarError)) throw error;
       if (error.kind === 'invalid_grant') {
-        await this.connections.markNeedsReconnect(connection.id);
+        await this.connections.markNeedsReconnect(connection);
         return { reconnect: 1 };
       }
-      // Transient errors keep the last blocks; the next pass retries.
+      // Errors keep the last blocks and the next pass retries, until non-transient ones persist (M-5).
       await this.connections.recordError(connection.id, error.kind);
+      if (failedPulls >= PERSISTENT_FAILED_PULLS) {
+        await this.connections.releaseBlocksAfterPersistentError(connection.id);
+        return { failed: 1, released: 1 };
+      }
       return { failed: 1 };
     }
+  }
+
+  // Consecutive pulls of one connection that failed with a non-transient error; any other outcome starts over. Kept in
+  // memory: the scheduler runs on a single instance, and a restart only delays the release.
+  private trackPull(connectionId: string, failed: boolean): number {
+    const count = failed && this.failedPulls.connectionId === connectionId ? this.failedPulls.count + 1 : Number(failed);
+    this.failedPulls = { connectionId, count };
+    return count;
   }
 
   // D113: 404/410 or a 403 that is not a rate limit (already mapped to transient) on the chosen calendar.

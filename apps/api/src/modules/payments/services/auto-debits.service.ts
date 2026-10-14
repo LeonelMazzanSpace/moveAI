@@ -410,21 +410,39 @@ export class AutoDebitsService {
   ): Promise<string> {
     const ref = created.externalReference;
     if (this.config.simulatorEnabled) return `${this.app.webUrl}/checkout/simulado?debito=${encodeURIComponent(ref)}`;
+    let preapproval: { id: string; initPoint: string };
     try {
       const user = await this.users.findById(userId);
       if (!user) throw new AppError('USER_NOT_FOUND');
-      const preapproval = await this.mercadoPago.createPreapproval({
+      preapproval = await this.mercadoPago.createPreapproval({
         externalReference: ref, reason: plan.name, payerEmail: user.email, amount: plan.price, startDate, ...frequency,
       });
-      await this.dataSource.query(`UPDATE auto_debits SET mp_preapproval_id = $2, updated_at = now() WHERE id = $1`, [
-        created.id,
-        preapproval.id,
-      ]);
-      return preapproval.initPoint;
     } catch {
       await this.markCancelled(this.dataSource.manager, created.id, 'provider', 'pending');
       throw new AppError('PAYMENT_PROVIDER_ERROR');
     }
+    if (await this.attachPreapproval(created.id, preapproval.id)) return preapproval.initPoint;
+    // M-1: another checkout or a cancel closed the debit while Mercado Pago created it, so its link is never handed out.
+    // The id is stored anyway, so the reconciliation cancels it again if this cancellation fails.
+    await this.cancelAtProviderBestEffort(created.id, preapproval.id);
+    const service = plan.service as AutoDebitService;
+    const active: unknown[] = await this.dataSource.query(
+      `SELECT 1 FROM auto_debits WHERE user_id = $1 AND service = $2 AND status IN ('pending','authorized') LIMIT 1`,
+      [userId, service],
+    );
+    throw new AppError(active.length > 0 ? 'AUTO_DEBIT_ACTIVE' : 'AUTO_DEBIT_NOT_FOUND');
+  }
+
+  // Stores the Mercado Pago subscription of the debit. Returns whether the debit is still pending (a CTE, so the
+  // query resolves to the returned rows only).
+  private async attachPreapproval(id: string, preapprovalId: string): Promise<boolean> {
+    const rows: { status: string }[] = await this.dataSource.query(
+      `WITH attached AS (
+         UPDATE auto_debits SET mp_preapproval_id = $2, updated_at = now() WHERE id = $1 RETURNING status
+       ) SELECT status FROM attached`,
+      [id, preapprovalId],
+    );
+    return rows[0]?.status === 'pending';
   }
 
   private async latestPerformanceEnd(userId: string): Promise<string | null> {

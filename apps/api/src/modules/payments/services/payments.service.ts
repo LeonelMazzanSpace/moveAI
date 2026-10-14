@@ -39,6 +39,9 @@ const RECONCILE_LOOKBACK_MS = 7 * 24 * 60 * MINUTE_MS;
 const BOOKING_RECONCILE_LOOKBACK_MS = 72 * 60 * MINUTE_MS;
 // Automatic debit charges Mercado Pago may still report (D96).
 const AUTO_DEBIT_RECONCILE_LOOKBACK_DAYS = 40;
+// Payment states Mercado Pago never moves to approved, and how many such payments the reconciliation remembers.
+const FINAL_DECLINED_STATUSES: ProviderPayment['status'][] = ['rejected', 'cancelled', 'refunded'];
+const DECLINED_PAYMENTS_MEMORY = 10_000;
 
 interface LockedPurchase {
   id: string;
@@ -141,6 +144,7 @@ const approvedFirst = (payments: ProviderPayment[]): ProviderPayment[] =>
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
+  private readonly declinedPayments = new Set<string>();
 
   constructor(
     private readonly dataSource: DataSource,
@@ -449,14 +453,14 @@ export class PaymentsService {
     }
   }
 
-  // R16 step 5, for booking purchases (D44). Returns the released booking, so its client is told after the commit (D93).
+  // R16 step 5, for booking purchases (D44). Returns the booking only if this call released its hold, so its client is
+  // told after the commit (D93); a hold staff or the job already closed was reported by them (T-060 M-1).
   private async reject(manager: EntityManager, purchase: LockedPurchase): Promise<string | null> {
     await manager.query(`UPDATE purchases SET status = 'rejected', updated_at = now() WHERE id = $1 AND status = 'pending'`, [
       purchase.id,
     ]);
     if (!purchase.bookingId) return null;
-    await this.bookings.releaseHold(manager, purchase.bookingId, 'cancelled');
-    return purchase.bookingId;
+    return (await this.bookings.releaseHold(manager, purchase.bookingId, 'cancelled')) ? purchase.bookingId : null;
   }
 
   private async flag(manager: EntityManager, purchaseId: string): Promise<void> {
@@ -508,7 +512,8 @@ export class PaymentsService {
   }
 
   // Returns whether the charge activated a plan. A charge Mercado Pago has not tried to collect yet has no payment;
-  // a declined one only emails the client (one email per charge, whatever Mercado Pago retries).
+  // a declined one only emails the client (one email per charge, whatever Mercado Pago retries), unless MOVE already
+  // closed the debit: Mercado Pago will not retry it (T-062 M-5).
   private async applyCharge(charge: ProviderAuthorizedPayment): Promise<boolean> {
     const debit = await this.autoDebits.findByPreapprovalId(charge.preapprovalId);
     if (!debit) {
@@ -517,15 +522,26 @@ export class PaymentsService {
     }
     if (!charge.paymentId) return false;
     const payment = await this.mercadoPago.getPayment(charge.paymentId);
-    if (payment.status === 'rejected' || payment.status === 'cancelled') await this.autoDebits.sendChargeFailed(debit, charge.id);
+    if (FINAL_DECLINED_STATUSES.includes(payment.status)) this.rememberDeclined(payment.id);
+    const declined = payment.status === 'rejected' || payment.status === 'cancelled';
+    if (declined && debit.status !== 'cancelled') await this.autoDebits.sendChargeFailed(debit, charge.id);
     if (payment.status !== 'approved') return false;
     return this.applyAutoDebitCharge(debit, payment);
+  }
+
+  // T-062 M-2: a declined payment never turns approved (Mercado Pago retries a charge with a new payment), so the
+  // reconciliation does not read it again. Kept in memory, bounded: after a restart each one is read once more.
+  private rememberDeclined(mpPaymentId: string): void {
+    this.declinedPayments.add(mpPaymentId);
+    if (this.declinedPayments.size <= DECLINED_PAYMENTS_MEMORY) return;
+    const oldest = this.declinedPayments.values().next().value;
+    if (oldest !== undefined) this.declinedPayments.delete(oldest);
   }
 
   // Active debits and those cancelled in the last 40 days: their state is read again (a debit MOVE closed but Mercado
   // Pago still holds is cancelled there again, I-1) and their approved charges are applied, also on a cancelled debit,
   // without changing its status (I-2, D108). A Mercado Pago failure on one step or one debit must not stop the others.
-  // Payments already stored are not read again.
+  // Payments already stored or already declined are not read again.
   private async reconcileAutoDebits(now: Date): Promise<number> {
     let applied = 0;
     const cancelledSince = new Date(now.getTime() - AUTO_DEBIT_RECONCILE_LOOKBACK_DAYS * 24 * 60 * MINUTE_MS);
@@ -539,6 +555,7 @@ export class PaymentsService {
       try {
         const charges = await this.mercadoPago.searchAuthorizedPayments(debit.mpPreapprovalId, AUTO_DEBIT_RECONCILE_LOOKBACK_DAYS);
         for (const charge of charges) {
+          if (charge.paymentId && this.declinedPayments.has(charge.paymentId)) continue;
           if (charge.paymentId && (await this.isPaymentStored(charge.paymentId))) continue;
           if (await this.applyCharge(charge)) applied += 1;
         }
@@ -565,7 +582,8 @@ export class PaymentsService {
     await this.autoDebits.advanceNextCharge(debit.id);
   }
 
-  // Booking purchases expire once their hold is gone: expired, or cancelled by staff or the system.
+  // Booking purchases expire once their hold is gone: expired, or cancelled by staff or the system. A pending automatic
+  // debit charge was already collected and flagged for its amount (D108), so it waits for staff instead (M-2).
   private async expireStale(now: Date): Promise<number> {
     const [{ count }]: { count: number }[] = await this.dataSource.query(
       `WITH expired AS (
@@ -574,7 +592,7 @@ export class PaymentsService {
            (pu.kind = 'booking' AND EXISTS (
              SELECT 1 FROM bookings b WHERE b.id = pu.booking_id AND b.status IN ('expired','cancelled')
            ))
-           OR (pu.kind = 'plan' AND pu.created_at < $1)
+           OR (pu.kind = 'plan' AND pu.auto_debit_id IS NULL AND pu.created_at < $1)
          )
          RETURNING pu.id
        ) SELECT count(*)::int AS count FROM expired`,

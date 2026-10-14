@@ -20,9 +20,18 @@ interface EmailBooking {
   endsAt: Date;
   professionalName: string | null;
   confirmedAt: Date | null;
+  holdExpiresAt: Date | null;
 }
 
 type StaffEvent = 'confirmed' | 'cancelled';
+
+// Name in the staff notice when the client's user can no longer be read (M-15).
+const UNKNOWN_CLIENT = 'Cliente';
+
+// T-060 M-2: a late payment confirmed a hold after it expired, so its client may already have been told it was not
+// confirmed (D43/D60).
+const confirmedAfterExpiredHold = (booking: EmailBooking): boolean =>
+  booking.holdExpiresAt !== null && booking.confirmedAt !== null && booking.confirmedAt > booking.holdExpiresAt;
 
 // Booking emails (D93) in one place: the client's mail plus, for Rehab, the notice to the staff address. They run after
 // the booking transaction committed, so nothing here ever throws.
@@ -37,64 +46,69 @@ export class BookingEmailsService {
     @Inject(appConfig.KEY) private readonly app: ConfigType<typeof appConfig>,
   ) {}
 
+  // The client's mail needs their user; the staff notice goes out without it (M-15).
   async confirmed(bookingId: string): Promise<void> {
     await this.guarded('booking-confirmed', [bookingId], async ([booking]) => {
       const user = await this.users.findById(booking.userId);
-      if (!user) return;
-      await this.notifications.send({
-        template: 'booking-confirmed',
-        to: { email: user.email, name: user.name },
-        userId: user.id,
-        idempotencyKey: `booking-confirmed:${booking.id}`,
-        params: {
-          name: user.name,
-          serviceName: SERVICE_LABEL[booking.service],
-          label: labelOf(booking),
-          date: displayDate(toBusinessDate(booking.startsAt)),
-          time: businessTime(booking.startsAt),
-        },
-      });
-      await this.notifyStaff(booking, user.name, 'confirmed');
+      if (user) {
+        await this.notifications.send({
+          template: 'booking-confirmed',
+          to: { email: user.email, name: user.name },
+          userId: user.id,
+          idempotencyKey: `booking-confirmed:${booking.id}`,
+          params: {
+            name: user.name,
+            serviceName: SERVICE_LABEL[booking.service],
+            label: labelOf(booking),
+            date: displayDate(toBusinessDate(booking.startsAt)),
+            time: businessTime(booking.startsAt),
+            ...(confirmedAfterExpiredHold(booking) ? { afterExpiredHold: true } : {}),
+          },
+        });
+      }
+      await this.notifyStaff(booking, user?.name ?? UNKNOWN_CLIENT, 'confirmed');
     });
   }
 
   async cancelledByClient(bookingId: string): Promise<void> {
     await this.guarded('booking-cancelled-by-client', [bookingId], async ([booking]) => {
       const user = await this.users.findById(booking.userId);
-      if (!user) return;
-      await this.notifications.send({
-        template: 'booking-cancelled-by-client',
-        to: { email: user.email, name: user.name },
-        userId: user.id,
-        idempotencyKey: `booking-cancelled-by-client:${booking.id}`,
-        params: {
-          name: user.name,
-          serviceName: SERVICE_LABEL[booking.service],
-          date: displayDate(toBusinessDate(booking.startsAt)),
-          time: businessTime(booking.startsAt),
-        },
-      });
-      await this.notifyStaff(booking, user.name, 'cancelled');
+      if (user) {
+        await this.notifications.send({
+          template: 'booking-cancelled-by-client',
+          to: { email: user.email, name: user.name },
+          userId: user.id,
+          idempotencyKey: `booking-cancelled-by-client:${booking.id}`,
+          params: {
+            name: user.name,
+            serviceName: SERVICE_LABEL[booking.service],
+            date: displayDate(toBusinessDate(booking.startsAt)),
+            time: businessTime(booking.startsAt),
+          },
+        });
+      }
+      await this.notifyStaff(booking, user?.name ?? UNKNOWN_CLIENT, 'cancelled');
     });
   }
 
   async cancelledByStaff(bookingId: string): Promise<void> {
     await this.guarded('booking-cancelled', [bookingId], async ([booking]) => {
       const user = await this.users.findById(booking.userId);
-      if (!user) return;
-      await this.notifications.send({
-        template: 'booking-cancelled',
-        to: { email: user.email, name: user.name },
-        userId: user.id,
-        idempotencyKey: `booking-cancelled:${booking.id}`,
-        params: {
-          name: user.name,
-          serviceName: SERVICE_LABEL[booking.service],
-          date: displayDate(toBusinessDate(booking.startsAt)),
-          time: businessTime(booking.startsAt),
-        },
-      });
-      await this.notifyStaff(booking, user.name, 'cancelled');
+      if (user) {
+        await this.notifications.send({
+          template: 'booking-cancelled',
+          to: { email: user.email, name: user.name },
+          userId: user.id,
+          idempotencyKey: `booking-cancelled:${booking.id}`,
+          params: {
+            name: user.name,
+            serviceName: SERVICE_LABEL[booking.service],
+            date: displayDate(toBusinessDate(booking.startsAt)),
+            time: businessTime(booking.startsAt),
+          },
+        });
+      }
+      await this.notifyStaff(booking, user?.name ?? UNKNOWN_CLIENT, 'cancelled');
     });
   }
 
@@ -160,7 +174,7 @@ export class BookingEmailsService {
   private load(bookingIds: string[]): Promise<EmailBooking[]> {
     return this.dataSource.query(
       `SELECT b.id, b.user_id AS "userId", s.service, b.source, s.starts_at AS "startsAt", s.ends_at AS "endsAt",
-         p.name AS "professionalName", b.confirmed_at AS "confirmedAt"
+         p.name AS "professionalName", b.confirmed_at AS "confirmedAt", b.hold_expires_at AS "holdExpiresAt"
        FROM bookings b
        JOIN time_slots s ON s.id = b.time_slot_id
        LEFT JOIN professionals p ON p.id = s.professional_id

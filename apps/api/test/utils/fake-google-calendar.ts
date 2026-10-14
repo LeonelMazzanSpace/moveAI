@@ -8,6 +8,13 @@ export type Method = Exclude<keyof GoogleCalendarService, 'buildAuthUrl'>;
 
 export type FakeEvent = GoogleEvent & { summary?: string; description?: string };
 
+const ALL_SCOPES = [
+  'openid',
+  'email',
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
+];
+
 const STATUS: Record<GoogleCalendarErrorKind, number> = {
   invalid_grant: 400, not_found: 404, conflict: 409, transient: 503, other: 403,
 };
@@ -24,6 +31,8 @@ export class FakeGoogleCalendar implements Pick<GoogleCalendarService, keyof Goo
   readonly revoked: string[] = [];
   readonly inserted: string[] = [];
   readonly refreshedWith: string[] = [];
+  // Scopes staff grants on the consent screen; null = everything MOVE asks for.
+  grantedScopes: string[] | null = null;
   private readonly failures = new Map<Method | '*', GoogleCalendarErrorKind>();
   private readonly holds = new Map<Method, { arrived: () => void; released: Promise<void> }>();
 
@@ -51,6 +60,7 @@ export class FakeGoogleCalendar implements Pick<GoogleCalendarService, keyof Goo
     this.revoked.length = 0;
     this.inserted.length = 0;
     this.refreshedWith.length = 0;
+    this.grantedScopes = null;
     this.clearFailures();
   }
 
@@ -82,7 +92,7 @@ export class FakeGoogleCalendar implements Pick<GoogleCalendarService, keyof Goo
 
   async exchangeCode(code: string): Promise<GoogleTokens> {
     this.fail('exchangeCode');
-    return { accessToken: `access-${code}`, refreshToken: `1//refresh-${code}` };
+    return { accessToken: `access-${code}`, refreshToken: `1//refresh-${code}`, scopes: this.grantedScopes ?? [...ALL_SCOPES] };
   }
 
   async refreshAccessToken(refreshToken: string): Promise<string> {
@@ -92,6 +102,7 @@ export class FakeGoogleCalendar implements Pick<GoogleCalendarService, keyof Goo
   }
 
   async revoke(token: string): Promise<void> {
+    await this.wait('revoke');
     this.fail('revoke');
     this.revoked.push(token);
   }
