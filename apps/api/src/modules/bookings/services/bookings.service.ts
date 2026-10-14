@@ -259,6 +259,8 @@ export class BookingsService {
   private async assertRoomForExpiredHold(manager: EntityManager, booking: BookingModel): Promise<void> {
     const slot = await this.schedule.lockSlot(manager, booking.timeSlotId);
     if (slot.cancelledAt || slot.startsAt.getTime() <= Date.now()) throw new AppError('SLOT_FULL');
+    // D111: a slot busy in Google Calendar (D94) has no room either, so the late payment is flagged instead.
+    if (await this.slotStats.calendarBlockedAt(manager, slot.id)) throw new AppError('SLOT_FULL');
     try {
       await this.assertRoom(manager, booking.userId, slot);
     } catch (error) {

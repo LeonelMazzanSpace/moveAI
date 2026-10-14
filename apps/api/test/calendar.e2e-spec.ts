@@ -333,6 +333,36 @@ describe('Google Calendar ↔ Rehab (e2e)', () => {
   });
 
   describe('Google → MOVE (pull) and availability', () => {
+    it('answers POST /staff/time-slots with the calendar flags of the contract', async () => {
+      const staff = await signUpStaff(app, ds);
+      const professionalId = await createProfessional(ds);
+      const res = await staff.agent.post('/api/staff/time-slots')
+        .send({ service: 'rehab', date: tomorrow(), startTime: '12:00', durationMinutes: 60, capacity: 1, professionalId })
+        .expect(201);
+      expect(res.body).toMatchObject({ booked: 0, calendarBlocked: false, calendarConflict: false });
+    });
+
+    it('never confirms an expired hold on a slot busy in Google when its payment arrives late (D43, D23)', async () => {
+      const staff = await signUpStaff(app, ds);
+      await connectAndChoose(staff.agent);
+      const slotId = await rehabSlot('10:00');
+      const client = await signUp(app, { name: 'Bruno Díaz' });
+      const planId = await planIdBySlug(ds, 'rehab-evaluacion');
+      const hold = await client.agent.post('/api/checkout/booking').send({ planId, timeSlotId: slotId }).expect(201);
+      const bookingId = hold.body.bookingId as string;
+      await ds.query(`UPDATE bookings SET status = 'expired', cancelled_by = 'system', cancelled_at = now() WHERE id = $1`, [bookingId]);
+      busyOver('10:00');
+      await sync(staff.agent);
+      expect(await blockedAt(slotId)).not.toBeNull();
+
+      const late = await request(app.getHttpServer()).post('/api/payments/dev/simulate')
+        .send({ externalReference: hold.body.externalReference, outcome: 'approved' }).expect(200);
+      expect(late.body).toMatchObject({ status: 'approved', needsAttention: true });
+      const [booking] = await ds.query(`SELECT status FROM bookings WHERE id = $1`, [bookingId]);
+      expect(booking.status).toBe('expired');
+      expect(await count(`email_logs WHERE template = 'booking-confirmed'`)).toBe(0);
+    });
+
     it('blocks a slot overlapped by a busy event and frees it when the event goes away', async () => {
       const staff = await signUpStaff(app, ds);
       await connectAndChoose(staff.agent);
