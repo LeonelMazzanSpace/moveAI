@@ -29,7 +29,7 @@ function ContinueRedirect() {
     return (
       <div className="space-y-3 text-center text-sm text-muted-foreground">
         <p>Tu sesión no está activa.</p>
-        <Link href={withNext('/ingresar', next)} className="underline underline-offset-2">
+        <Link href={withNext('/ingresar', next)} className="inline-flex min-h-8 items-center underline underline-offset-2">
           Ingresar
         </Link>
       </div>

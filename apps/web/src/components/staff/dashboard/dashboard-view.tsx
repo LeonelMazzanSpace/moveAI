@@ -98,7 +98,7 @@ function TodaySlots({ slots }: { slots: StaffTimeSlotDto[] }) {
                   <TableCell className="px-4 py-3.5 text-muted-foreground">{`${slot.booked}/${slot.capacity}`}</TableCell>
                   <TableCell className="px-4 py-3.5 text-muted-foreground">{slot.present}</TableCell>
                   <TableCell className="px-4 py-3.5 text-right">
-                    <Link href={slotHref(slot)} className="text-xs underline underline-offset-4 hover:text-foreground">
+                    <Link href={slotHref(slot)} className="inline-flex min-h-8 items-center text-xs underline underline-offset-4 hover:text-foreground">
                       Ver turno
                     </Link>
                   </TableCell>

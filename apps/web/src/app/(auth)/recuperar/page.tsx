@@ -22,7 +22,7 @@ export default function RecuperarPage() {
         <ForgotPasswordForm />
       </div>
       <p className="mt-6 text-center text-xs text-muted-foreground">
-        <Link href="/ingresar" className="underline underline-offset-2">
+        <Link href="/ingresar" className="inline-flex min-h-8 items-center underline underline-offset-2">
           Volver a ingresar
         </Link>
       </p>

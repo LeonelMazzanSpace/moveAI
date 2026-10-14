@@ -9,7 +9,7 @@ import { CtaLink } from './hero';
 function ContactLink({ href, children }: { href: string | null; children: string }) {
   if (!href) return <>{children}</>;
   return (
-    <a href={href} className="hover:text-foreground">
+    <a href={href} className="inline-flex min-h-8 items-center hover:text-foreground">
       {children}
     </a>
   );
