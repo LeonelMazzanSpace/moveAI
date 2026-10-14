@@ -64,6 +64,10 @@ const ERROR_MESSAGES: Record<ErrorCode, string> = {
   AUTO_DEBIT_NOT_ALLOWED: 'Este plan no tiene débito automático.',
   AUTO_DEBIT_ACTIVE: 'Ya tenés un débito automático activo para este servicio.',
   AUTO_DEBIT_NOT_FOUND: 'No encontramos ese débito automático.',
+  CALENDAR_NOT_CONFIGURED: 'La conexión con Google Calendar no está configurada.',
+  CALENDAR_NOT_CONNECTED: 'Primero conectá una cuenta de Google Calendar.',
+  CALENDAR_INVALID_CALENDAR: 'Elegí un calendario de la lista.',
+  CALENDAR_PROVIDER_ERROR: 'Google Calendar no respondió. Probá de nuevo en un rato.',
 };
 
 export function errorMessage(error: unknown): string {
