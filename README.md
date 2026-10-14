@@ -36,6 +36,7 @@ El `.env.example` de la API trae valores de desarrollo. Sin credenciales de prov
 | API | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL` | Conexión a PostgreSQL (`DB_SSL=true` en Neon) |
 | API | `BETTER_AUTH_SECRET`, `COOKIE_DOMAIN` | Secreto de sesiones y dominio de la cookie (`.move.uy` en producción) |
 | API | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth (opcional; las dos o ninguna) |
+| API | `CALENDAR_TOKEN_KEY` | Sincronización de Rehab con Google Calendar (opcional): 32 bytes en base64 (`openssl rand -base64 32`) que cifran el token del calendario conectado; la sincronización también necesita las dos de Google (ver [docs/deploy.md](docs/deploy.md)) |
 | API | `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` | Mercado Pago (vacíos = simulador en desarrollo; obligatorios en producción) |
 | API | `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME` | Brevo (vacíos = dry-run en desarrollo; obligatorios en producción) |
 | API | `SCHEDULER_ENABLED` | `true` o `false`; activo en una sola instancia |
@@ -52,9 +53,10 @@ El `.env.example` de la API trae valores de desarrollo. Sin credenciales de prov
 | `pnpm test:e2e` | E2E de la API contra Postgres (requiere `E2E_DATABASE_NAME`, ver [docs/development.md](docs/development.md#tests)) |
 | `pnpm e2e:reset` / `pnpm test:e2e:web` / `pnpm lint:e2e` | Reinicia la base `move_e2e`, corre las pruebas end to end de la web con Playwright en desktop y mobile, y revisa su código (tsc y oxlint; `pnpm lint` lo incluye). Las pruebas requieren `E2E_STAFF_PASSWORD` y `E2E_CLIENT_PASSWORD`; ver [docs/development.md](docs/development.md#pruebas-end-to-end). |
 | `pnpm db:up` / `pnpm db:down` / `pnpm db:logs` | Postgres local |
-| `pnpm manual:demo-data` | Carga datos de demostración inventados por HTTP contra la API local (ver [Manual de usuario](#manual-de-usuario)) |
-| `pnpm manual:screenshots` | Captura una imagen de cada pantalla de la web en `docs/manual/img/` |
+| `pnpm manual:demo-data` | Carga datos de demostración inventados por HTTP contra la API local, con dos débitos automáticos simulados (ver [Manual de usuario](#manual-de-usuario)). Exige `API_URL` y `WEB_URL` |
+| `pnpm manual:screenshots` | Captura una imagen de cada pantalla de la web en `docs/manual/img/` (escritorio y pasada mobile). Exige `API_URL` y `WEB_URL` |
 | `pnpm manual:pdf` | Genera `docs/manual/manual-de-usuario.pdf` desde el Markdown |
+| `pnpm responsive:audit` | Audita todas las rutas de la web a 375, 768, 1024 y 1440 px (scroll horizontal, elementos fuera de pantalla, área táctil, texto cortado). Exige `API_URL` y `WEB_URL`, sin valor por defecto; ver [docs/responsive-audit.md](docs/responsive-audit.md) |
 
 Scripts de la API (`pnpm --filter @move/api <script>`):
 
@@ -62,6 +64,7 @@ Scripts de la API (`pnpm --filter @move/api <script>`):
 |---|---|
 | `seed` | Carga planes, horarios y configuración provisorios (idempotente) |
 | `user:create-staff -- --email <e> --name <n> [--promote-existing]` | Crea un usuario staff; la contraseña va en `CREATE_STAFF_PASSWORD` (preferible a `--password`). Si el email ya existe se rechaza, salvo con `--promote-existing` (D54), que convierte esa cuenta en staff; `--name` solo se usa al crear una cuenta nueva |
+| `emails:preview` | Renderiza las 17 plantillas de email con datos de ejemplo en `apps/api/tmp/email-preview/` (con un `index.html`), sin base ni red; la carpeta está ignorada por git |
 | `test:e2e` | E2E de la API |
 | `migration:generate` / `migration:run` / `migration:revert` / `migration:show` | Migraciones |
 
@@ -89,7 +92,7 @@ Las tablas y columnas se nombran en snake_case automáticamente (`SnakeNamingStr
 - [Parte 4: Proveedores, uno por uno](docs/manual/manual-de-usuario.md#parte-4-proveedores-uno-por-uno): Neon, AWS Elastic Beanstalk, Vercel, dominio y cookies, Mercado Pago, Google OAuth, Brevo y Bitbucket Pipelines, con ambientes separados y la tabla de variables.
 - [Parte 5: Puesta en marcha y mantenimiento](docs/manual/manual-de-usuario.md#parte-5-puesta-en-marcha-y-mantenimiento): primer staff, checklist posterior al deploy, rollback y cómo regenerar el manual.
 
-Las capturas y el PDF se regeneran con `pnpm manual:demo-data`, `pnpm manual:screenshots` y `pnpm manual:pdf`; el diagrama, con `node scripts/manual/render-diagram.mjs` (pasos y variables `MANUAL_STAFF_PASSWORD` / `MANUAL_CLIENT_PASSWORD` en [Regenerar este manual](docs/manual/manual-de-usuario.md#regenerar-este-manual)).
+Las capturas y el PDF se regeneran con `pnpm manual:demo-data`, `pnpm manual:screenshots` (necesita antes `pnpm --filter @move/api emails:preview`) y `pnpm manual:pdf`; el diagrama, con `node scripts/manual/render-diagram.mjs` (pasos y variables `MANUAL_STAFF_PASSWORD` / `MANUAL_CLIENT_PASSWORD` en [Regenerar este manual](docs/manual/manual-de-usuario.md#regenerar-este-manual)).
 
 ## Documentación
 

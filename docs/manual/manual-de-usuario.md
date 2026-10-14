@@ -2,17 +2,17 @@
 
 Plataforma de **Performance, Rehab y Recovery** de MOVE (Uruguay): registro, planes, pagos, reservas, asistencia, seguimiento y renovación en un solo lugar.
 
-Este manual es la guía única para clientes, staff de MOVE y equipo técnico. Tiene una captura de cada pantalla y se ordena así:
+Este manual es la guía única para clientes, staff de MOVE y equipo técnico. Tiene una captura de cada pantalla (y una pasada en celular de las principales) y se ordena así:
 
 1. [Probar MOVE en local](#probar-move-en-local): los pasos, en orden, para tener la plataforma funcionando en tu computadora con datos de demostración, y qué muestra cada usuario de demo.
-2. [Estado actual frente a MOVE.pdf](#estado-actual-frente-a-movepdf): qué está hecho, qué está simulado en local y qué falta, sección por sección del documento de alcance. Termina con la [deuda conocida](#deuda-conocida-y-comportamientos-a-tener-presentes) y con [qué queda abierto al cerrar la tanda de deuda](#qué-queda-abierto-al-cerrar-la-tanda-de-deuda): decisiones pendientes, falta de deploy y deuda menor de tests y herramientas.
+2. [Estado actual frente a MOVE.pdf](#estado-actual-frente-a-movepdf): qué está hecho, qué está simulado en local y qué falta, sección por sección del documento de alcance. Termina con la [deuda conocida](#deuda-conocida-y-comportamientos-a-tener-presentes) y con qué queda abierto al cerrar la [tanda de deuda](#qué-queda-abierto-al-cerrar-la-tanda-de-deuda) y la [tanda de comentarios del cliente](#qué-queda-abierto-al-cerrar-la-tanda-de-comentarios-del-cliente): decisiones pendientes, deuda menor, falta de deploy y pruebas reales con proveedores.
 3. [Parte 1: Clientes](#parte-1-clientes): cómo usar el sitio, contratar un plan y reservar.
 4. [Parte 2: Staff de MOVE](#parte-2-staff-de-move): el panel de gestión (clientes, turnos, pagos, seguimiento y configuración).
 5. [Parte 3: Cómo levantar todo](#parte-3-cómo-levantar-todo): el sistema completo en una computadora, paso a paso, y el orden para publicarlo en producción.
 6. [Parte 4: Proveedores, uno por uno](#parte-4-proveedores-uno-por-uno): qué falta configurar en Neon, AWS, Vercel, el dominio, Mercado Pago, Google, Brevo y Bitbucket, con los links a la documentación oficial.
 7. [Parte 5: Puesta en marcha y mantenimiento](#parte-5-puesta-en-marcha-y-mantenimiento): primer usuario de staff, checklist posterior al deploy, rollback y cómo regenerar este manual.
 
-> **Sobre los datos de las capturas.** Todas las imágenes salen de una base de demostración con personas, emails y teléfonos **inventados** (emails `@example.com`), cargada el 13/10/2026. Los planes, precios, horarios y umbrales que se ven son **provisorios** hasta que MOVE los confirme (ver [Reglas y valores provisorios](#reglas-y-valores-provisorios)). Hoy no hay una versión publicada: todo corre localmente (ver la [Parte 3](#parte-3-cómo-levantar-todo)).
+> **Sobre los datos de las capturas.** Todas las imágenes salen de una base de demostración con personas, emails y teléfonos **inventados** (emails `@example.com`), cargada el 14/10/2026. Los planes, precios, horarios y umbrales que se ven son **provisorios** hasta que MOVE los confirme (ver [Reglas y valores provisorios](#reglas-y-valores-provisorios)). Hoy no hay una versión publicada: todo corre localmente (ver la [Parte 3](#parte-3-cómo-levantar-todo)).
 
 ## Probar MOVE en local
 
@@ -88,10 +88,13 @@ Esta sección es el camino más corto para ver la plataforma funcionando en tu c
    ```bash
    printf 'Contraseña del staff: '; read -rs MANUAL_STAFF_PASSWORD && export MANUAL_STAFF_PASSWORD; echo
    printf 'Contraseña de los clientes: '; read -rs MANUAL_CLIENT_PASSWORD && export MANUAL_CLIENT_PASSWORD; echo
+   export API_URL=http://localhost:3001/api WEB_URL=http://localhost:3000 MANUAL_ALLOW_DEV_PORTS=1
    pnpm manual:demo-data
    ```
 
-   El script comprueba que Docker y la base responden, imprime la **base destino** antes de escribir (`Base destino: move …`) y se **niega a cargar** datos si `DB_HOST` o `API_URL` no son locales (localhost, 127.0.0.1 o ::1). Tarda unos segundos. Solo se puede cargar **una vez por base**: si ya hay datos de demostración, avisa y no hace nada (para repetirlo, usá una base nueva: ver [Regenerar este manual](#regenerar-este-manual)). Las fechas son relativas al día de la carga (planes que vencen en unos días, asistencias de las últimas semanas, turnos de hoy).
+   `API_URL` y `WEB_URL` son **obligatorias**: los scripts del manual no tienen valor por defecto y **rechazan los puertos 3000 y 3001** (los de la app de desarrollo de quien programa en el repositorio) para no escribir sobre datos reales por error. `MANUAL_ALLOW_DEV_PORTS=1` confirma que en esos puertos corre **tu** copia de demostración, como en esta guía; con otros puertos (por ejemplo, API en 3168 y web en 3268) no hace falta.
+
+   El script comprueba que Docker y la base responden, imprime la **base destino** antes de escribir (`Base destino: move …`) y se **niega a cargar** datos si `DB_HOST`, `API_URL` o `WEB_URL` no son locales (localhost, 127.0.0.1 o ::1). Además de clientes, reservas, pagos y alertas, carga un email de avisos del staff de ejemplo, dos débitos automáticos simulados y la marca "ocupado en Google Calendar" en un turno de Rehab (ver la tabla de abajo). Tarda unos segundos. Solo se puede cargar **una vez por base**: si ya hay datos de demostración, avisa y no hace nada (para repetirlo, usá una base nueva: ver [Regenerar este manual](#regenerar-este-manual)). Las fechas son relativas al día de la carga (planes que vencen en unos días, asistencias de las últimas semanas, turnos de hoy).
 
 9. **Levantar la web** (consola 3, **sin** `PORT` exportado: ver el paso 2) y abrir `http://localhost:3000/ingresar`:
 
@@ -105,17 +108,17 @@ Esta sección es el camino más corto para ver la plataforma funcionando en tu c
 
 | Usuario (`@example.com`) | Qué muestra |
 |---|---|
-| `staff` | Todo el panel de staff: dashboard, clientes, turnos y asistencia, pagos, seguimiento, check-ins y configuración |
+| `staff` | Todo el panel de staff: dashboard, clientes, turnos y asistencia, pagos, seguimiento, check-ins y configuración (con el email de avisos de ejemplo `avisos@example.com` en Configuración → Contacto) |
 | `sofia.martinez` | La clienta "al día": Plan Trimestral vigente (vence en 55 días) y un paquete Recovery de 4 sesiones con una sesión reservada. Asiste casi todos los días (con una ausencia y un no show en su historia), tiene reservas próximas y respondió el check-in |
-| `martin.rodriguez` | Plan Mensual vigente (vence en 12 días), reservas próximas, una reserva cancelada y el check-in respondido |
+| `martin.rodriguez` | Plan Mensual vigente (vence en 12 días), reservas próximas, una reserva cancelada y el check-in respondido. Tiene un **débito automático de Performance** autorizado: el primer cobro es el día siguiente al vencimiento (en su perfil y en su ficha de staff) |
 | `lucia.pereira` | Plan Mensual **por vencer** (vence en 4 días): alerta "Por vencer", aviso de vencimiento en su perfil, una asistencia **pendiente de marcar** en el último turno y un check-in pendiente de responder |
 | `andres.silva` | Plan Mensual **vencido** (venció hace 5 días): alerta "Vencidos sin renovar"; no puede reservar y su perfil lo lleva a renovar |
-| `camila.fernandez` | Plan Trimestral vigente pero **inactiva** (casi 4 semanas sin asistir): alerta "Inactividad prolongada" con un contacto de WhatsApp registrado sin respuesta; tiene un check-in pendiente |
+| `camila.fernandez` | Plan Trimestral vigente pero **inactiva** (casi 4 semanas sin asistir): alerta "Inactividad prolongada" con un contacto de WhatsApp registrado sin respuesta; tiene un check-in pendiente. Tiene además un **débito automático de Recovery** (paquete de 4 sesiones) con su primer cobro ya hecho: figura en Pagos con el distintivo **Débito automático** |
 | `joaquin.techera` | Plan Mensual con **pausa por lesión** y fecha de re-contacto hoy: estado "Pausa" y alerta "Re-contactar"; no recibe alertas ni emails automáticos |
 | `valentina.gomez` | Plan Trimestral pagado por **transferencia** (pago manual). Pasó más de una semana sin asistir: el staff la contactó y la alerta figura como gestionada. Tiene el check-in pendiente (es la que se ve en la pantalla de check-in) |
-| `federico.alvarez` | Respondió el check-in con una **molestia**: el staff lo derivó a Rehab, tiene el **seguimiento fisioterapéutico habilitado** y un turno de Rehab reservado (Reservar → Fisioterapia) |
+| `federico.alvarez` | Respondió el check-in con una **molestia**: el staff lo derivó a Rehab, tiene el **seguimiento fisioterapéutico habilitado** y un turno de Rehab reservado (Reservar → Fisioterapia). Ese turno está marcado **ocupado en Google Calendar** (una marca de demostración, sin Google conectado): en Turnos y asistencia se ve el aviso de conflicto |
 | `diego.machado` | Plan Mensual pagado en **efectivo** (pago manual). Alerta de **baja de frecuencia**, un no show en el último turno y un check-in con **cambio de objetivos** (alerta abierta) |
-| `nicolas.acosta` | Sin plan ni compras: sirve para contratar un **paquete Recovery** de punta a punta (checkout → simulador de pagos → resultado) |
+| `nicolas.acosta` | Sin plan ni compras: sirve para contratar un **paquete Recovery** de punta a punta (checkout → simulador de pagos → resultado) y para probar el **débito automático** (checkout con débito → simulador → resultado) |
 | `paula.rivero` | **Invitada**: compró la Evaluación de Rehab sin tener cuenta |
 | `mateo.lemos` | **Invitado**: compró una sesión individual de Recovery sin tener cuenta |
 
@@ -128,6 +131,7 @@ Las cuentas de los invitados (`paula.rivero` y `mateo.lemos`) **no pueden ingres
 - **La API no arranca y el log dice qué variable falta o es inválida:** el paso 2 no se hizo en esa consola, o se editó un valor. `PORT` y `DB_PORT` aceptan solo dígitos (1 a 65535) y `DB_SSL` solo `true` o `false`.
 - **`manual:demo-data` dice que no puede conectar a la base:** Docker no está abierto o el contenedor `move-postgres` no está levantado (paso 3).
 - **`manual:demo-data` dice "Ya hay datos de demostración":** la base ya se cargó; usá una base nueva (ver arriba).
+- **`manual:demo-data` o `manual:screenshots` dicen que falta `API_URL` o `WEB_URL`, o que apuntan al puerto de la app de desarrollo:** exportalas con los puertos de tu API y tu web (paso 8). En los puertos 3000 y 3001 hace falta además `MANUAL_ALLOW_DEV_PORTS=1`.
 - **El puerto 3000 o 3001 está ocupado:** cerrá la otra aplicación o cambiá `PORT` (API) y el puerto de la web, y mantené `WEB_URL`, `API_PUBLIC_URL` y `NEXT_PUBLIC_API_URL` apuntando a esos puertos.
 
 ## Estado actual frente a MOVE.pdf
@@ -145,7 +149,8 @@ Las cuentas de los invitados (`paula.rivero` y `mateo.lemos`) **no pueden ingres
 | Requisito | Estado | Evidencia |
 |---|---|---|
 | Perfiles Visitante, Cliente/Alumno y Staff MOVE | Hecho | Roles `client` y `staff`; el visitante navega sin cuenta. La API responde 401 sin sesión y 403 a un cliente en `/api/staff/*`; la web redirige según el rol |
-| Inicio, Performance, Rehab, Recovery y Planes | Hecho | Capturas 01–09 |
+| Inicio, Performance, Rehab, Recovery y Planes | Hecho | Capturas 01–09; el inicio suma **Equipo** y **Dónde estamos** (capturas 39 y 40) y Recovery suma **Recovery Room** (captura 41) |
+| Datos de contacto (dirección, horarios, WhatsApp, Instagram, email y mapa) editables desde el panel y visibles en el pie del sitio, en Dónde estamos y en el pie de los emails (agregado a pedido del cliente) | Hecho | Capturas 40 y 42 |
 | Acceso al perfil, registro e inicio de sesión | Hecho | Capturas 12, 13 y 17 |
 | Contratar o reservar sin ser cliente, creando el usuario en el proceso | Hecho | Rehab y sesión individual de Recovery admiten invitados (capturas 05 y 07). Contratar un plan o paquete pide ingresar primero |
 
@@ -192,7 +197,7 @@ Las cuentas de los invitados (`paula.rivero` y `mateo.lemos`) **no pueden ingres
 | Estado, plan, inicio y vencimiento, pagos y renovaciones, última asistencia, frecuencia, reservas y cancelaciones, uso de Rehab y Recovery, historial de contactos | Hecho | Capturas 26 y 28 |
 | Personas registradas en cada turno y marcado ágil de asistencia | Hecho | Captura 29 |
 | Pagos (agregado en el proyecto) | Hecho | Capturas 30 y 31: operaciones de Mercado Pago y pagos manuales en efectivo o transferencia |
-| Configuración de planes, horarios, profesionales y reglas (agregado) | Hecho | Capturas 35–38 |
+| Configuración de planes, horarios, profesionales, reglas, contacto y calendario (agregado) | Hecho | Capturas 35–38, 42 y 43 |
 
 ### Seguimiento y retención
 
@@ -237,26 +242,28 @@ Las cuentas de los invitados (`paula.rivero` y `mateo.lemos`) **no pueden ingres
 | Rehab: disponibilidad por profesional, fecha y horario, bloqueo automático del horario, asociación al cliente | Hecho | El turno queda retenido 15 minutos mientras se paga (configurable) |
 | Recovery: horarios, control de disponibilidad, reserva individual o con paquete | Hecho | Captura 07 |
 | Disponibilidad administrada desde el panel | Hecho | Capturas 36 y 37 (horarios, turnos puntuales y profesionales) |
+| Google Calendar ↔ Rehab en los dos sentidos, con un solo calendario de MOVE (agregado a pedido del cliente) | Pendiente de credenciales | El código está completo; hace falta el cliente OAuth de Google y `CALENDAR_TOKEN_KEY`. Sin eso la pestaña Calendario avisa que falta configurar (captura 43); el conflicto con una reserva se ve en la captura 50. Pasos en [Google Calendar](#google-calendar-sincronización-de-rehab) |
 
 ### Pagos (Mercado Pago)
 
 | Requisito | Estado | Evidencia |
 |---|---|---|
 | Crear la operación, asociarla al usuario, plan o reserva, recibir y validar la confirmación, registrar el estado, activar planes, confirmar reservas, registrar renovaciones | Simulado en local | Simulador de pagos (captura 23). El código real usa Checkout Pro, webhook firmado e idempotente y conciliación cada 10 minutos |
-| Revisar la integración existente y validar credenciales y entornos de prueba | Pendiente | [Mercado Pago](#mercado-pago-pagos) |
+| Débito automático con la suscripción (`preapproval`) de Mercado Pago, para los planes que el staff marque (agregado a pedido del cliente) | Simulado en local | Checkout con débito, simulador y resultado (capturas 44–46), perfil del cliente y ficha de staff (47 y 48), Pagos con el distintivo y el filtro de origen (49). El código real crea la suscripción, procesa sus avisos y cobros y los concilia |
+| Revisar la integración existente y validar credenciales y entornos de prueba | Pendiente | [Mercado Pago](#mercado-pago-pagos), incluida su [prueba real](#prueba-real-de-mercado-pago-con-credenciales) |
 
 ### Automatizaciones y seguimiento
 
 | Requisito | Estado | Evidencia |
 |---|---|---|
-| Tareas programadas con `@nestjs/schedule` dentro de la API | Hecho | Seis jobs: vencimiento de reservas retenidas (cada minuto), conciliación de pagos (cada 10 minutos), generación de turnos (03:00), detección de seguimiento (07:00), recordatorios de vencimiento (09:00) y check-ins mensuales (10:00, primer lunes); horas de Montevideo |
+| Tareas programadas con `@nestjs/schedule` dentro de la API | Hecho | Nueve jobs: vencimiento de reservas retenidas (cada minuto), conciliación de pagos (cada 10 minutos), generación de turnos (03:00), detección de seguimiento (07:00), recordatorios de vencimiento (09:00), check-ins mensuales (10:00, primer lunes), **recordatorios de turno** (18:00) y los dos de **Google Calendar** (enviar las reservas de Rehab, cada minuto; leer los horarios ocupados, cada 5 minutos); horas de Montevideo |
 | Reglas y fechas en PostgreSQL; sin infraestructura extra | Hecho | Umbrales en Configuración (captura 38); un lock de Postgres evita que un job corra dos veces a la vez |
 
 ### Comunicaciones (Brevo)
 
 | Requisito | Estado | Evidencia |
 |---|---|---|
-| Confirmación de reservas, de pagos, avisos de vencimiento, recuperación de acceso, check-ins | Simulado en local | Nueve plantillas (ver [qué emails manda el sistema](#qué-emails-manda-el-sistema)); sin `BREVO_API_KEY` se registran en `email_logs` con estado `skipped` y no se envían |
+| Confirmación de reservas, de pagos, avisos de vencimiento, recuperación de acceso, check-ins | Simulado en local | 17 plantillas, todas con el pie de contacto (ver [qué emails manda el sistema](#qué-emails-manda-el-sistema), con su vista previa); sin `BREVO_API_KEY` se registran en `email_logs` con estado `skipped` y no se envían |
 | Seguimientos automáticos | Hecho en parte | Los clientes reciben el check-in mensual y los avisos de vencimiento. Las alertas de inactividad y baja de frecuencia **no** mandan email al cliente: llegan al staff, que contacta a la persona |
 | Integración directa desde NestJS | Hecho | API REST de Brevo con `fetch`, sin SDK |
 
@@ -278,7 +285,8 @@ Las cuentas de los invitados (`paula.rivero` y `mateo.lemos`) **no pueden ingres
 - **Sin penalidades** por ausencia o no show en el MVP: los tres estados se registran, pero no tienen consecuencias.
 - **El staff no reserva en nombre de clientes:** sí cancela reservas y marca asistencia.
 - **Valores provisorios:** planes, precios, horarios y umbrales son los del mockup hasta que MOVE los confirme (Configuración → Reglas).
-- **Uso desde el celular (agregado):** menú ☰ en el sitio público, el perfil del cliente y el panel de staff; las tablas de Turnos y asistencia y de Pagos se muestran como tarjetas (ver [Sitio público](#sitio-público), [Turnos y asistencia](#turnos-y-asistencia) y [Pagos](#pagos)); la suite de pruebas end to end recorre las pantallas en escritorio y en celular.
+- **Uso desde el celular (agregado):** menú ☰ en el sitio público, el perfil del cliente y el panel de staff (hasta 1023 px de ancho); las tablas de Turnos y asistencia y de Pagos se muestran como tarjetas (hasta 1279 px); los botones miden 32 px de alto en todos los anchos. Hay una [pasada en celular](#uso-desde-el-celular) de las pantallas principales, una [auditoría responsive](#auditoría-responsive) de todas las rutas y la suite de pruebas end to end recorre las pantallas en escritorio y en celular.
+- **Tanda de comentarios del cliente (agregado, D90–D98):** Equipo y Recovery Room como contenido fijo del sitio, datos de contacto editables, mails nuevos y pie de contacto, Google Calendar para Rehab, débito automático con Mercado Pago, aclaración de la regla de plan vigente en Performance y la auditoría responsive. Cada tema tiene su sección en las partes 1 y 2; lo que queda abierto está en [qué queda abierto al cerrar la tanda de comentarios del cliente](#qué-queda-abierto-al-cerrar-la-tanda-de-comentarios-del-cliente).
 - **Dominio:** el sitio actual de MOVE está en `moveperformance.uy`. El dominio de la plataforma nueva **no está decidido**; este manual usa `<dominio>` (y `api.<dominio>` para la API) como marcador. El código no tiene ningún dominio fijo: todo sale de variables de entorno.
 
 ### Deuda conocida y comportamientos a tener presentes
@@ -319,7 +327,32 @@ También siguen abiertos los valores provisorios de Configuración y la cuenta d
 - `apps/api/test/webhook.e2e-spec.ts` espera los bloqueos de Postgres con un bucle propio, en lugar del helper compartido `waitForLockWaiters` (`apps/api/test/utils/db.ts`) que usan los demás specs.
 - Dos detalles cosméticos en tests de la web: falta una línea en blanco entre dos tests de `turnos-view.test.tsx`, y el test de `clients-view.test.tsx` sobre una búsqueda igual a la de la URL también pasa sin el guard `latestQ` que cubre (ese comportamiento no se puede observar desde afuera).
 - La guarda de la base de las pruebas end to end (`scripts/e2e/env.mjs`) solo compara `DB_PORT` cuando está definido. Si no lo está y el contenedor `move-postgres` publica otro puerto que el 5432, `pnpm e2e:reset` borra y recrea la base en el contenedor, pero las migraciones y la API se conectan al Postgres del 5432 (el daño queda limitado a una base con nombre `move_e2e…`). Mientras tanto: exportar `DB_PORT` con el puerto que publica el contenedor.
-- `API_URL` y `WEB_URL` no son obligatorias en `manual:demo-data` y `manual:screenshots`: si faltan usan `http://localhost:3001/api` y `http://localhost:3000`. Los scripts rechazan destinos que no sean locales, pero si ahí corre otra aplicación con datos propios, escriben contra ella. Exportarlas siempre (ver [Regenerar este manual](#regenerar-este-manual)).
+
+
+### Qué queda abierto al cerrar la tanda de comentarios del cliente
+
+La tanda de comentarios del cliente (14/10/2026) sumó el Equipo y Recovery Room, los datos de contacto editables, los emails nuevos con pie de contacto, la sincronización de Rehab con Google Calendar, el débito automático con Mercado Pago y una auditoría responsive de todas las pantallas. Todo funciona en local; esto es lo que quedó sin resolver.
+
+**Decisiones de producto pendientes** (de MOVE o del usuario; ninguna se tomó en el código):
+
+| Tema | Qué falta decidir | Dónde está el detalle |
+|---|---|---|
+| Sesiones de los débitos de paquetes (D118) | Cada cobro de un débito de un paquete Recovery entrega las sesiones que el paquete tiene **en ese momento**, pero cobra el monto fijado al contratar. Si el staff cambia la cantidad de sesiones de un paquete, los débitos ya contratados heredan la cantidad nueva con el monto viejo. Decidir si MOVE quiere eso o si cada débito debe quedar fijo con lo que se contrató | [Pago único o débito automático](#pago-único-o-débito-automático) |
+| Avisos de Mercado Pago (D68), que sigue abierta | La decisión (a) o (b) también alcanza al débito: los avisos de la suscripción y de sus cobros usan la misma firma. Si no llegan firmados, la conciliación los cubre (refresca los débitos y aplica los cobros aprobados de los últimos 40 días), con demora | [Decisión D68](#decisión-d68-avisos-de-mercado-pago) |
+| Diferencias con el sitio actual que el cliente no pidió | El sitio actual (moveperformance.uy) tiene un **precio para socios con 50 % de descuento**, **códigos de descuento** y una condición para la **primera sesión**; la plataforma nueva no los tiene y no se relevó su detalle. Preguntarle a MOVE si los quiere | – |
+| Pruebas reales con los proveedores | Nada de esta tanda se probó con credenciales reales: hay un checklist por proveedor | [Mercado Pago](#prueba-real-de-mercado-pago-con-credenciales), [Google Calendar](#google-calendar-sincronización-de-rehab) y [Brevo](#prueba-real-de-brevo-con-credenciales) |
+
+**Deuda residual** (detalles menores que se decidió no arreglar; ninguno pone en riesgo datos, y el equipo técnico tiene el detalle en los reportes de revisión):
+
+- **Email de contacto en el formulario.** El formulario de Configuración → Contacto acepta algunos emails mal armados (por ejemplo, con dos puntos seguidos, como `ana..x@move.uy`) que la API rechaza: el staff ve el aviso genérico de error en lugar de "Ingresá un email válido." y no se guarda nada incorrecto.
+- **Enlace de Google Maps.** Pasa lo mismo con algunos enlaces `https://` incompletos (por ejemplo, `https://maps`): el formulario los deja pasar y la API los rechaza.
+- **Emails de contacto con `%`.** La API acepta que el email de contacto tenga el símbolo `%`. Como ese email se usa en el enlace `mailto:` público, un email con caracteres codificados podría armar un correo con destinatarios o texto de más en algunos programas de correo. Solo lo escribe el staff: no cargar emails con `%`.
+- **Error de débitos en el perfil.** Si falla un momento la carga de los débitos, el perfil de **todos** los clientes muestra el mismo aviso de error dos veces (uno en la tarjeta del plan y otro en la de paquetes), aunque no tengan débito.
+- **Botón "Atrás".** Si el cliente vuelve con "Atrás" desde Mercado Pago o el staff desde Google, algunos navegadores restauran la página con los botones ya deshabilitados (**Conectar Google Calendar**, **Pagar**, la forma de pago): hace falta recargar. No se probó en un navegador real.
+- **Calendario con error persistente.** Si Google falla de forma continua, desde la sexta pasada (cada 5 minutos) se repite la liberación de los bloqueos y su registro en el log mientras dure el error; el email al staff sale una sola vez por día.
+- **Test de la página de inicio.** Está atado a la estructura interna de la página (si se renombra la sección Dónde estamos, falla con un mensaje que no lo explica). Es deuda de tests: no cambia lo que ve nadie.
+
+**Lo que sigue igual.** No hay deploy (D51) ni credenciales reales de ningún proveedor; el repositorio todavía no está conectado a un CI (ver [Dónde vive el repositorio](#dónde-vive-el-repositorio)). El diagrama de arquitectura no se actualizó con Google Calendar ni con el débito: están descritos en el texto de la [Arquitectura](#arquitectura).
 
 ---
 
@@ -327,7 +360,7 @@ También siguen abiertos los valores provisorios de Configuración y la cuenta d
 
 ### Sitio público
 
-No hace falta tener cuenta para mirar el sitio. La barra de arriba tiene **Inicio**, **Performance**, **Rehab**, **Recovery** y **Planes**, el botón **Ingresar** y el botón **Reservar**. En el celular la barra se reemplaza por un botón de menú (☰) arriba a la derecha: abre la lista de secciones, **Cerrar menú** la cierra y al elegir una sección el menú se cierra solo. Lo mismo ocurre en el perfil del cliente (el botón queda junto a la campana de avisos) y en el panel de staff (el botón queda arriba a la izquierda).
+No hace falta tener cuenta para mirar el sitio. La barra de arriba tiene **Inicio**, **Equipo**, **Performance**, **Rehab**, **Recovery** y **Planes**, el botón **Ingresar** y el botón **Reservar**. Al pie de todas las páginas públicas figuran la dirección, los horarios, el WhatsApp, el Instagram, el email y el link al mapa de MOVE (los edita el staff en [Contacto](#contacto)); si no se pueden cargar, el pie se muestra sin ese bloque. En el celular la barra se reemplaza por un botón de menú (☰) arriba a la derecha: abre la lista de secciones, **Cerrar menú** la cierra y al elegir una sección el menú se cierra solo. Lo mismo ocurre en el perfil del cliente (el botón queda junto a la campana de avisos) y en el panel de staff (el botón queda arriba a la izquierda).
 
 #### Inicio
 
@@ -335,13 +368,21 @@ Presenta los tres servicios de MOVE y lleva a **Ver planes** o a **Reservar Reco
 
 ![Inicio](img/01-inicio.png)
 
+Más abajo está la sección **Equipo** ("El equipo detrás de MOVE", a la que también lleva **Equipo** en la barra): presenta a Pierina Paladini, Gianluca Pasini y Leandro Olenchuk con su foto, su rol, una biografía breve y sus especialidades. Las fotos y los textos son **fijos** (salen del sitio actual de MOVE, moveperformance.uy) y no se editan desde el panel.
+
+![Inicio: Equipo](img/39-inicio-equipo.png)
+
+Al final del inicio, **Dónde estamos** muestra la dirección, los horarios, el WhatsApp, el Instagram y el email de MOVE, con los botones **Abrir en Google Maps** y **Escribinos por WhatsApp**. Solo aparece lo que el staff completó.
+
+![Inicio: Dónde estamos](img/40-inicio-donde-estamos.png)
+
 #### Performance
 
 Entrenamiento semi personalizado por reserva, sin límite semanal de asistencias mientras tu plan esté vigente. La página muestra los planes y, más abajo, la sección **Horarios y cupos**.
 
 ![Performance](img/02-performance.png)
 
-En **Horarios y cupos** elegís el día y ves cada horario con su cupo en tiempo real (por ejemplo, `5 / 14 cupos`). Para reservar necesitás un plan vigente; si tu plan venció, la plataforma bloquea nuevas reservas y te lleva a renovar.
+En **Horarios y cupos** elegís el día y ves cada horario con su cupo en tiempo real (por ejemplo, `5 / 14 cupos`). Para reservar necesitás un plan vigente; si tu plan venció, la plataforma bloquea nuevas reservas y te lleva a renovar. El recuadro **Plan vigente:** de la página lo resume como una regla: para reservar necesitás un plan activo en la fecha del turno y, si tu plan vence, lo renovás desde tu perfil para seguir reservando.
 
 ![Performance: horarios y cupos](img/03-performance-horarios.png)
 
@@ -360,6 +401,10 @@ La reserva tiene cuatro pasos: **Evaluación → Fecha y horario → Pago → Co
 Recovery Room by MOVE está abierta a todo público, sin plan previo. Podés pagar una **sesión individual** o contratar un **paquete** de 4 u 8 sesiones.
 
 ![Recovery](img/06-recovery.png)
+
+Entre la presentación y las modalidades está **Recovery Room by MOVE**: un texto sobre el espacio, tres fotos (el sillón de gravedad cero, el sauna infrarrojo y el panel de luz roja e infrarroja) y cinco tarjetas con lo que ofrece: botas de presoterapia, luz roja e infrarroja, sauna infrarrojo, meditación y respiración, y sillón de gravedad cero. Igual que el Equipo, es contenido fijo.
+
+![Recovery Room](img/41-recovery-room.png)
 
 En **Reservá tu sesión** elegís la modalidad (**Sesión individual** o **Paquete**), el día y el horario. La sesión individual se paga en el momento y se puede reservar sin tener cuenta. Los paquetes duran 30 días desde la compra y las sesiones que no uses vencen al final.
 
@@ -382,6 +427,8 @@ Compará los planes de Performance (Mensual, Trimestral, Semestral) y de Recover
 | Sesión individual (Recovery) | $ 900 | 45 minutos |
 | Paquete 4 sesiones (Recovery) | $ 3.200 | 4 sesiones en 30 días |
 | Paquete 8 sesiones (Recovery) | $ 5.900 | 8 sesiones en 30 días |
+
+Los planes que el staff marca con **Permite débito automático** (en la semilla, el Plan Mensual de Performance y los paquetes de Recovery de 4 y 8 sesiones) se pueden contratar también con [débito automático](#pago-único-o-débito-automático).
 
 #### Reservar
 
@@ -441,6 +488,28 @@ Si el pago de un plan sigue pendiente después de la espera (por ejemplo, porque
 
 **Límites del checkout.** Para evitar abusos, cada persona puede tener como máximo **2 reservas pendientes de pago** a la vez: si intentás una tercera, ves "Ya tenés reservas pendientes de pago. Completá el pago o esperá a que venzan." (las retenidas vencen a los 15 minutos). Además, el checkout acepta hasta 10 intentos por minuto desde una misma conexión y, al reservar una sesión de Rehab o Recovery, hasta 20 intentos por hora desde esa misma conexión: si superás cualquiera de los dos límites, ves "Hiciste demasiados intentos. Esperá un rato y probá de nuevo." Los intentos se cuentan por conexión a internet: las personas que usan la misma red (por ejemplo, el wifi del gimnasio) comparten el límite.
 
+#### Pago único o débito automático
+
+En los planes que lo permiten, el checkout ofrece dos formas de pago: **Pago único** (lo de arriba) y **Débito automático**, que cobra el plan solo, en cada período, con la suscripción de Mercado Pago. Al elegir el débito, el botón pasa a **Activar débito automático** y el texto dice cada cuánto se cobra (cada mes en los planes de Performance, cada 30 días en los paquetes) y que podés cancelarlo cuando quieras desde tu perfil.
+
+![Checkout con débito automático](img/44-checkout-plan-debito.png)
+
+Cómo funciona:
+
+- **Primer cobro.** Si ya tenés un plan de Performance vigente, el checkout avisa "El primer cobro es el dd/mm, cuando termina tu plan actual": se cobra el día siguiente al fin de lo que ya pagaste, así no pagás dos veces el mismo tiempo. Sin plan vigente, o en Recovery, el primer cobro es en el momento de autorizar.
+- **Monto fijo.** Se cobra lo que aceptaste al contratar, aunque después cambie el precio del plan.
+- **Uno por servicio.** Podés tener un débito activo de Performance y otro de Recovery. Con un débito activo de Performance el checkout no deja comprar un plan de Performance con pago único: avisa "Ya tenés débito automático activo para Performance" y te lleva a gestionarlo en tu perfil. En Recovery sí podés comprar un paquete suelto aunque tengas débito. Si empezás un débito nuevo del mismo servicio mientras otro quedó sin autorizar, el anterior se cancela.
+- **Sin autorizar en 24 horas**, el débito se cancela solo.
+- **Cada cobro aprobado** activa el plan o paquete en el momento (en Performance, a continuación del período vigente) y queda registrado en Pagos. **Si un cobro es rechazado** recibís el email "No pudimos cobrar tu plan de MOVE" y Mercado Pago reintenta solo. **Si el débito se cancela** (desde tu perfil, desde Mercado Pago o por el staff) recibís el email "Tu débito automático en MOVE fue cancelado"; lo que ya pagaste sigue vigente. No hay pausa: se cancela y se contrata de nuevo.
+
+En desarrollo, después de **Activar débito automático** aparece el **simulador de débito automático** en lugar de Mercado Pago, con **Autorizar** (te lleva al resultado), **Cobrar ciclo (aprobado)**, **Cobrar ciclo (rechazado)** y **Cancelar**.
+
+![Simulador de débito automático (solo desarrollo)](img/45-checkout-simulado-debito.png)
+
+El resultado muestra "Confirmando tu débito" mientras espera la autorización (pasado un rato, "Débito en proceso" con **Intentar de nuevo**), "Débito automático activo" con el plan, el monto de cada cobro y el próximo cobro, o "Débito no activado" si se canceló o no se autorizó.
+
+![Resultado del débito automático](img/46-checkout-resultado-debito.png)
+
 ### Mi perfil
 
 Es tu pantalla principal. Muestra:
@@ -448,11 +517,16 @@ Es tu pantalla principal. Muestra:
 - **Tu plan de Performance** (estado Activo, Por vencer o Vencido), desde cuándo está vigente, cuándo vence, el progreso del período y el botón **Renovar plan**.
 - **Paquetes Recovery**: cuántas sesiones te quedan y cuándo vence el paquete.
 - **Próximas reservas**, cada una con su botón **Cancelar**. Una reserva que está retenida esperando el pago (por ejemplo, una evaluación de Rehab que todavía no pagaste) muestra el aviso **Pago pendiente**; si no se completa el pago a tiempo, la reserva se libera sola.
+- **Débito automático** (si tenés uno): en la tarjeta del plan de Performance o de los paquetes figura "Débito automático activo · próximo cobro dd/mm" (o "pendiente de autorización") y el botón **Cancelar débito**, con confirmación: lo que ya pagaste sigue vigente hasta el último día cubierto.
 - **Reservar**: accesos directos a Performance y Recovery.
 - **Avisos** (también desde la campana de arriba): plan por vencer o vencido, check-in pendiente o respondido y paquete con pocas sesiones.
 - **Tu mes en MOVE**: asistencias del mes y veces por semana.
 
 ![Mi perfil](img/17-perfil.png)
+
+Con un débito automático activo (en la captura, Martín Rodríguez), la tarjeta del plan suma una línea con el próximo cobro y **Cancelar débito**.
+
+![Mi perfil con débito automático](img/47-perfil-debito.png)
 
 **Reservar Performance.** Con un plan vigente, elegí el día y el horario en **Performance → Horarios y cupos** (o desde **Reservar**). Podés reservar hasta 14 días hacia adelante. Si el turno se llenó, la plataforma avisa que está completo; si no tenés plan vigente, avisa que necesitás uno.
 
@@ -483,6 +557,20 @@ Lista tu actividad (reservas, pagos, asistencias, ausencias, no shows y cancelac
 Si tenés un plan de Performance vigente y no estás en pausa, una vez por mes recibís un email con el link al **check-in**: tres preguntas de un minuto (cómo te sentís con el entrenamiento, si sentiste alguna molestia y si cambiaron tus objetivos). Si contás una molestia o querés ajustar objetivos, el equipo lo ve y se comunica con vos.
 
 ![Check-in](img/21-check-in.png)
+
+### Emails que recibís
+
+Además de los de ingreso y pagos, MOVE te escribe por estos motivos (todos terminan con la dirección, los horarios, el WhatsApp y el Instagram de MOVE, para que sepas cómo contactar al equipo):
+
+| Email | Cuándo llega |
+|---|---|
+| **Cancelaste tu reserva en MOVE** | Cancelás una reserva desde tu perfil |
+| **Tu reserva en MOVE no se confirmó** | El pago se rechazó o la reserva retenida venció antes de pagarse; trae el link para volver a reservar |
+| **Te esperamos mañana en MOVE** | A las 18:00 del día anterior a un turno de Rehab o Recovery, **incluso si estás en pausa** (es un aviso del servicio, no de seguimiento) |
+| **No pudimos cobrar tu plan de MOVE** | Mercado Pago rechazó un cobro de tu débito automático |
+| **Tu débito automático en MOVE fue cancelado** | Se canceló tu débito; indica hasta cuándo sigue vigente lo que ya pagaste |
+
+La lista completa de emails, con su vista previa, está en [Qué emails manda el sistema](#qué-emails-manda-el-sistema).
 
 ---
 
@@ -528,6 +616,10 @@ Al abrir un cliente ves su plan y paquetes, las **métricas** (frecuencia semana
 
 ![Detalle del cliente](img/28-staff-cliente-detalle.png)
 
+**Débito automático.** Si el cliente tiene débitos automáticos, la sección **Débito automático** de su ficha los lista, del más reciente al más antiguo, con el plan, el estado (**Pendiente de autorización**, **Activo** o **Cancelado**), el monto, cada cuánto se cobra y el próximo cobro. **Cancelar débito** pide confirmación: lo que el cliente ya pagó sigue vigente y Mercado Pago deja de cobrar los próximos ciclos.
+
+![Detalle del cliente con débito automático](img/48-staff-cliente-debito.png)
+
 ### Turnos y asistencia
 
 Elegí el día (con las flechas o el calendario) y el servicio (**Performance**, **Recovery** o **Fisioterapia**). Los botones de horario cambian de turno. Arriba se ve cuántas reservas tiene (`5/14`), cuántos presentes, cuántos ausentes y no shows y las cancelaciones; abajo, la lista de alumnos con su plan, su última asistencia y su estado.
@@ -535,6 +627,10 @@ Elegí el día (con las flechas o el calendario) y el servicio (**Performance**,
 ![Turnos y asistencia](img/29-staff-turnos.png)
 
 En el celular cada alumno se muestra como una **tarjeta** (nombre, plan, última asistencia y estado) con **P**, **A**, **NS** y **Cancelar** a la vista, sin deslizar la tabla hacia los costados.
+
+**Google Calendar.** Un turno de Rehab que la agenda de Google marca como ocupado muestra **Ocupado en Google Calendar** y no se puede reservar. Si ese turno ya tenía una reserva, la marca es **Conflicto con Google Calendar**: la reserva **no se cancela sola**, el staff recibe un email para resolverlo con el cliente . En la captura, el turno de Federico está marcado a mano en los datos de demostración, sin Google conectado (ver [Calendario](#calendario)).
+
+![Turno de Rehab en conflicto con Google Calendar](img/50-staff-turnos-conflicto.png)
 
 **Marcar asistencia.** Con los botones de cada alumno:
 
@@ -553,6 +649,10 @@ Ninguno tiene penalidad por ahora. Sin marcar, el alumno figura como **Pendiente
 Lista las operaciones, de la más reciente a la más antigua, con cliente, ítem, servicio, monto, método (Mercado Pago, efectivo o transferencia) y estado. Filtrá por **Estado** (Aprobados, Pendientes, Rechazados, Expirados), por **Método** o con **Requieren atención**.
 
 ![Pagos](img/30-staff-pagos.png)
+
+El filtro **Origen** separa los **Pago único** de los **Débito automático**: los cobros del débito llevan el distintivo **Débito automático** junto al método. En la captura, el filtro está en Débito automático y muestra el primer cobro del paquete de Camila Fernández.
+
+![Pagos filtrados por débito automático](img/49-staff-pagos-debito.png)
 
 En el celular cada operación se muestra como una **tarjeta** con sus datos (fecha, cliente, ítem, servicio, monto, método y estado), y los filtros y **Registrar pago manual** quedan a la vista sin deslizar.
 
@@ -604,11 +704,11 @@ La pantalla muestra a la izquierda la **vista previa** de lo que ve el alumno y,
 
 ### Configuración
 
-La configuración tiene cuatro pestañas.
+La configuración tiene seis pestañas: **Planes**, **Horarios**, **Profesionales**, **Reglas**, **Contacto** y **Calendario**.
 
 #### Planes
 
-Alta, edición, desactivación y baja de los planes y paquetes, agrupados por servicio (Performance, Fisioterapia y Recovery): nombre, precio, período o sesiones y destacado. El identificador (slug) de un plan eliminado se puede reutilizar en un plan nuevo.
+Alta, edición, desactivación y baja de los planes y paquetes, agrupados por servicio (Performance, Fisioterapia y Recovery): nombre, precio, período o sesiones y destacado. La casilla **Permite débito automático** (solo para planes por período y paquetes de sesiones) habilita el débito automático en ese plan. El identificador (slug) de un plan eliminado se puede reutilizar en un plan nuevo.
 
 ![Configuración: planes](img/35-staff-configuracion-planes.png)
 
@@ -632,6 +732,64 @@ Acá se editan los umbrales del sistema: horas para cancelar (2), días de reser
 
 Mientras el aviso **"Valores provisorios — confirmar con MOVE"** esté visible, los planes, precios, horarios y umbrales son los del mockup y **no están confirmados**. Cuando MOVE los defina, se editan en estas pestañas y se tilda **Marcar los valores como confirmados**.
 
+#### Contacto
+
+Acá se editan los datos de contacto de MOVE: **Dirección**, **Horarios**, **WhatsApp**, **Instagram**, **Email de contacto** y **Enlace de Google Maps**, más el **Email para avisos del staff**. Los seis primeros se muestran en el pie del sitio, en **Dónde estamos** del inicio y al pie de todos los emails a clientes; un campo vacío no se muestra. Los valores iniciales son los del sitio actual de MOVE (el email de contacto arranca vacío).
+
+![Configuración: contacto](img/42-staff-configuracion-contacto.png)
+
+El formulario valida cada campo y lo marca con un texto en español: dirección y horarios hasta 200 caracteres; WhatsApp con `+` y entre 8 y 15 dígitos (se permiten espacios); Instagram con `@` y hasta 30 letras, números, puntos o guiones bajos; emails válidos; el enlace de Maps tiene que empezar con `https://`. **Guardar** confirma con "Contacto guardado."
+
+El **Email para avisos del staff** recibe los avisos de las reservas de Rehab (confirmadas o canceladas) y los de Google Calendar (conflicto y desconexión). Si está vacío no se manda ningún aviso y no pasa nada más: es opcional.
+
+#### Calendario
+
+Sincroniza las reservas de **Rehab** con **un solo Google Calendar de MOVE**, en los dos sentidos:
+
+- **De MOVE a Google** (cada minuto): cada reserva de Rehab confirmada crea un evento ("Rehab · Evaluación — Nombre Apellido" o "Rehab · Seguimiento — …", con el profesional en la descripción; solo lleva el nombre del cliente) y, si la reserva se cancela, el evento se borra.
+- **De Google a MOVE** (cada 5 minutos): los eventos **ocupados** del calendario (confirmados o tentativos, que no sean "libres", que no haya declinado el calendario y que no haya creado MOVE) bloquean los turnos de Rehab con los que se pisan, desde hoy hasta la ventana de reserva más un día. Un evento de día completo bloquea el día entero. Un turno bloqueado **no se puede reservar** por ninguna vía (cliente con sesión, invitado o seguimiento fisioterapéutico).
+
+La pestaña muestra uno de estos estados:
+
+| Estado | Qué se ve | Qué hacer |
+|---|---|---|
+| **No configurado** | "Falta configurar Google en el servidor: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y CALENDAR_TOKEN_KEY." (captura de abajo) | Lo resuelve el equipo técnico: [Google Calendar](#google-calendar-sincronización-de-rehab) |
+| **Desconectado** | Una explicación y **Conectar Google Calendar** | Abre la pantalla de consentimiento de Google. Al volver, un aviso dice "Google Calendar conectado" o "No pudimos conectar Google Calendar. Probá de nuevo." |
+| **Conectado, sin calendario** | La cuenta conectada y el selector **Calendario de MOVE** ("Elegí un calendario"; el principal figura como "(principal)") con **Guardar** | Elegir el calendario donde MOVE va a escribir (solo aparecen los que tienen permiso de escritura). Si la cuenta no tiene ninguno, avisa y ofrece **Reconectar** con otra |
+| **Conectado** | Cuenta, calendario y **última sincronización**; **Sincronizar ahora** y **Desconectar** | **Sincronizar ahora** corre las dos sincronizaciones en el momento. **Desconectar** pide confirmación: los turnos ocupados vuelven a poder reservarse y **los eventos ya creados quedan en Google** |
+| **Requiere reconexión** | "Perdimos el acceso a Google Calendar…" y **Reconectar** | Reconectar con la cuenta. Mientras tanto los bloqueos se liberaron y las reservas nuevas no se sincronizan; al reconectar se crean los eventos pendientes |
+
+![Configuración: calendario (sin configurar)](img/43-staff-configuracion-calendario.png)
+
+**Conflictos.** Si un horario ocupado en Google cae sobre un turno que **ya tiene una reserva**, la reserva **no se cancela**: el turno queda marcado **Conflicto con Google Calendar** en [Turnos y asistencia](#turnos-y-asistencia) y el staff recibe el email "Conflicto en Google Calendar" (uno por reserva en conflicto). **Errores.** Si Google falla por un momento (red, error del servidor o límite de uso), se mantienen los bloqueos y se reintenta solo. Si Google revoca el acceso, el estado pasa a **Requiere reconexión**, los turnos se liberan y el staff recibe el email "Google Calendar se desconectó de MOVE" (como máximo uno por día).
+
+### Uso desde el celular
+
+En pantallas de hasta 1023 px de ancho el sitio público, el perfil del cliente y el panel de staff se manejan con el menú **☰**; las tablas de **Turnos y asistencia** y **Pagos** se muestran como tarjetas hasta 1279 px y los botones miden 32 px de alto en todos los anchos. Las capturas de esta pasada son de 390 × 844 px.
+
+<table>
+  <tr>
+    <td align="center"><img src="img/m01-inicio.png" alt="Inicio en el celular" width="200" style="width:44mm"><br><sub>Inicio</sub></td>
+    <td align="center"><img src="img/m02-menu-publico.png" alt="Menú del sitio en el celular" width="200" style="width:44mm"><br><sub>Menú del sitio</sub></td>
+    <td align="center"><img src="img/m03-recovery-room.png" alt="Recovery Room en el celular" width="200" style="width:44mm"><br><sub>Recovery Room</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="img/m04-planes.png" alt="Planes en el celular" width="200" style="width:44mm"><br><sub>Planes</sub></td>
+    <td align="center"><img src="img/m05-perfil.png" alt="Perfil con débito automático en el celular" width="200" style="width:44mm"><br><sub>Perfil con débito automático</sub></td>
+    <td align="center"><img src="img/m06-checkout-plan-debito.png" alt="Checkout con débito en el celular" width="200" style="width:44mm"><br><sub>Checkout con débito</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="img/m07-staff-dashboard.png" alt="Staff: Dashboard en el celular" width="200" style="width:44mm"><br><sub>Staff: Dashboard</sub></td>
+    <td align="center"><img src="img/m08-staff-turnos.png" alt="Staff: Turnos y asistencia en el celular" width="200" style="width:44mm"><br><sub>Staff: Turnos y asistencia</sub></td>
+    <td align="center"><img src="img/m09-staff-pagos.png" alt="Staff: Pagos en el celular" width="200" style="width:44mm"><br><sub>Staff: Pagos</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="img/m10-staff-configuracion-contacto.png" alt="Staff: Configuración, Contacto en el celular" width="200" style="width:44mm"><br><sub>Staff: Configuración, Contacto</sub></td>
+  </tr>
+</table>
+
+La [auditoría responsive](#auditoría-responsive) revisa todas las rutas.
+
 ---
 
 ## Parte 3: Cómo levantar todo
@@ -650,15 +808,20 @@ MOVE es un monorepo con dos aplicaciones: la web (`apps/web`, Next.js) y la API 
 6. La API manda los emails por Brevo.
 7. El navegador paga en la página de Mercado Pago y vuelve a la web (`/checkout/resultado`).
 8. Con Google, el navegador pasa por la pantalla de consentimiento y Google vuelve a la API (`/api/auth/callback/google`).
+9. Para sincronizar Rehab, el staff conecta su cuenta de Google desde Configuración → Calendario (otro consentimiento de Google, que vuelve a `/api/calendar/oauth/callback`); la API guarda el token cifrado, crea y borra eventos y lee los horarios ocupados.
+10. Para el débito automático, la API crea la suscripción (`preapproval`) en Mercado Pago, que cobra cada ciclo y avisa por webhook; la conciliación lo respalda.
+
+Los puntos 9 y 10 no figuran en el diagrama.
 
 Hoy **nada de esto está en la nube**: todo corre en una computadora, con Postgres en Docker y reemplazos de desarrollo para los proveedores:
 
 | Pieza | En local, sin credenciales | Con credenciales |
 |---|---|---|
 | Base de datos | Postgres 17 en Docker (`pnpm db:up`, contenedor `move-postgres`) | Neon |
-| Mercado Pago | **Simulador de pagos**: el checkout lleva a `/checkout/simulado`, donde se aprueba o rechaza la compra. Solo existe sin `MP_ACCESS_TOKEN` y con `NODE_ENV` distinto de `production` (en producción la API ni siquiera lo monta) | Checkout Pro real, webhook y conciliación |
+| Mercado Pago | **Simulador de pagos**: el checkout lleva a `/checkout/simulado`, donde se aprueba o rechaza la compra; también simula el débito automático (autorizar, cobrar un ciclo aprobado o rechazado y cancelar). Solo existe sin `MP_ACCESS_TOKEN` y con `NODE_ENV` distinto de `production` (en producción la API ni siquiera lo monta) | Checkout Pro real, webhook y conciliación |
 | Brevo | **Dry-run**: no sale ningún email; cada uno queda en la tabla `email_logs` con estado `skipped` y como línea de log (`email skipped <plantilla> user=<id>`), sin datos personales | Envío real |
 | Google | Botón oculto | Botón **Continuar con Google** |
+| Google Calendar | La pestaña Calendario avisa que falta configurar (sin `CALENDAR_TOKEN_KEY` ni credenciales de Google) | Sincronización de Rehab |
 | Jobs | Corren dentro de la API, igual que en producción | Igual |
 
 ### Local, paso a paso
@@ -741,9 +904,16 @@ Requisitos: Node 24 (`nvm use` lee `.nvmrc`), pnpm 10 (`corepack enable`) y Dock
    curl -X POST http://localhost:3001/api/staff/automations/run/<job> --cookie "<cookie de sesión del staff>"
    ```
 
-   Jobs: `followup-detect`, `checkins-monthly`, `expiry-reminders`, `generate-slots`, `expire-holds` y `reconcile-payments`. La cookie se copia del header `Cookie` de cualquier request a la API en las herramientas de desarrollo del navegador. La corrida manual funciona aunque `SCHEDULER_ENABLED=false`, usa el mismo lock que el cron y es idempotente.
+   Jobs: `followup-detect`, `checkins-monthly`, `expiry-reminders`, `generate-slots`, `expire-holds`, `reconcile-payments` y `booking-reminders` (recordatorios del día siguiente). Los dos de Google Calendar corren solos (cada minuto y cada 5 minutos) y se disparan a mano con **Configuración → Calendario → Sincronizar ahora**. La cookie se copia del header `Cookie` de cualquier request a la API en las herramientas de desarrollo del navegador. La corrida manual funciona aunque `SCHEDULER_ENABLED=false`, usa el mismo lock que el cron y es idempotente.
 
-9. **Tests.**
+9. **Probar el débito automático.** Sin Mercado Pago, con el simulador: ingresá como cliente, abrí un plan que lo permita (`/checkout/plan/performance-mensual`, `recovery-paquete-4` o `recovery-paquete-8`), elegí **Débito automático**, **Activar débito automático** y, en el simulador, **Autorizar**. Probá también **Cobrar ciclo (aprobado)**, **Cobrar ciclo (rechazado)** y **Cancelar** (o **Cancelar débito** desde **Mi perfil** o desde la ficha del cliente en el panel). Por API: `POST /api/payments/dev/simulate-auto-debit` con `{ "externalReference": "<ref>", "action": "authorize" | "charge_approved" | "charge_rejected" | "cancel" }`; solo existe sin `MP_ACCESS_TOKEN` y fuera de producción. Los emails de cobro rechazado y de cancelación quedan en `email_logs` (dry-run). Los datos de demostración ya traen dos débitos (Martín y Camila).
+
+10. **Probar Google Calendar y ver los emails.**
+
+    - Sin credenciales, **Configuración → Calendario** avisa que falta configurar. Para probar la conexión real hace falta un cliente OAuth de Google (ver [Google Calendar](#google-calendar-sincronización-de-rehab)): en la consola de la API exportá `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y `CALENDAR_TOKEN_KEY` (generada con `openssl rand -base64 32`, sin guardarla en ningún archivo), registrá en Google la redirect URI `http://localhost:3001/api/calendar/oauth/callback` y reiniciá la API. Después: **Conectar Google Calendar**, elegí el calendario y creá una reserva de Rehab (aparece el evento en Google) o un evento ocupado en Google sobre un turno de Rehab (el turno pasa a **Ocupado en Google Calendar** en unos minutos, o al instante con **Sincronizar ahora**).
+    - Para ver cómo se ven todos los emails sin base ni red: `pnpm --filter @move/api emails:preview` genera un HTML por plantilla en `apps/api/tmp/email-preview/` (carpeta ignorada por git) y un `index.html` que los lista; abrilo en el navegador.
+
+11. **Tests.**
 
    ```bash
    pnpm lint                                              # oxlint (API) y ESLint (web)
@@ -840,6 +1010,7 @@ Todas las variables de la API se validan al arrancar (`apps/api/src/config/env.v
 | `TRUST_PROXY_HOPS` | AWS | Fijo para ALB + Nginx | `2` | `2` |
 | `SCHEDULER_ENABLED` | AWS | `true` en una sola instancia | `true` | `true` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google | Cliente OAuth web (el secreto se ve una sola vez) | opcional | opcional (las dos o ninguna) |
+| `CALENDAR_TOKEN_KEY` | Google Calendar | Generarla: `openssl rand -base64 32` (32 bytes en base64). Cifra el token del calendario conectado y firma el `state` de OAuth; cambiarla obliga a reconectar. La sincronización de Rehab necesita además las dos de Google. Si está definida con otro largo, la API no arranca | opcional | opcional |
 | `MP_ACCESS_TOKEN` | Mercado Pago | **Tus integraciones** → la aplicación → credenciales | de prueba | productivo |
 | `MP_WEBHOOK_SECRET` | Mercado Pago | **Webhooks** de la aplicación → clave secreta | de la aplicación | de la aplicación |
 | `BREVO_API_KEY` | Brevo | **Settings → SMTP & API → API Keys** (se ve una sola vez) | `move-dev` | `move-prod` |
@@ -984,7 +1155,7 @@ Valores de cada ambiente:
 3. **Webhook y clave secreta.** En la aplicación, **Webhooks → Configurar notificaciones** ([webhooks](https://www.mercadopago.com.uy/developers/es/docs/your-integrations/notifications/webhooks)):
    - **URL modo pruebas:** `https://api.<dominio-dev>/api/payments/webhook/mercadopago`.
    - **URL modo producción:** `https://api.<dominio>/api/payments/webhook/mercadopago`.
-   - Evento: **Pagos** (`payment`). La API ignora los demás tipos.
+   - Eventos: **Pagos** (`payment`) y, para el débito automático, los de la **suscripción** (`subscription_preapproval`, cambios de estado) y de los **pagos de la suscripción** (`subscription_authorized_payment`, cada cobro). Misma clave secreta y misma firma. La API ignora los demás tipos. Confirmar en el panel los nombres exactos de cada tema.
    - Al guardar se genera la **clave secreta** de esa aplicación: copiarla a `MP_WEBHOOK_SECRET`. Con una sola aplicación, la misma clave queda en los dos ambientes (la única credencial compartida); con la opción (b) de [D68](#decisión-d68-avisos-de-mercado-pago), cada ambiente tiene su aplicación y su clave. **Restablecer** la cambia: actualizar la variable enseguida, o los avisos firmados empiezan a responder 401.
 
    La API verifica la firma de cada aviso con formato Webhooks (`x-signature` con HMAC-SHA256 sobre `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`): sin firma válida responde 401 sin efectos. Hoy, además, cada preferencia lleva su propia `notification_url` (`${API_PUBLIC_URL}/api/payments/webhook/mercadopago`), que según Mercado Pago tiene prioridad sobre la URL del panel; por eso `API_PUBLIC_URL` tiene que ser pública y HTTPS. Mientras sea así (decisión abierta [D68](#decisión-d68-avisos-de-mercado-pago)):
@@ -993,6 +1164,7 @@ Valores de cada ambiente:
 4. **URLs de retorno.** No se configuran en el panel: la API las manda en cada preferencia (`back_urls` a `${WEB_URL}/checkout/resultado?ref=<referencia>`, con `auto_return: approved`) ([URLs de retorno](https://www.mercadopago.com.uy/developers/es/docs/checkout-pro-preferences/configure-back-urls)).
 5. **Cuentas y tarjetas de prueba.** En la aplicación, **Cuentas de prueba → Crear cuenta de prueba**: una **Vendedor** y una **Comprador**, país Uruguay (no se puede cambiar después) ([cuentas de prueba](https://www.mercadopago.com.uy/developers/es/docs/checkout-pro-preferences/test-accounts)). Pagar con la cuenta compradora en una ventana privada, con las tarjetas de prueba de Uruguay; el nombre del titular define el resultado (`APRO` aprobado, `OTHE` rechazado, etc.) ([compras de prueba](https://www.mercadopago.com.uy/developers/es/docs/checkout-pro-preferences/integration-test/test-purchases)).
 6. **Pasaje a producción.** Cuando el circuito completo funciona en desarrollo: **Datos de integración → Credenciales → Productivas → Activar credenciales** (industria, sitio web, términos), y copiar el Access Token productivo a `MP_ACCESS_TOKEN` del ambiente de producción ([salir a producción](https://www.mercadopago.com.uy/developers/es/docs/checkout-pro-preferences/go-to-production)). Mercado Pago exige HTTPS en producción.
+7. **Débito automático (Suscripciones).** El débito usa la API de suscripciones (`preapproval`) con el mismo `MP_ACCESS_TOKEN`: no hay que configurar otra cosa en el panel, pero **Suscripciones tiene que estar habilitado para la cuenta de Uruguay** (ver la prueba real de abajo). El staff elige qué planes lo permiten con **Permite débito automático** en Configuración → Planes. La API manda en cada suscripción `back_url` a `${WEB_URL}/checkout/resultado?debito=<referencia>` y el email del cliente como `payer_email`.
 
 **Cómo probarlo.** Los pagos hechos con credenciales de prueba pueden no generar avisos, así que en desarrollo la firma y el pago se prueban por separado:
 
@@ -1000,6 +1172,17 @@ Valores de cada ambiente:
 2. **Pago (desarrollo):** contratar un plan desde `https://<dominio-dev>/planes` y pagar con la cuenta compradora de prueba (titular `APRO`). Si no llega ningún aviso, el pago entra por la **conciliación**: el job corre cada 10 minutos y consulta las compras pendientes con más de `reconcileAfterMinutes` (10, provisorio, en Configuración → Reglas), así que el plan puede tardar en activarse. Para no esperar, correr `reconcile-payments` a mano (paso 8 de [Local, paso a paso](#local-paso-a-paso)) pasados esos minutos.
 3. El plan queda activo en Mi perfil y la operación figura aprobada en **Pagos** del panel de staff. Repetir la conciliación o el aviso no duplica la suscripción ni extiende la vigencia dos veces.
 4. **Producción, con el primer pago real:** en CloudWatch tiene que aparecer `webhook payment=<id>` (aviso firmado aceptado). Si para ese pago solo hay respuestas 401 y el plan se activa recién con la conciliación, la firma de los avisos a la `notification_url` no valida: resolver [D68](#decisión-d68-avisos-de-mercado-pago) antes de seguir.
+
+#### Prueba real de Mercado Pago con credenciales
+
+Cuando haya credenciales (hoy el pago y el débito solo se probaron con el simulador):
+
+- [ ] **Suscripciones habilitado.** Confirmar que Suscripciones (`preapproval`) está habilitado para la cuenta de Uruguay. Si no lo está, al activar un débito el cliente ve "No pudimos iniciar el pago" (502 `PAYMENT_PROVIDER_ERROR`) y el débito queda cancelado.
+- [ ] **Usuarios de prueba.** Una cuenta **Vendedor** y una **Comprador** (paso 5) y un débito completo con la compradora.
+- [ ] **Email del pagador.** Verificar si Mercado Pago exige que el `payer_email` de la suscripción coincida con la cuenta de Mercado Pago del comprador (MOVE manda el email de la cuenta del cliente en MOVE). Si lo exige, hay que sumar al checkout un campo "email de tu cuenta de Mercado Pago": es un cambio de código.
+- [ ] **Webhook público y D68.** Con una URL pública (un túnel en pruebas) confirmar que llegan, con firma válida, los avisos de pago, de suscripción y de cobro de suscripción; si no, la conciliación los respalda (ver [D68](#decisión-d68-avisos-de-mercado-pago)).
+- [ ] **Ciclo completo.** Autorizar → el perfil muestra el próximo cobro → un cobro aprobado (una sola compra y un solo período aunque llegue por webhook y por conciliación) → un cobro rechazado (llega el email) → cancelar (llega el email y lo pagado sigue vigente).
+- [ ] **Primer cobro de Performance.** Con un plan vigente, el primer cobro tiene que caer el día siguiente a su fin (`start_date`); sin plan vigente y en Recovery, en el momento.
 
 **Errores comunes:**
 
@@ -1031,6 +1214,39 @@ Valores de cada ambiente:
 - **`redirect_uri_mismatch`:** el redirect URI no coincide exactamente (esquema, subdominio, `/api/auth/callback/google`, barra final) con `API_PUBLIC_URL`. Los cambios en Google pueden tardar de 5 minutos a unas horas.
 - **"Access blocked" para usuarios reales:** la app sigue en *Testing*.
 - **El botón aparece pero falla:** `NEXT_PUBLIC_GOOGLE_ENABLED=true` en la web sin `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` en la API de ese ambiente.
+
+### Google Calendar (sincronización de Rehab)
+
+**Acceso:** el proyecto de Google Cloud de MOVE (el mismo de [Google OAuth](#google-oauth-inicio-de-sesión-con-google) o uno propio), con permiso para habilitar APIs, editar la pantalla de consentimiento y crear o editar clientes OAuth. Es opcional: sin estas variables, **Configuración → Calendario** avisa "Falta configurar Google en el servidor" y todo lo demás funciona.
+
+**Cómo funciona.** El staff conecta **una** cuenta de Google desde Configuración → Calendario, con un consentimiento propio (distinto del de iniciar sesión con Google, con los permisos `openid email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly`). La API guarda el token de acceso **cifrado** (AES-256-GCM) con `CALENDAR_TOKEN_KEY`; nunca aparece en claro en la base ni en los logs. El `state` de la conexión vence a los 10 minutos y solo vale para el mismo staff.
+
+**Pasos:**
+
+1. **Habilitar la API.** En el proyecto de Google Cloud, habilitar **Google Calendar API** (APIs y servicios → Biblioteca).
+2. **Redirect URI.** En el cliente OAuth web ([Google OAuth](#google-oauth-inicio-de-sesión-con-google), paso 3) agregar a **Authorized redirect URIs** el callback de la **API**: `https://api.<dominio>/api/calendar/oauth/callback`, `https://api.<dominio-dev>/api/calendar/oauth/callback` y, para los desarrolladores, `http://localhost:3001/api/calendar/oauth/callback`. Tiene que coincidir exactamente con `${API_PUBLIC_URL}/api/calendar/oauth/callback`.
+3. **Pantalla de consentimiento en producción.** En **Audience**, publicar la app (*In production*). En *Testing*, el token vence a los **7 días** y el staff tendría que reconectar cada semana. Los permisos de Calendar son sensibles: Google puede pedir verificación.
+4. **Clave de cifrado.** Generar `CALENDAR_TOKEN_KEY` con `openssl rand -base64 32` y cargarla en las variables de la API de cada ambiente (una distinta por ambiente). Cambiarla obliga a reconectar el calendario.
+5. **Variables y deploy.** Con `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y `CALENDAR_TOKEN_KEY` cargadas, redeploy de la API. La web no cambia.
+6. **Conectar.** Configuración → Calendario → **Conectar Google Calendar**, aceptar con la cuenta de MOVE y elegir el calendario donde se van a crear las reservas.
+
+#### Prueba real de Google Calendar con credenciales
+
+- [ ] Calendar API habilitada, redirect URI registrada y consentimiento en producción.
+- [ ] Conectar y elegir calendario; **Sincronizar ahora** actualiza la última sincronización.
+- [ ] Una reserva de Rehab crea el evento (con el nombre del cliente y el profesional) en pocos minutos; cancelarla lo borra.
+- [ ] Un evento ocupado en Google sobre un turno libre lo marca **Ocupado en Google Calendar** y no se puede reservar (ni como invitado ni con sesión); borrar el evento lo libera.
+- [ ] Un evento ocupado sobre un turno **con reserva** marca **Conflicto con Google Calendar**, la reserva sigue y el staff recibe un solo email.
+- [ ] Revocar el acceso desde la cuenta de Google pasa el estado a **Requiere reconexión**, libera los turnos y manda el email; **Reconectar** crea los eventos pendientes.
+- [ ] **Desconectar** deja los eventos ya creados en Google.
+- [ ] En la base, `calendar_connections.refresh_token_enc` tiene el formato `iv:tag:ciphertext` (no un token en claro) y los logs no muestran tokens.
+
+**Errores comunes:**
+
+- **`redirect_uri_mismatch`:** la redirect URI no coincide exactamente con `${API_PUBLIC_URL}/api/calendar/oauth/callback`.
+- **Al volver de Google, "No pudimos conectar Google Calendar":** el consentimiento se canceló, o pasaron más de 10 minutos, o lo abrió otro usuario de staff.
+- **La pestaña dice "Falta configurar Google en el servidor":** falta alguna de las tres variables en la API de ese ambiente.
+- **La conexión se cae cada semana:** la app de Google sigue en *Testing*.
 
 ### Brevo (emails)
 
@@ -1067,8 +1283,36 @@ Todos salen después de que se guarda la operación, se registran en `email_logs
 | `plan-expired` | Tu plan de MOVE venció | Job de recordatorios, plan vencido |
 | `checkin-invite` | ¿Cómo venís? Contanos en 1 minuto | Check-in mensual o envío manual |
 | `rehab-referral` | Te habilitamos el seguimiento fisioterapéutico | **Derivar a Rehab** desde un check-in |
+| `booking-cancelled-by-client` | Cancelaste tu reserva en MOVE | El cliente cancela una reserva desde su perfil |
+| `booking-not-confirmed` | Tu reserva en MOVE no se confirmó | El pago se rechazó o la reserva retenida venció; trae el link para reservar de nuevo |
+| `booking-reminder` | Te esperamos mañana en MOVE | Job de las 18:00: reservas confirmadas de Rehab y Recovery del día siguiente |
+| `staff-rehab-booking` | Rehab: reserva confirmada (o cancelada) · fecha hora | Al **email de avisos del staff**, cuando se confirma o se cancela una reserva de Rehab |
+| `staff-calendar-conflict` | Conflicto en Google Calendar · fecha hora | Al email de avisos del staff: un horario ocupado en Google cae sobre un turno con reserva (uno por reserva) |
+| `staff-calendar-disconnected` | Google Calendar se desconectó de MOVE | Al email de avisos del staff: se perdió el acceso a Google; trae el link a Configuración → Calendario (uno por día) |
+| `auto-debit-charge-failed` | No pudimos cobrar tu plan de MOVE | Mercado Pago rechazó un cobro del débito automático |
+| `auto-debit-cancelled` | Tu débito automático en MOVE fue cancelado | Se cancela el débito (desde MOVE o desde Mercado Pago); indica hasta cuándo sigue vigente lo pagado |
 
-Los clientes en pausa no reciben emails automáticos.
+Los clientes en pausa no reciben emails automáticos de seguimiento; el **recordatorio de turno** sí les llega, porque es un aviso del servicio. Los cuatro emails del staff van a la dirección fija de **Email para avisos del staff** (Configuración → Contacto): si está vacía no se envía nada y tampoco hay error.
+
+#### Pie de contacto y vista previa
+
+Todos los emails terminan con el pie de contacto de Configuración → Contacto (dirección, horarios, WhatsApp, Instagram y email; lo que esté vacío no se muestra). El texto de las nueve plantillas originales se revisó: voseo, fecha y hora de Montevideo, servicio, profesional si es Rehab y el botón correcto.
+
+Para ver cómo queda cada una sin base, sin red y sin Brevo: `pnpm --filter @move/api emails:preview` genera un HTML por plantilla en `apps/api/tmp/email-preview/` y un `index.html` con la lista.
+
+![Vista previa: lista de plantillas](img/51-emails-vista-previa.png)
+
+![Vista previa: recordatorio de turno](img/52-email-recordatorio.png)
+
+![Vista previa: cobro rechazado del débito](img/53-email-debito-rechazado.png)
+
+![Vista previa: aviso de Rehab al staff](img/54-email-aviso-staff-rehab.png)
+
+#### Prueba real de Brevo con credenciales
+
+- [ ] API key y remitente verificados (pasos 1 a 3).
+- [ ] Mandar **cada una de las 17 plantillas** a una casilla de prueba, provocándolas como dice la tabla (las de staff necesitan el **Email para avisos del staff**), y compararlas con la vista previa.
+- [ ] Revisar el pie de contacto, los links (`/reservar` en "no se confirmó", `/perfil` en los del débito y `/staff/configuracion?tab=calendario` en el de desconexión) y que no caigan en spam.
 
 ### Bitbucket Pipelines (CI)
 
@@ -1128,6 +1372,9 @@ El comando arranca la aplicación, por eso necesita las mismas variables que la 
 - [ ] Jobs en los logs: aparecen las líneas de `expire-holds` y `reconcile-payments` (corren solas) y, tras **Ejecutar detección ahora**, la de `followup-detect`. Con varias instancias, solo una registra los jobs.
 - [ ] Neon: las tablas existen en la base del ambiente y la conexión usa SSL.
 - [ ] Google (si se activó): **Continuar con Google** ingresa y vuelve a la plataforma.
+- [ ] Débito automático: contratar un plan con una cuenta compradora de prueba y recorrer la [prueba real de Mercado Pago](#prueba-real-de-mercado-pago-con-credenciales) (autorizar, cobro aprobado, rechazado y cancelación).
+- [ ] Google Calendar (si se activó): conectar y recorrer la [prueba real](#prueba-real-de-google-calendar-con-credenciales) (evento, bloqueo, conflicto y reconexión).
+- [ ] Contacto: completar Configuración → Contacto y verificar el pie del sitio, **Dónde estamos** y el pie de un email.
 - [ ] Reemplazar los valores provisorios de Configuración (aviso "Valores provisorios — confirmar con MOVE") con los que defina MOVE y tildar **Marcar los valores como confirmados**.
 
 ### Rollback
@@ -1146,28 +1393,43 @@ Este manual y sus capturas se generan con datos de demostración inventados. Las
 # 2. API corriendo (pnpm dev:api) y la web compilada para producción: pnpm --filter @move/web build y pnpm --filter @move/web start.
 #    El script de build ya fija NODE_ENV=production: no hace falta exportarlo ni cambiarlo. En la consola de la web no debe haber
 #    un PORT exportado (la web toma su puerto de PORT; el del ejemplo de la API es 3001). Definir DB_NAME (y DB_USER si no es "move"),
-#    API_URL (con /api) y WEB_URL (origen de la web); por defecto apuntan a http://localhost:3001/api y http://localhost:3000
-export DB_NAME=move_demo API_URL=http://localhost:3001/api WEB_URL=http://localhost:3000   # ejemplo
+#    API_URL (con /api) y WEB_URL (origen de la web): son obligatorias, no tienen valor por defecto y se rechazan los puertos 3000 y 3001
+export DB_NAME=move_demo API_URL=http://localhost:3168/api WEB_URL=http://localhost:3268   # ejemplo: usá los puertos de tu API y tu web
 printf 'Contraseña del staff: '; read -rs MANUAL_STAFF_PASSWORD && export MANUAL_STAFF_PASSWORD; echo
 printf 'Contraseña de los clientes: '; read -rs MANUAL_CLIENT_PASSWORD && export MANUAL_CLIENT_PASSWORD; echo     # mínimo 8 caracteres
 pnpm exec playwright install chromium     # una sola vez
-pnpm manual:demo-data       # carga 10 clientes de ejemplo en distintos estados, reservas, pagos, alertas y check-ins
-pnpm manual:screenshots     # una captura por pantalla en docs/manual/img/ (1440×900)
+pnpm manual:demo-data       # carga 10 clientes de ejemplo en distintos estados, reservas, pagos, débitos automáticos, alertas y check-ins
+pnpm --filter @move/api emails:preview    # vista previa de los emails en apps/api/tmp/email-preview/ (la usan 4 capturas)
+pnpm manual:screenshots     # una captura por pantalla en docs/manual/img/ (1440×900) y la pasada mobile (390×844)
 node scripts/manual/render-diagram.mjs    # solo si cambió docs/manual/arquitectura.html: regenera img/arquitectura.png
 # editar docs/manual/manual-de-usuario.md si cambió algo
 pnpm manual:pdf             # genera docs/manual/manual-de-usuario.pdf (A4, imágenes embebidas)
 ```
 
-- **Exportá siempre `API_URL` y `WEB_URL`** con los puertos de tu API y tu web: si no están definidas, los scripts usan 3001 y 3000, así que asegurate de que ahí no corra otra aplicación con datos reales. Los dos scripts rechazan una URL que no sea local (localhost, 127.0.0.1 o ::1) y `manual:screenshots` imprime su destino (`Destino: API …; web …`) antes de empezar.
+- **`API_URL` y `WEB_URL` son obligatorias** en los dos scripts: no tienen valor por defecto y los dos rechazan una URL que no sea local (localhost, 127.0.0.1 o ::1) y los puertos 3000 y 3001 (la app de desarrollo), para no escribir ni comprar sobre datos reales. Si en esos puertos corre tu propia copia de demostración (como en [Probar MOVE en local](#probar-move-en-local)), agregá `MANUAL_ALLOW_DEV_PORTS=1`. `manual:screenshots` imprime su destino (`Destino: API …; web …`) antes de empezar.
 - Para cambiar solo el texto o el diagrama no hace falta la base ni la API: alcanza con editar el Markdown (o `arquitectura.html` y correr `render-diagram.mjs`) y correr `pnpm manual:pdf`.
-- `manual:demo-data` hace estas comprobaciones **antes de escribir** nada: `API_URL` y `DB_HOST` (si está definido) son locales, Docker y la base responden (`SELECT 1`), y la base no tiene ya datos de demostración. Imprime la base destino (`Base destino: …`) y, si algo no se cumple, termina con un mensaje claro. La historia (asistencias pasadas y planes que vencen o vencieron) no se puede crear por la API porque no admite reservar ni marcar asistencia en el pasado: esos datos se insertan con SQL en la base de desarrollo mediante `docker exec <contenedor> psql` (contenedor `move-postgres`, o `MANUAL_DB_CONTAINER`), solo para los clientes de demostración.
-- `manual:screenshots` captura primero en un directorio temporal y **reemplaza las imágenes de `docs/manual/img/` solo si salieron todas las capturas esperadas (38)**: arma una carpeta nueva al lado y la renombra en el lugar de la actual, así que si algo falla las imágenes actuales quedan intactas y nunca queda un juego a medias. No toca `arquitectura.png`. Al agregar o quitar una pantalla hay que actualizar `EXPECTED_IMAGE_COUNT` en `scripts/manual/capture.mjs`.
+- `manual:demo-data` hace estas comprobaciones **antes de escribir** nada: `API_URL`, `WEB_URL` y `DB_HOST` (si está definido) son locales, Docker y la base responden (`SELECT 1`), y la base no tiene ya datos de demostración. Imprime la base destino (`Base destino: …`) y, si algo no se cumple, termina con un mensaje claro. La historia (asistencias pasadas y planes que vencen o vencieron) no se puede crear por la API porque no admite reservar ni marcar asistencia en el pasado: esos datos se insertan con SQL en la base de desarrollo mediante `docker exec <contenedor> psql` (contenedor `move-postgres`, o `MANUAL_DB_CONTAINER`), solo para los clientes de demostración.
+- `manual:screenshots` captura primero en un directorio temporal y **reemplaza las imágenes de `docs/manual/img/` solo si salieron todas las capturas esperadas (64: 54 de escritorio y 10 de celular)**: arma una carpeta nueva al lado y la renombra en el lugar de la actual, así que si algo falla las imágenes actuales quedan intactas y nunca queda un juego a medias. No toca `arquitectura.png`. Al agregar o quitar una pantalla hay que actualizar `EXPECTED_IMAGE_COUNT` en `scripts/manual/capture.mjs`.
 - No corras `pnpm db:up` ni `pnpm db:down` con `DB_NAME=move_demo` exportado: Docker recrearía el contenedor de Postgres con esa base. Crear la base de demostración con `docker exec move-postgres createdb -U move move_demo` alcanza.
-- `manual:screenshots` compra un paquete de Recovery con el cliente de demostración Nicolás Acosta (checkout → simulador → resultado); volver a correrlo agrega otra compra, así que para repetir las capturas conviene recrear la base de demostración. La captura de Recovery (`07`) se toma sin sesión iniciada, como un invitado.
+- `manual:screenshots` compra un paquete de Recovery con el cliente de demostración Nicolás Acosta (checkout → simulador → resultado) y después le activa un débito automático de Recovery (checkout con débito → simulador → resultado). Volver a correrlo agrega otra compra y el segundo débito falla (`AUTO_DEBIT_ACTIVE`), así que para repetir las capturas hay que recrear la base de demostración. También necesita la vista previa de emails (`emails:preview`) y se niega a empezar si falta.
+- Los datos de demostración incluyen dos cosas que no salen de un uso normal: un email de avisos del staff de ejemplo (`avisos@example.com`) y la marca **ocupado en Google Calendar** en el turno de Rehab de Federico, puesta por SQL sin conectar Google, para poder mostrar el conflicto (capturas 50). La captura de Recovery (`07`) se toma sin sesión iniciada, como un invitado.
 - Usuarios de la demostración: la tabla de [Probar MOVE en local](#probar-move-en-local). El staff es `staff@example.com` (o `MANUAL_STAFF_EMAIL`) con la contraseña de `MANUAL_STAFF_PASSWORD`; los clientes, con la de `MANUAL_CLIENT_PASSWORD`.
+
+### Auditoría responsive
+
+`pnpm responsive:audit` recorre todas las rutas de la web (públicas, de cliente y de staff, más las seis pestañas de Configuración) a **375×812, 768×1024, 1024×768 y 1440×900** y marca, en cada combinación: scroll horizontal de la página, elementos fuera de la pantalla o cortados, botones, links y campos con área táctil menor a 32×32 px, texto cortado, una ruta que responde con error o termina en otra URL, y el overlay de errores de Next. Donde existe el botón **Abrir menú**, también abre el menú y revisa el panel.
+
+Necesita la API y la web levantadas con los datos de `pnpm manual:demo-data` y las mismas variables que los otros scripts (`MANUAL_STAFF_PASSWORD`, `MANUAL_CLIENT_PASSWORD`, `API_URL` y `WEB_URL`, obligatorias y sin valor por defecto; rechaza los puertos 3000 y 3001):
+
+```bash
+pnpm responsive:audit            # AUDIT_ONLY=/staff/turnos para repetir solo una ruta
+```
+
+**Estado al cierre de la auditoría (T-065): 219 combinaciones revisadas, 0 hallazgos.** Para llegar ahí se hizo, y por eso se ve distinto a lo anterior: los botones de MOVE pasaron a 32 px de alto en todos los anchos (mínimo táctil), el menú ☰ se usa hasta 1023 px y las tablas de Turnos y de Pagos son tarjetas hasta 1279 px. La primera corrida había encontrado 2648 hallazgos, casi todos de área táctil, y un error real de Next en el checkout de un plan, que también se corrigió. Qué cubre y qué no (diálogos, estados de error, pantallas que dependen de datos que la demostración no genera) y la tabla de la primera corrida: [`docs/responsive-audit.md`](../responsive-audit.md). Las capturas de [Uso desde el celular](#uso-desde-el-celular) son de 390 × 844 px.
 
 ### Valores provisorios y decisiones abiertas
 
+- Lo que quedó abierto de la tanda de comentarios del cliente (débitos y sesiones del paquete, diferencias con el sitio actual, deuda menor y pruebas reales con proveedores): [Qué queda abierto al cerrar la tanda de comentarios del cliente](#qué-queda-abierto-al-cerrar-la-tanda-de-comentarios-del-cliente).
 - Planes, precios, horarios y umbrales son los del mockup y deben ser confirmados por MOVE. Hasta entonces la pantalla de Reglas muestra "Valores provisorios — confirmar con MOVE".
 - Dominio final de la plataforma (hoy `moveperformance.uy` es el sitio anterior) y dominio registrable de desarrollo (`<dominio-dev>`). Si en lugar de eso se elige `dev.<dominio>`, es un riesgo de seguridad aceptado (la sesión de producción, también la del staff, llega al código de desarrollo) y los perfiles de navegador separados pasan a ser regla (ver [Ambientes separados](#ambientes-separados-de-desarrollo-y-producción)).
 - Dónde vive el repositorio y qué CI lo valida (ver [Dónde vive el repositorio](#dónde-vive-el-repositorio)).
@@ -1182,3 +1444,5 @@ Abierta; no implementada en código en este proyecto. Hoy la API manda una `noti
 - **(b) Recomendada.** Quitar la `notification_url` de cada preferencia y usar solo la URL configurada en el panel (**Webhooks**), con **una aplicación de Mercado Pago por ambiente**. Así cada ambiente tiene también su propia clave secreta (hoy es la única credencial compartida entre desarrollo y producción).
 
 Cualquiera de las dos se confirma con un pago real: en el log aparece `webhook payment=<id>` y la compra se aprueba sin esperar la conciliación.
+
+El **débito automático** suma dos tipos de aviso (`subscription_preapproval` y `subscription_authorized_payment`) que usan la misma firma, así que la decisión los alcanza: con la opción (b), cada ambiente también recibe sus avisos de suscripción en la URL del panel. Si no llegaran firmados, la conciliación refresca los débitos pendientes y autorizados y aplica los cobros aprobados de los últimos 40 días, con demora.

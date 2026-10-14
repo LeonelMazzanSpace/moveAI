@@ -7,8 +7,10 @@
 //   MANUAL_STAFF_PASSWORD   (obligatoria) contraseña del staff de demostración
 //   MANUAL_CLIENT_PASSWORD  (obligatoria) contraseña común de los clientes de demostración (mínimo 8 caracteres)
 //   MANUAL_STAFF_EMAIL      (opcional) default staff@example.com
-//   API_URL                 (opcional) default http://localhost:3001/api
-//   WEB_URL                 (opcional) origen de la web, default http://localhost:3000
+//   API_URL                 (obligatoria) URL de TU API con /api, por ejemplo http://localhost:3168/api. Sin valor por
+//                           defecto y se rechazan los puertos 3000 y 3001 (la app de desarrollo), salvo con
+//                           MANUAL_ALLOW_DEV_PORTS=1 (para quien corre una copia propia de demostración en esos puertos)
+//   WEB_URL                 (obligatoria) origen de TU web, por ejemplo http://localhost:3268 (mismos puertos rechazados)
 //   MANUAL_DB_CONTAINER     (opcional) contenedor de Postgres, default move-postgres
 //   DB_NAME, DB_USER        base y usuario de Postgres para la historia por SQL. Se toman del entorno del proceso y,
 //                           solo si faltan, de apps/api/.env (si existe). Si no hay ni entorno ni archivo, falla.
@@ -16,6 +18,10 @@
 //                           (localhost, 127.0.0.1 o ::1): el script se niega a cargar datos en una base remota.
 //   API_URL                 tiene que apuntar a un host local (misma regla): el script se niega a registrar cuentas ni
 //                           comprar planes en una API remota.
+//
+// Además de los clientes, reservas, pagos y alertas, carga el email de avisos del staff (de ejemplo), dos débitos
+// automáticos simulados (Martín, Performance; Camila, Recovery, con su primer cobro) y, solo para la demostración, la
+// marca "ocupado en Google Calendar" en el turno de Rehab de Federico (sin conectar Google) para ver el conflicto.
 //
 // Antes de escribir nada comprueba que Docker y la base responden (`SELECT 1`) e imprime la base destino.
 // Las contraseñas nunca se imprimen. Falla con un mensaje claro si ya hay datos de demostración.
@@ -29,8 +35,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const API_URL = (process.env.API_URL ?? 'http://localhost:3001/api').replace(/\/$/, '');
-const WEB_URL = process.env.WEB_URL ?? 'http://localhost:3000';
+const API_URL = (process.env.API_URL ?? '').replace(/\/$/, '');
+const WEB_URL = (process.env.WEB_URL ?? '').replace(/\/$/, '');
+// Puertos de la app de desarrollo del usuario: el script nunca escribe ahí.
+const PROTECTED_PORTS = new Set(['3000', '3001']);
 const STAFF_EMAIL = process.env.MANUAL_STAFF_EMAIL ?? 'staff@example.com';
 const DB_CONTAINER = process.env.MANUAL_DB_CONTAINER ?? 'move-postgres';
 const BUSINESS_TZ = 'America/Montevideo';
@@ -209,15 +217,20 @@ function assertLocalDatabaseHost() {
   }
 }
 
-function assertLocalApiUrl() {
-  let host;
+// API_URL y WEB_URL son obligatorias: sin valor por defecto, una variable olvidada no apunta a la app de desarrollo.
+function assertLocalTarget(name, value, example) {
+  if (!value) throw new Error(`Falta la variable de entorno ${name} (por ejemplo ${example}): no tiene valor por defecto.`);
+  let url;
   try {
-    host = new URL(API_URL).hostname;
+    url = new URL(value);
   } catch {
-    throw new Error('API_URL no es una URL válida (por ejemplo http://localhost:3001/api).');
+    throw new Error(`${name} no es una URL válida (por ejemplo ${example}).`);
   }
-  if (!isLocalHost(host)) {
-    throw new Error('API_URL no es local: los datos de demostración solo se cargan en una API local.');
+  if (!isLocalHost(url.hostname)) {
+    throw new Error(`${name} no es local: los datos de demostración solo se cargan en una API y una web locales.`);
+  }
+  if (PROTECTED_PORTS.has(url.port) && process.env.MANUAL_ALLOW_DEV_PORTS !== '1') {
+    throw new Error(`${name} apunta al puerto ${url.port}, el de la app de desarrollo: usá los puertos de tu propia API y web (o MANUAL_ALLOW_DEV_PORTS=1 si la app de esos puertos es la tuya y es de demostración).`);
   }
 }
 
@@ -267,6 +280,26 @@ async function guestPurchase(guest, plan, slot) {
     guest: { name: guest.name, email: guest.email, phone: guest.phone },
   });
   await request(null, 'POST', '/payments/dev/simulate', { externalReference: checkout.externalReference, outcome: 'approved' });
+}
+
+// Contrata un débito automático por la API y lo autoriza con el simulador (sin Mercado Pago). Con un período vigente de
+// Performance el primer cobro queda para el día siguiente a su fin; en Recovery el primer cobro es en el momento.
+async function simulatedAutoDebit(session, plan) {
+  const checkout = await request(session, 'POST', '/checkout/auto-debit', { planSlug: plan.slug });
+  await request(null, 'POST', '/payments/dev/simulate-auto-debit', { externalReference: checkout.externalReference, action: 'authorize' });
+}
+
+// Solo demostración: marca como ocupado en Google Calendar el turno de Rehab de la reserva de `email`, sin conectar Google.
+function markCalendarBlockedSql(email) {
+  return `
+UPDATE time_slots SET calendar_blocked_at = now()
+WHERE id = (
+  SELECT b.time_slot_id FROM bookings b
+  JOIN users u ON u.id = b.user_id
+  JOIN time_slots s ON s.id = b.time_slot_id
+  WHERE u.email = '${email}' AND s.service = 'rehab' AND b.status = 'confirmed' AND s.starts_at > now()
+  ORDER BY s.starts_at LIMIT 1
+);`;
 }
 
 function historyRows(today) {
@@ -357,7 +390,8 @@ async function main() {
   const dbName = databaseSetting('DB_NAME');
   const dbUser = databaseSetting('DB_USER') ?? 'move';
   if (!dbName) throw new Error('No se sabe qué base usar: definí DB_NAME en el entorno (o creá apps/api/.env con DB_NAME).');
-  assertLocalApiUrl();
+  assertLocalTarget('API_URL', API_URL, 'http://localhost:3168/api');
+  assertLocalTarget('WEB_URL', WEB_URL, 'http://localhost:3268');
   assertLocalDatabaseHost();
   const sql = createSql(dbName, dbUser);
   assertDatabaseReachable(sql, dbName);
@@ -368,6 +402,9 @@ async function main() {
   const staff = await signIn(STAFF_EMAIL, staffPassword);
   const me = await request(staff, 'GET', '/me');
   await assertEmpty(staff);
+
+  step('Email de avisos del staff (de ejemplo)');
+  await request(staff, 'PATCH', '/staff/settings/contact', { staffNotificationsEmail: 'avisos@example.com' });
 
   const plans = new Map((await request(null, 'GET', '/catalog/plans')).map((plan) => [plan.slug, plan]));
   const plan = (slug) => {
@@ -412,6 +449,10 @@ async function main() {
     sql(shiftSubscriptionSql(email, addDays(today, endsInDays)));
   }
   sql(insertAttendanceSql([...historyRows(today), ...recentSlotRows(today)], me.id));
+
+  step('Débitos automáticos simulados (Martín en Performance, Camila en Recovery)');
+  await simulatedAutoDebit(sessions.martin, plan('performance-mensual'));
+  await simulatedAutoDebit(sessions.camila, plan('recovery-paquete-4'));
 
   step('Reservas Performance (hoy y próximos días), Recovery y una cancelación');
   const evening = await findSlot(sessions.sofia, 'performance', { fromDay: 0, minHoursAhead: 3, time: '19:00' });
@@ -460,6 +501,7 @@ async function main() {
   await request(staff, 'PATCH', `/staff/clients/${ids.federico}/rehab-followup`, { enabled: true });
   const followupSlot = await findSlot(sessions.federico, 'rehab', { fromDay: 2 });
   await request(sessions.federico, 'POST', '/bookings', { timeSlotId: followupSlot.id });
+  sql(markCalendarBlockedSql(CLIENTS.find((client) => client.key === 'federico').email));
 
   step('Contactos del staff sobre las alertas');
   const alerts = await request(staff, 'GET', '/staff/alerts');

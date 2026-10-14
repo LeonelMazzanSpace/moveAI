@@ -52,10 +52,15 @@ Sin credenciales de proveedores todo funciona localmente:
 | Mercado Pago | Simulador de pagos (solo si `MP_ACCESS_TOKEN` está vacío y `NODE_ENV` no es `production`) | Checkout real con `MP_ACCESS_TOKEN` y `MP_WEBHOOK_SECRET` |
 | Brevo | Dry-run: el email se registra en el log de la API y no se envía | Envío real con `BREVO_API_KEY` y `BREVO_SENDER_EMAIL` |
 | Google OAuth | El botón de Google queda oculto (`NEXT_PUBLIC_GOOGLE_ENABLED` vacío) | `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` en la API y `NEXT_PUBLIC_GOOGLE_ENABLED=true` en la web |
+| Google Calendar (Rehab) | Configuración → Calendario avisa que falta configurar | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y `CALENDAR_TOKEN_KEY` en la API |
 
 **Simulador de pagos.** En el checkout aparece un panel de desarrollo para aprobar o rechazar la compra pendiente (llama a `POST /api/payments/dev/simulate` con `externalReference` y `outcome` `approved` o `rejected`). Con `MP_ACCESS_TOKEN` definido o con `NODE_ENV=production` ese endpoint responde `NOT_FOUND`. Un pago rechazado deja la compra en `pending`.
 
-**Emails en dry-run.** Los emails (restablecer contraseña, invitación de cliente nuevo, check-ins, recordatorios) no salen: buscá la línea del envío en la consola de la API. Los logs no incluyen emails, nombres ni contenido, solo ids.
+**Débito automático.** Con el simulador activo (mismas condiciones que arriba), el checkout de un plan con **Permite débito automático** (en la semilla: `performance-mensual`, `recovery-paquete-4` y `recovery-paquete-8`) ofrece **Débito automático**; al activarlo lleva a `/checkout/simulado?debito=<ref>`, donde se puede **Autorizar**, **Cobrar ciclo (aprobado)**, **Cobrar ciclo (rechazado)** y **Cancelar**. Por API: `POST /api/payments/dev/simulate-auto-debit` con `externalReference` y `action` (`authorize`, `charge_approved`, `charge_rejected` o `cancel`); responde `NOT_FOUND` con `MP_ACCESS_TOKEN` definido o en producción. Con un período de Performance vigente el primer cobro queda para el día siguiente a su fin; en Recovery, o sin período vigente, `authorize` cobra en el momento. `pnpm manual:demo-data` ya deja un débito de Performance (Martín) y uno de Recovery (Camila).
+
+**Google Calendar.** No hay simulador de Google: sin las tres variables la pestaña Calendario avisa que falta configurar. Para probar la conexión de verdad, exportar en la consola de la API `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y `CALENDAR_TOKEN_KEY` (`openssl rand -base64 32`, sin guardarla en un archivo), registrar en el cliente OAuth de Google la redirect URI `${API_PUBLIC_URL}/api/calendar/oauth/callback` (en local, `http://localhost:3001/api/calendar/oauth/callback`) y conectar desde Configuración → Calendario. Los jobs de push (cada minuto) y pull (cada 5 minutos) corren solos; **Sincronizar ahora** los dispara a mano. La clave y la forma de la sincronización están en [deploy.md](deploy.md) y en el [manual](manual/manual-de-usuario.md#google-calendar-sincronización-de-rehab).
+
+**Emails en dry-run.** Los emails (restablecer contraseña, invitación de cliente nuevo, check-ins, recordatorios) no salen: buscá la línea del envío en la consola de la API. Los logs no incluyen emails, nombres ni contenido, solo ids. Para ver el aspecto de las 17 plantillas sin base ni red: `pnpm --filter @move/api emails:preview` escribe un HTML por plantilla y un `index.html` en `apps/api/tmp/email-preview/` (ignorada por git).
 
 ## Tests
 
@@ -120,6 +125,10 @@ pnpm test:e2e:web                                            # las dos suites; -
 - El reporte HTML queda en `artifacts/e2e/report` (`pnpm exec playwright show-report artifacts/e2e/report`) y las capturas y trazas, solo de las pruebas que fallan, en `artifacts/e2e/results`. `artifacts/` está ignorado por git.
 - `E2E_WORKERS` (entero de 1 a 99, default 4) fija los workers de Playwright.
 - La suite no corre en Bitbucket Pipelines; su código sí se revisa con `pnpm lint:e2e`, incluido en `pnpm lint`.
+
+## Auditoría responsive
+
+`pnpm responsive:audit` recorre todas las rutas de la web a 375, 768, 1024 y 1440 px contra una API y una web locales con los datos de `pnpm manual:demo-data`. Necesita `MANUAL_STAFF_PASSWORD`, `MANUAL_CLIENT_PASSWORD`, `API_URL` y `WEB_URL`; estas dos no tienen valor por defecto y el script rechaza los puertos 3000 y 3001. Detalle de lo que revisa y de su estado en [responsive-audit.md](responsive-audit.md).
 
 ## Correr un job a mano
 
