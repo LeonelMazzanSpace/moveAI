@@ -228,6 +228,31 @@ describe('checkout (e2e)', () => {
       await second.agent.post('/api/checkout/booking').send({ planId, timeSlotId: slotId }).expect(201);
     });
 
+    it('emails the client once when the payment is rejected, and a repeated rejection does not email again (D93)', async () => {
+      const slotId = await rehabSlot();
+      const planId = await planIdBySlug(ctx.dataSource, 'rehab-evaluacion');
+      const { agent, userId } = await signUpClient(ctx.app);
+      const res = await agent.post('/api/checkout/booking').send({ planId, timeSlotId: slotId }).expect(201);
+      const notConfirmed = () => ctx.dataSource.query(
+        `SELECT template, user_id AS "userId", idempotency_key AS key FROM email_logs WHERE template = 'booking-not-confirmed'`);
+      expect(await notConfirmed()).toEqual([]);
+
+      await simulate(res.body.externalReference, 'rejected');
+      expect(await notConfirmed()).toEqual([
+        { template: 'booking-not-confirmed', userId, key: `booking-not-confirmed:${res.body.bookingId}` },
+      ]);
+      await simulate(res.body.externalReference, 'rejected');
+      expect(await notConfirmed()).toHaveLength(1);
+    });
+
+    it('does not email about a plan purchase that was declined (only bookings are released)', async () => {
+      const { agent } = await signUpClient(ctx.app);
+      const planId = await planIdBySlug(ctx.dataSource, 'performance-trimestral');
+      const res = await agent.post('/api/checkout/plan').send({ planId }).expect(201);
+      await simulate(res.body.externalReference, 'rejected');
+      expect(await ctx.dataSource.query(`SELECT 1 FROM email_logs WHERE template = 'booking-not-confirmed'`)).toEqual([]);
+    });
+
     it('emails a client whose hold expired once, even if the job runs again (D93)', async () => {
       const slotId = await rehabSlot();
       const planId = await planIdBySlug(ctx.dataSource, 'rehab-evaluacion');
