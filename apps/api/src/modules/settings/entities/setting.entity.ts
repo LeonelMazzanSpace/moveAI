@@ -1,7 +1,7 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 import type { User } from '../../users/entities/user.entity.js';
 
-export type SettingValue = number | boolean;
+export type SettingValue = number | boolean | string;
 
 @Entity('settings')
 export class Setting {
