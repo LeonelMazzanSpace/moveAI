@@ -148,7 +148,6 @@ Las cuentas de los invitados (`paula.rivero` y `mateo.lemos`) **no pueden ingres
 | Inicio, Performance, Rehab, Recovery y Planes | Hecho | Capturas 01–09 |
 | Acceso al perfil, registro e inicio de sesión | Hecho | Capturas 12, 13 y 17 |
 | Contratar o reservar sin ser cliente, creando el usuario en el proceso | Hecho | Rehab y sesión individual de Recovery admiten invitados (capturas 05 y 07). Contratar un plan o paquete pide ingresar primero |
-| Uso desde el celular (agregado) | Hecho | Menú ☰ en el sitio público, el perfil del cliente y el panel de staff; las tablas de Turnos y asistencia y de Pagos se muestran como tarjetas (ver [Sitio público](#sitio-público), [Turnos y asistencia](#turnos-y-asistencia) y [Pagos](#pagos)); la suite de pruebas end to end recorre las pantallas en escritorio y en celular |
 
 ### Performance, reservas y asistencia
 
@@ -279,6 +278,7 @@ Las cuentas de los invitados (`paula.rivero` y `mateo.lemos`) **no pueden ingres
 - **Sin penalidades** por ausencia o no show en el MVP: los tres estados se registran, pero no tienen consecuencias.
 - **El staff no reserva en nombre de clientes:** sí cancela reservas y marca asistencia.
 - **Valores provisorios:** planes, precios, horarios y umbrales son los del mockup hasta que MOVE los confirme (Configuración → Reglas).
+- **Uso desde el celular (agregado):** menú ☰ en el sitio público, el perfil del cliente y el panel de staff; las tablas de Turnos y asistencia y de Pagos se muestran como tarjetas (ver [Sitio público](#sitio-público), [Turnos y asistencia](#turnos-y-asistencia) y [Pagos](#pagos)); la suite de pruebas end to end recorre las pantallas en escritorio y en celular.
 - **Dominio:** el sitio actual de MOVE está en `moveperformance.uy`. El dominio de la plataforma nueva **no está decidido**; este manual usa `<dominio>` (y `api.<dominio>` para la API) como marcador. El código no tiene ningún dominio fijo: todo sale de variables de entorno.
 
 ### Deuda conocida y comportamientos a tener presentes
@@ -311,7 +311,7 @@ Al cerrar la tanda de deuda técnica, la plataforma funciona completa en local. 
 
 También siguen abiertos los valores provisorios de Configuración y la cuenta de AWS, en [Valores provisorios y decisiones abiertas](#valores-provisorios-y-decisiones-abiertas).
 
-**Comportamientos conocidos.** Los que ya están en la tabla de [deuda conocida](#deuda-conocida-y-comportamientos-a-tener-presentes) (campos numéricos opcionales de un plan, links de 72 horas y de 1 hora, contador de check-ins, límite de intentos del checkout en memoria, compras vencidas, identificadores de planes eliminados y botón de Google) no se repiten acá.
+**Comportamientos conocidos.** Los que ya están en la tabla de [deuda conocida](#deuda-conocida-y-comportamientos-a-tener-presentes) no se repiten acá.
 
 **Sin deploy (D51).** No hay ambientes de desarrollo ni de producción en la nube: todo corre en local. Los pasos para publicar están en [`docs/deploy.md`](../deploy.md) y en las partes [3](#parte-3-cómo-levantar-todo) y [4](#parte-4-proveedores-uno-por-uno) de este manual.
 
