@@ -5,7 +5,7 @@ import { test as base, expect, type Locator, type Page } from '@playwright/test'
 import type { CheckoutResponseDto, MeDto, PlanDto, ProfessionalDto, Service, StaffTimeSlotDto } from '../apps/web/src/lib/api/types';
 import { E2E_API_ORIGIN, E2E_API_URL, E2E_PROFESSIONAL_NAME, E2E_STAFF_EMAIL, E2E_WEB_URL, requireEnv } from '../scripts/e2e/env.mjs';
 import { ApiClient, fakeIp } from './support/api';
-import { addDays, businessDate } from './support/time';
+import { addDays, businessDate, businessTime } from './support/time';
 
 export { expect };
 
@@ -66,6 +66,18 @@ function uniqueSlotMoment(): { date: string; time: string } {
   const hour = 6 + (Math.floor(key / SLOT_MINUTES.length) % 15);
   const day = 2 + (Math.floor(key / (SLOT_MINUTES.length * 15)) % 10);
   return { date: addDays(businessDate(), day), time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}` };
+}
+
+// Un horario de uniqueSlotMoment que ningún turno activo del servicio ocupa todavía: una corrida sin `pnpm e2e:reset` en el
+// medio no se tropieza con los turnos que dejó la anterior (dos botones con la misma hora rompen los selectores).
+async function freeSlotMoment(staff: ApiClient, service: Service): Promise<{ date: string; time: string }> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const moment = uniqueSlotMoment();
+    const slots = await staff.call<StaffTimeSlotDto[]>('GET', `/staff/time-slots?date=${moment.date}&service=${service}`);
+    const taken = slots.some((slot) => slot.cancelledAt === null && businessTime(new Date(slot.startsAt)) === moment.time);
+    if (!taken) return moment;
+  }
+  throw new Error(`No hay un horario libre para un turno de ${service}: corré pnpm e2e:reset.`);
 }
 
 export async function buyPlan(api: ApiClient, slug: string): Promise<void> {
@@ -168,7 +180,7 @@ export const test = base.extend<Fixtures>({
   createSlot: async ({ staff }, use) => {
     let professionalId: string | undefined;
     await use(async ({ service, capacity = 1, date, time, durationMinutes = 60 }) => {
-      const moment = date && time ? { date, time } : uniqueSlotMoment();
+      const moment = date && time ? { date, time } : await freeSlotMoment(staff, service);
       if (service === 'rehab' && !professionalId) {
         const professionals = await staff.call<ProfessionalDto[]>('GET', '/staff/professionals');
         professionalId = professionals.find((professional) => professional.name === E2E_PROFESSIONAL_NAME)?.id;

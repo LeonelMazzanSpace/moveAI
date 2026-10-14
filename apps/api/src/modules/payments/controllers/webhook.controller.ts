@@ -36,10 +36,20 @@ export class WebhookController {
         secret,
       });
     if (!valid) throw new AppError('INVALID_SIGNATURE');
-    if (single(req.query.type) !== 'payment' || !dataId) return { received: true };
+    if (!dataId) return { received: true };
 
-    this.logger.log(`webhook payment=${dataId}`);
-    await this.payments.applyProviderPayment(await this.mercadoPago.getPayment(dataId));
+    // D96: subscriptions notify their state and each charge; any other type is acknowledged without effects.
+    const type = single(req.query.type);
+    if (type === 'payment') {
+      this.logger.log(`webhook payment=${dataId}`);
+      await this.payments.applyProviderPayment(await this.mercadoPago.getPayment(dataId));
+    } else if (type === 'subscription_preapproval') {
+      this.logger.log(`webhook preapproval=${dataId}`);
+      await this.payments.refreshAutoDebit(dataId);
+    } else if (type === 'subscription_authorized_payment') {
+      this.logger.log(`webhook authorized_payment=${dataId}`);
+      await this.payments.applyAuthorizedPayment(dataId);
+    }
     return { received: true };
   }
 }

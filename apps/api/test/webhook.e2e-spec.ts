@@ -329,6 +329,27 @@ describe('Mercado Pago webhook (e2e)', () => {
     await agent.post('/api/checkout/booking').send({ planId, timeSlotId: slotId }).expect(201);
   });
 
+  it('sends no booking-not-confirmed email when Mercado Pago fails (the hold is abandoned, not rejected)', async () => {
+    const { agent } = await signUpClient(app);
+    const professionalId = await createProfessional(ds);
+    const slotId = await createSlot(ds, { service: 'rehab', startsAt: businessDateTime(addDays(businessToday(), 1), '12:00'), capacity: 1, professionalId });
+    const planId = await planIdBySlug(ds, 'rehab-evaluacion');
+    fake.createPreference.mockRejectedValueOnce(new Error('provider down'));
+    await agent.post('/api/checkout/booking').send({ planId, timeSlotId: slotId }).expect(502);
+    expect(await count(`bookings WHERE status = 'cancelled'`)).toBe(1);
+    expect(await count(`email_logs WHERE template = 'booking-not-confirmed'`)).toBe(0);
+  });
+
+  it('emails the client when a booking payment is rejected by webhook, once even if notified again', async () => {
+    const { agent, userId } = await signUpClient(app);
+    const { ref, bookingId } = await rehabCheckout(agent);
+    providerPayments.set('671', { id: '671', status: 'rejected', statusDetail: 'cc_rejected_other_reason', externalReference: ref, transactionAmount: 1800 });
+    await notify('671').expect(200);
+    await notify('671').expect(200);
+    const logs = await ds.query(`SELECT user_id AS "userId", idempotency_key AS key FROM email_logs WHERE template = 'booking-not-confirmed'`);
+    expect(logs).toEqual([{ userId, key: `booking-not-confirmed:${bookingId}` }]);
+  });
+
   it('stores the preference and sends the hold expiry to Mercado Pago', async () => {
     const { agent } = await signUpClient(app);
     const { ref } = await rehabCheckout(agent);
@@ -466,7 +487,7 @@ describe('Mercado Pago webhook (e2e)', () => {
       const booking = await rehabCheckout((await signUpClient(app)).agent);
       // The hold runs out and the expiry job releases it, as in production.
       await ds.query(`UPDATE bookings SET hold_expires_at = now() - interval '1 minute' WHERE id = $1`, [booking.bookingId]);
-      await expect(app.get(BookingsService).expireHolds(new Date())).resolves.toBe(1);
+      await expect(app.get(BookingsService).expireHoldsWithIds(new Date())).resolves.toHaveLength(1);
       await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 2 });
       expect((await purchaseOf(ref)).status).toBe('expired');
       expect(await purchaseOf(booking.ref)).toEqual({ status: 'expired', needs_attention: false });

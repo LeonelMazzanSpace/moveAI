@@ -4,7 +4,7 @@ import { addDays, businessDateTime, businessMonth, businessToday } from '../src/
 import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
 import type { Service } from '../src/modules/catalog/entities/plan.entity.js';
 import { createTestApp, type TestApp } from './utils/app.js';
-import { signUp, signUpClient, signUpStaff, type TestAgent } from './utils/auth.js';
+import { signUp, signUpClient, signUpStaff, TEST_ORIGIN, type TestAgent } from './utils/auth.js';
 import { resetDb } from './utils/db.js';
 import { createProfessional, createSlot, givePack, givePerformancePlan, planIdBySlug } from './utils/fixtures.js';
 
@@ -254,6 +254,41 @@ describe('staff clients, KPIs and dashboard (e2e)', () => {
       await bad({ ...ok, phone: '09\u0000912345' });
       await bad({ ...ok, role: 'staff' });
       await bad({ name: ok.name });
+      const [{ count }] = await ctx.dataSource.query(`SELECT count(*)::int AS count FROM users WHERE role = 'client'`);
+      expect(count).toBe(0);
+    });
+  });
+
+  describe('POST /api/staff/clients with unpaired surrogates', () => {
+    const ok = { name: 'Sofía Techera', email: 'sote@test.move', phone: '099123456' };
+
+    it.each([['high surrogate', '\ud800'], ['low surrogate', 'a\udc00']])(
+      'rejects a lone %s in the name, email or phone with VALIDATION_FAILED', async (_label, bad) => {
+        const overrides = [{ name: `Ana ${bad}` }, { name: bad }, { email: `${bad}@x.com` }, { email: bad }, { phone: `0991${bad}2345` }];
+        for (const override of overrides) {
+          const res = await staff.agent.post('/api/staff/clients').send({ ...ok, ...override });
+          expect(res.status, JSON.stringify(override)).toBe(400);
+          expect(res.body.code, JSON.stringify(override)).toBe('VALIDATION_FAILED');
+        }
+        const [{ count }] = await ctx.dataSource.query(`SELECT count(*)::int AS count FROM users WHERE role = 'client'`);
+        expect(count).toBe(0);
+      });
+
+    it('still accepts a valid surrogate pair (emoji)', async () => {
+      const res = await staff.agent.post('/api/staff/clients').send({ ...ok, name: 'Ana 😀' }).expect(201);
+      expect(res.body).toMatchObject({ name: 'Ana 😀' });
+    });
+  });
+
+  describe('POST /api/auth/sign-up/email with unpaired surrogates', () => {
+    it.each([
+      ['email', { email: 'a\ud800@test.move' }], ['email', { email: '\udc00' }],
+      ['name', { name: 'Ana \ud800' }], ['name', { name: '\udc00' }],
+    ])('answers 4xx, never 500, for a lone surrogate in the %s', async (_field, override) => {
+      const res = await request(ctx.app.getHttpServer()).post('/api/auth/sign-up/email').set('Origin', TEST_ORIGIN)
+        .send({ name: 'Ana Pérez', email: 'surrogate@test.move', password: 'Secreto123!', ...override });
+      expect(res.status, JSON.stringify(override)).toBeGreaterThanOrEqual(400);
+      expect(res.status, JSON.stringify(override)).toBeLessThan(500);
       const [{ count }] = await ctx.dataSource.query(`SELECT count(*)::int AS count FROM users WHERE role = 'client'`);
       expect(count).toBe(0);
     });

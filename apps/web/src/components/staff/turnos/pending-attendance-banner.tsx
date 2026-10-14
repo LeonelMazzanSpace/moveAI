@@ -45,7 +45,7 @@ export function PendingAttendanceBanner({ slots, isError = false, onRetry }: Pen
       <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
         {slots.map((slot) => (
           <li key={slot.id}>
-            <Link href={slotHref(slot)} className="underline underline-offset-4 hover:text-foreground">
+            <Link href={slotHref(slot)} className="inline-flex min-h-8 items-center underline underline-offset-4 hover:text-foreground">
               {slotLabel(slot)}
             </Link>
           </li>

@@ -4,10 +4,13 @@ import { DisplayTitle } from '@/components/move/display-title';
 import { Eyebrow } from '@/components/move/eyebrow';
 import { PageContainer } from '@/components/move/page-container';
 import { AccountCta } from '@/components/public/account-cta';
+import { ContactSection } from '@/components/public/contact-section';
 import { CtaLink, Hero } from '@/components/public/hero';
+import { loadContact } from '@/components/public/load-contact';
 import { loadPlans } from '@/components/public/load-plans';
 import { PlansSection, PlansSkeleton } from '@/components/public/plans-section';
 import { ServiceCards } from '@/components/public/service-cards';
+import { TeamSection } from '@/components/public/team-section';
 
 export const metadata: Metadata = {
   title: { absolute: 'MOVE — Performance, Rehab & Recovery' },
@@ -18,6 +21,10 @@ export const metadata: Metadata = {
 async function FeaturedPlans() {
   const plans = await loadPlans('performance');
   return <PlansSection plans={plans} ctaLabel="Contratar" hrefFor={(plan) => `/checkout/plan/${plan.slug}`} />;
+}
+
+async function HomeContact() {
+  return <ContactSection contact={await loadContact()} />;
 }
 
 export default function HomePage() {
@@ -55,11 +62,13 @@ export default function HomePage() {
         </PageContainer>
       </section>
 
+      <TeamSection />
+
       <section className="border-t border-border">
         <PageContainer className="py-20">
           <div className="flex flex-wrap items-end justify-between gap-6">
             <div>
-              <Eyebrow index="02">Planes</Eyebrow>
+              <Eyebrow index="03">Planes</Eyebrow>
               <div className="mt-4">
                 <DisplayTitle>Elegí tu plan.</DisplayTitle>
               </div>
@@ -77,6 +86,10 @@ export default function HomePage() {
       </section>
 
       <AccountCta />
+
+      <Suspense fallback={null}>
+        <HomeContact />
+      </Suspense>
     </>
   );
 }

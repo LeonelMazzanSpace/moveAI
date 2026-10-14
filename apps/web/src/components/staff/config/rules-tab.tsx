@@ -63,7 +63,7 @@ function RulesForm({ settings }: { settings: SettingsDto }) {
       {settings.valuesProvisional ? (
         <div className="flex flex-wrap items-center gap-4 rounded border border-border bg-warning-muted px-4 py-3">
           <StatusBadge tone="warning">Valores provisorios — confirmar con MOVE</StatusBadge>
-          <Label htmlFor={`${uid}-confirmed`} className="text-sm">
+          <Label htmlFor={`${uid}-confirmed`} className="min-h-8 text-sm">
             <input id={`${uid}-confirmed`} type="checkbox" className={CHECKBOX_CLASS} {...register('confirmed')} />
             Marcar los valores como confirmados
           </Label>
@@ -83,7 +83,7 @@ function RulesForm({ settings }: { settings: SettingsDto }) {
           </FormField>
         ))}
       </div>
-      <Label htmlFor={`${uid}-checkin`} className="text-sm">
+      <Label htmlFor={`${uid}-checkin`} className="min-h-8 text-sm">
         <input id={`${uid}-checkin`} type="checkbox" className={CHECKBOX_CLASS} {...register('checkinMonthlyEnabled')} />
         Enviar el check-in mensual
       </Label>

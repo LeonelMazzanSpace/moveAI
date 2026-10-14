@@ -5,7 +5,7 @@ import { QueryFailedError, Repository, type FindOptionsWhere } from 'typeorm';
 import { AppError } from '../../../common/errors/app-error.js';
 import type { CreatePlanDto } from '../dto/create-plan.dto.js';
 import type { UpdatePlanDto } from '../dto/update-plan.dto.js';
-import { assertDurationClearable, isPlanSlug, validatePlanShape } from '../domain/plan-rules.js';
+import { assertAutoDebitAllowed, assertDurationClearable, isPlanSlug, validatePlanShape } from '../domain/plan-rules.js';
 import { Plan, type Service } from '../entities/plan.entity.js';
 import { toPlanDto, type PlanModel } from '../models/plan.model.js';
 
@@ -61,6 +61,7 @@ export class CatalogService {
       durationMinutes: dto.durationMinutes ?? null,
     };
     validatePlanShape(shape);
+    assertAutoDebitAllowed(shape.kind, dto.autoDebitEnabled ?? false);
     const plan = this.plans.create({
       ...shape,
       slug: dto.slug,
@@ -71,6 +72,7 @@ export class CatalogService {
       featured: dto.featured ?? false,
       active: dto.active ?? true,
       sortOrder: dto.sortOrder ?? 0,
+      autoDebitEnabled: dto.autoDebitEnabled ?? false,
     });
     try {
       return toPlanDto(await this.plans.save(plan));
@@ -96,6 +98,7 @@ export class CatalogService {
           sessionsIncluded: changes.sessionsIncluded ?? plan.sessionsIncluded,
           durationMinutes: changes.durationMinutes === undefined ? plan.durationMinutes : changes.durationMinutes,
         });
+        assertAutoDebitAllowed(plan.kind, changes.autoDebitEnabled ?? plan.autoDebitEnabled);
         return toPlanDto(await repository.save(repository.merge(plan, changes)));
       });
     } catch (error) {

@@ -1,6 +1,6 @@
 import type { DataSource, EntityManager } from 'typeorm';
 import type { PlanKind, Service } from '../modules/catalog/entities/plan.entity.js';
-import { SETTING_DB_KEYS, SETTINGS_DEFAULTS } from '../modules/settings/settings.defaults.js';
+import { CONTACT_DB_KEYS, CONTACT_DEFAULTS, SETTING_DB_KEYS, SETTINGS_DEFAULTS } from '../modules/settings/settings.defaults.js';
 
 // Provisional catalog and schedule taken from the mockups (D4/D10): confirm with MOVE.
 
@@ -111,26 +111,35 @@ const SEED_TEMPLATE_GROUPS: SeedTemplateGroup[] = [
 ];
 
 export async function insertDefaultSettings(dataSource: DataSource): Promise<void> {
-  const keys = Object.keys(SETTINGS_DEFAULTS) as (keyof typeof SETTINGS_DEFAULTS)[];
-  const placeholders = keys.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2}::jsonb)`).join(', ');
-  const params = keys.flatMap((key) => [SETTING_DB_KEYS[key], JSON.stringify(SETTINGS_DEFAULTS[key])]);
+  const settingKeys = Object.keys(SETTINGS_DEFAULTS) as (keyof typeof SETTINGS_DEFAULTS)[];
+  const contactKeys = Object.keys(CONTACT_DEFAULTS) as (keyof typeof CONTACT_DEFAULTS)[];
+  const rows = [
+    ...settingKeys.map((key) => [SETTING_DB_KEYS[key], JSON.stringify(SETTINGS_DEFAULTS[key])]),
+    ...contactKeys.map((key) => [CONTACT_DB_KEYS[key], JSON.stringify(CONTACT_DEFAULTS[key])]),
+  ];
+  const placeholders = rows.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2}::jsonb)`).join(', ');
+  const params = rows.flat();
   await dataSource.query(`INSERT INTO settings (key, value) VALUES ${placeholders} ON CONFLICT (key) DO NOTHING`, params);
 }
+
+// D96: plans offered with Mercado Pago automatic debit (same list as the AutoDebits migration).
+const AUTO_DEBIT_PLAN_SLUGS = ['performance-mensual', 'recovery-paquete-4', 'recovery-paquete-8'];
 
 async function insertPlans(manager: EntityManager): Promise<number> {
   let inserted = 0;
   for (const plan of SEED_PLANS) {
     const rows: { id: string }[] = await manager.query(
       `INSERT INTO plans (slug, service, kind, name, description, features, price, period_months, period_days,
-         sessions_included, duration_minutes, featured, sort_order)
+         sessions_included, duration_minutes, featured, sort_order, auto_debit_enabled)
        SELECT $1::text, $2::text, $3::text, $4::text, $5::text, $6::text[], $7::integer, $8::smallint, $9::smallint,
-         $10::smallint, $11::smallint, $12::boolean, $13::smallint
+         $10::smallint, $11::smallint, $12::boolean, $13::smallint, $14::boolean
        WHERE NOT EXISTS (SELECT 1 FROM plans WHERE slug = $1)
        ON CONFLICT (slug) WHERE deleted_at IS NULL DO NOTHING
        RETURNING id`,
       [
         plan.slug, plan.service, plan.kind, plan.name, DESCRIPTIONS[plan.service], plan.features, plan.price,
         plan.periodMonths, plan.periodDays, plan.sessionsIncluded, plan.durationMinutes, plan.featured, plan.sortOrder,
+        AUTO_DEBIT_PLAN_SLUGS.includes(plan.slug),
       ],
     );
     inserted += rows.length;

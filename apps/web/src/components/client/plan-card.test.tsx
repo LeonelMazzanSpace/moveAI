@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/api/errors';
-import type { MySubscriptionsDto } from '@/lib/api/types';
+import type { AutoDebitDto, MySubscriptionsDto } from '@/lib/api/types';
 import { PacksSection } from './packs-card';
 import { ClientPlanCard, ClientPlanSection } from './plan-card';
 
@@ -78,6 +78,15 @@ const subscriptions: MySubscriptionsDto = {
   recoveryPacks: [{ id: 'k1', planId: 'p', planName: 'Paquete 4 sesiones', startsOn: '2026-10-01', endsOn: '2026-10-31', sessionsTotal: 4, sessionsUsed: 1, sessionsLeft: 3 }],
 };
 
+/** Responde cada ruta del perfil por separado: las secciones también consultan `/me/auto-debits`. */
+function mockProfile(data: MySubscriptionsDto = subscriptions, debits: AutoDebitDto[] = []) {
+  apiFetch.mockImplementation(async (path: string) => {
+    if (path === '/me/subscriptions') return data;
+    if (path === '/me/auto-debits') return debits;
+    throw new Error(`unexpected request ${path}`);
+  });
+}
+
 function renderSections() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -103,7 +112,8 @@ describe('subscription sections', () => {
 
   it('recovers both sections with a single retry', async () => {
     const user = userEvent.setup();
-    apiFetch.mockRejectedValueOnce(new ApiError(500, 'INTERNAL_ERROR', 'x')).mockResolvedValue(subscriptions);
+    mockProfile();
+    apiFetch.mockRejectedValueOnce(new ApiError(500, 'INTERNAL_ERROR', 'x'));
     renderSections();
 
     await user.click(await screen.findByRole('button', { name: 'Reintentar' }));
@@ -114,10 +124,81 @@ describe('subscription sections', () => {
   });
 
   it('renders both sections when the request succeeds', async () => {
-    apiFetch.mockResolvedValue(subscriptions);
+    mockProfile();
     renderSections();
 
     expect(await screen.findByText('Paquetes Recovery')).toBeInTheDocument();
     expect(screen.getByText('Todavía no tenés un plan Performance')).toBeInTheDocument();
+  });
+});
+
+const activeSubscription = {
+  id: 's', planId: 'p', planName: 'Plan Mensual', service: 'performance' as const, startsOn: '2026-10-01', endsOn: '2026-10-31',
+  status: 'active' as const, daysLeft: 5, progressPct: 80,
+};
+
+const debitOf = (over: Partial<AutoDebitDto>): AutoDebitDto => ({
+  id: 'd1', planId: 'p', planName: 'Plan Mensual', planSlug: 'performance-mensual', service: 'performance', status: 'authorized', amount: 3900,
+  frequency: 1, frequencyType: 'months', nextChargeDate: '2026-11-15', createdAt: '2026-10-14T12:00:00.000Z', cancelledAt: null,
+  cancelReason: null, ...over,
+});
+
+describe('automatic debit in the profile', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('shows the Performance debit inside the plan card and not in the packs card', async () => {
+    mockProfile({ ...subscriptions, performance: activeSubscription }, [debitOf({})]);
+    renderSections();
+
+    expect(await screen.findByText('Débito automático activo · próximo cobro 15/11')).toBeInTheDocument();
+    expect(screen.getAllByText(/Débito automático/)).toHaveLength(1);
+    expect(screen.getByText('Plan Mensual — Performance').closest('div.rounded')).toContainElement(
+      screen.getByText('Débito automático activo · próximo cobro 15/11'),
+    );
+  });
+
+  it('shows the Recovery debit inside the packs card', async () => {
+    mockProfile({ ...subscriptions, performance: activeSubscription }, [
+      debitOf({ id: 'd2', service: 'recovery', planSlug: 'recovery-paquete-4', nextChargeDate: '2026-11-03' }),
+    ]);
+    renderSections();
+
+    expect(await screen.findByText('Débito automático activo · próximo cobro 03/11')).toBeInTheDocument();
+    expect(screen.getByText('Paquetes Recovery').closest('div.rounded')).toContainElement(
+      screen.getByText('Débito automático activo · próximo cobro 03/11'),
+    );
+  });
+
+  it('still shows a pending debit when there is no plan or pack yet', async () => {
+    mockProfile({ performance: null, upcomingPerformance: null, recoveryPacks: [] }, [debitOf({ status: 'pending', nextChargeDate: null })]);
+    renderSections();
+
+    expect(await screen.findByText('Débito automático pendiente de autorización')).toBeInTheDocument();
+    expect(screen.getByText('Todavía no tenés un plan Performance')).toBeInTheDocument();
+  });
+
+  it('confirms with the last paid day of the plan, counting the scheduled plan', async () => {
+    const user = userEvent.setup();
+    const upcoming = { ...activeSubscription, id: 's2', startsOn: '2026-11-01', endsOn: '2026-11-30', status: 'scheduled' as const };
+    mockProfile({ ...subscriptions, performance: activeSubscription, upcomingPerformance: upcoming }, [debitOf({})]);
+    renderSections();
+
+    await user.click(await screen.findByRole('button', { name: 'Cancelar débito' }));
+
+    expect(await screen.findByText('Lo que ya pagaste sigue vigente hasta el 30/11/2026.')).toBeInTheDocument();
+  });
+
+  it('confirms with the last pack expiry for the Recovery debit', async () => {
+    const user = userEvent.setup();
+    const packs = [
+      { id: 'k1', planId: 'p', planName: 'Paquete 4 sesiones', startsOn: '2026-10-01', endsOn: '2026-10-31', sessionsTotal: 4, sessionsUsed: 1, sessionsLeft: 3 },
+      { id: 'k2', planId: 'p', planName: 'Paquete 8 sesiones', startsOn: '2026-10-15', endsOn: '2026-11-14', sessionsTotal: 8, sessionsUsed: 0, sessionsLeft: 8 },
+    ];
+    mockProfile({ performance: null, upcomingPerformance: null, recoveryPacks: packs }, [debitOf({ id: 'd2', service: 'recovery' })]);
+    renderSections();
+
+    await user.click(await screen.findByRole('button', { name: 'Cancelar débito' }));
+
+    expect(await screen.findByText('Lo que ya pagaste sigue vigente hasta el 14/11/2026.')).toBeInTheDocument();
   });
 });

@@ -6,7 +6,8 @@ import { GenerateSlotsJob } from '../jobs/generate-slots.job.js';
 import type { TimeSlotModel } from '../models/time-slot.model.js';
 import { ScheduleService } from '../services/schedule.service.js';
 
-// Shape of `StaffTimeSlotDto`; a slot that was just created has no bookings, so every counter is 0.
+// Shape of `StaffTimeSlotDto`; a slot that was just created has no bookings, so every counter is 0, and the calendar
+// pull has not seen it yet, so it is not blocked (D94).
 function toStaffSlot(slot: TimeSlotModel) {
   return {
     id: slot.id,
@@ -22,6 +23,8 @@ function toStaffSlot(slot: TimeSlotModel) {
     noShow: 0,
     cancelled: 0,
     pendingAttendance: 0,
+    calendarBlocked: false,
+    calendarConflict: false,
   };
 }
 

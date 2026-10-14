@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { RADIO_CLASS } from '@/components/move/radio-styles';
 import { ApiError } from '@/lib/api/errors';
 
 const apiFetch = vi.fn();
@@ -18,7 +19,37 @@ async function answerQuickly() {
   await userEvent.click(screen.getByRole('button', { name: 'Enviar respuesta' }));
 }
 
+const optionCard = (name: string) => {
+  const card = screen.getByRole('radio', { name }).closest('label');
+  if (!card) throw new Error(`the option ${name} is not inside a card`);
+  return card;
+};
+
 describe('CheckinForm', () => {
+  it('draws every option with the shared radio style', () => {
+    render(<CheckinForm firstName="Martina" onSubmit={vi.fn()} />);
+    const radios = screen.getAllByRole('radio');
+    expect(radios).toHaveLength(7);
+    for (const radio of radios) expect(radio.className).toContain(RADIO_CLASS);
+  });
+
+  it('highlights only the chosen option of each question', async () => {
+    render(<CheckinForm firstName="Martina" onSubmit={vi.fn()} />);
+    expect(optionCard('Bien')).toHaveClass('border-border');
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Bien' }));
+    expect(screen.getByRole('radio', { name: 'Bien' })).toBeChecked();
+    expect(optionCard('Bien')).toHaveClass('border-foreground');
+    expect(optionCard('Bien')).not.toHaveClass('border-border');
+    expect(optionCard('Muy bien')).toHaveClass('border-border');
+
+    await userEvent.click(screen.getByText('Muy bien'));
+    expect(screen.getByRole('radio', { name: 'Muy bien' })).toBeChecked();
+    expect(optionCard('Muy bien')).toHaveClass('border-foreground');
+    expect(optionCard('Bien')).toHaveClass('border-border');
+    expect(optionCard('No')).toHaveClass('border-border');
+  });
+
   it('requires the pain detail and submits the answers', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     render(<CheckinForm firstName="Martina" onSubmit={onSubmit} />);

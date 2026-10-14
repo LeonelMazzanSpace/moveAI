@@ -20,6 +20,7 @@ interface SlotStatsRow {
   endsAt: Date;
   capacity: number;
   cancelledAt: Date | null;
+  calendarBlockedAt: Date | null;
   professionalId: string | null;
   professionalName: string | null;
   booked: number;
@@ -35,7 +36,7 @@ interface SlotStatsRow {
 // `pendingAttendance` only counts slots that already started.
 const slotStatsSql = (where: string, having = 'true') => `
   SELECT s.id, s.service, s.starts_at AS "startsAt", s.ends_at AS "endsAt", s.capacity, s.cancelled_at AS "cancelledAt",
-    p.id AS "professionalId", p.name AS "professionalName",
+    s.calendar_blocked_at AS "calendarBlockedAt", p.id AS "professionalId", p.name AS "professionalName",
     count(b.id) FILTER (WHERE b.status IN ('pending_payment','confirmed'))::int AS booked,
     count(b.id) FILTER (WHERE b.status = 'confirmed' AND a.status = 'present')::int AS present,
     count(b.id) FILTER (WHERE b.status = 'confirmed' AND a.status = 'absent')::int AS absent,
@@ -84,6 +85,8 @@ const toStaffSlot = (row: SlotStatsRow): StaffTimeSlotDto => ({
   noShow: row.noShow,
   cancelled: row.cancelled,
   pendingAttendance: row.pendingAttendance,
+  calendarBlocked: row.calendarBlockedAt !== null,
+  calendarConflict: row.calendarBlockedAt !== null && row.booked > 0,
 });
 
 @Injectable()
@@ -94,9 +97,10 @@ export class SlotStatsService {
     private readonly settings: SettingsService,
   ) {}
 
+  // Slots busy in Google Calendar (D94) are hidden like cancelled ones.
   async listPublicSlots(service: Service, date: string, viewerId?: string): Promise<TimeSlotDto[]> {
     const rows = await this.query(
-      `s.service = $2 AND s.starts_at BETWEEN $3 AND $4 AND s.cancelled_at IS NULL`,
+      `s.service = $2 AND s.starts_at BETWEEN $3 AND $4 AND s.cancelled_at IS NULL AND s.calendar_blocked_at IS NULL`,
       [service, businessDayStart(date), businessDayEnd(date)],
       viewerId,
     );
@@ -107,7 +111,7 @@ export class SlotStatsService {
   async availability(service: Service, from: string, days: number): Promise<AvailabilityDayDto[]> {
     const to = addDays(from, days - 1);
     const [rows, windowDays] = await Promise.all([
-      this.query(`s.service = $2 AND s.starts_at BETWEEN $3 AND $4 AND s.cancelled_at IS NULL`, [
+      this.query(`s.service = $2 AND s.starts_at BETWEEN $3 AND $4 AND s.cancelled_at IS NULL AND s.calendar_blocked_at IS NULL`, [
         service, businessDayStart(from), businessDayEnd(to),
       ]),
       this.settings.get('bookingWindowDays'),
@@ -166,6 +170,15 @@ export class SlotStatsService {
       [slotId],
     );
     return count;
+  }
+
+  // D94. Read it after locking the slot, so a mark written by a concurrent calendar pull is already visible.
+  async calendarBlockedAt(manager: EntityManager, slotId: string): Promise<Date | null> {
+    const [row]: { calendarBlockedAt: Date | null }[] = await manager.query(
+      `SELECT calendar_blocked_at AS "calendarBlockedAt" FROM time_slots WHERE id = $1`,
+      [slotId],
+    );
+    return row?.calendarBlockedAt ?? null;
   }
 
   async updateCapacity(slotId: string, capacity: number): Promise<StaffTimeSlotDto> {

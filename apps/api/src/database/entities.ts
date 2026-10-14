@@ -8,6 +8,7 @@ import { Checkin } from '../modules/followup/entities/checkin.entity.js';
 import { FollowupAlert } from '../modules/followup/entities/followup-alert.entity.js';
 import { FollowupContact } from '../modules/followup/entities/followup-contact.entity.js';
 import { InactivityReason } from '../modules/followup/entities/inactivity-reason.entity.js';
+import { AutoDebit } from '../modules/payments/entities/auto-debit.entity.js';
 import { Payment } from '../modules/payments/entities/payment.entity.js';
 import { Purchase } from '../modules/payments/entities/purchase.entity.js';
 import { Professional } from '../modules/schedule/entities/professional.entity.js';
@@ -37,4 +38,5 @@ export const ALL_ENTITIES = [
   FollowupAlert,
   FollowupContact,
   Checkin,
+  AutoDebit,
 ];

@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  Matches,
   Max,
   Min,
   MinLength,
@@ -37,6 +38,9 @@ export const parsePort = (raw: unknown): number => {
   const port = Number(raw);
   return port >= 1 && port <= 65535 ? port : Number.NaN;
 };
+
+// D94: exactly 32 bytes in base64 (43 characters and one `=` of padding).
+export const CALENDAR_TOKEN_KEY_PATTERN = /^[A-Za-z0-9+/]{43}=$/;
 
 const hasGoogle = (o: EnvironmentVariables): boolean =>
   o.GOOGLE_CLIENT_ID !== undefined || o.GOOGLE_CLIENT_SECRET !== undefined;
@@ -95,6 +99,11 @@ class EnvironmentVariables {
   @ValidateIf(hasGoogle)
   @IsString()
   GOOGLE_CLIENT_SECRET?: string;
+
+  // Encrypts the Google Calendar refresh token and signs the OAuth state. Optional: without it the calendar is off.
+  @IsOptional()
+  @Matches(CALENDAR_TOKEN_KEY_PATTERN, { message: 'CALENDAR_TOKEN_KEY must be 32 bytes in base64' })
+  CALENDAR_TOKEN_KEY?: string;
 
   @ValidateIf((o: EnvironmentVariables) => isProduction(o) || o.MP_ACCESS_TOKEN !== undefined)
   @IsString()

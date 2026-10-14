@@ -8,8 +8,17 @@ export interface NavItem {
   sub?: boolean;
 }
 
+/** Width from which a header shows its inline navigation instead of the mobile menu (static strings so Tailwind sees them). */
+export type NavBreakpoint = 'md' | 'lg';
+
+export const BREAKPOINT_CLASSES: Record<NavBreakpoint, { show: string; showInline: string; hide: string }> = {
+  md: { show: 'md:flex', showInline: 'md:inline-flex', hide: 'md:hidden' },
+  lg: { show: 'lg:flex', showInline: 'lg:inline-flex', hide: 'lg:hidden' },
+};
+
 export const PUBLIC_NAV_ITEMS: NavItem[] = [
   { label: 'Inicio', href: '/', exact: true },
+  { label: 'Equipo', href: '/#equipo', exact: true },
   { label: 'Performance', href: '/performance' },
   { label: 'Rehab', href: '/rehab' },
   { label: 'Recovery', href: '/recovery' },

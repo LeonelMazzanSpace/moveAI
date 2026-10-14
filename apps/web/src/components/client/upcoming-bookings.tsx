@@ -126,7 +126,7 @@ export function UpcomingBookings() {
     <div className="rounded border border-border bg-card">
       <div className="flex items-center justify-between gap-3 border-b border-border px-7 py-4">
         <h2 className="text-sm font-semibold">Próximas reservas</h2>
-        <Link href="/historial" className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground">
+        <Link href="/historial" className="inline-flex min-h-8 items-center text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground">
           Ver todas
         </Link>
       </div>

@@ -4,7 +4,7 @@ import { ALL_ENTITIES } from '../src/database/entities.js';
 import { DefaultSettings1791901335369 } from '../src/database/migrations/1791901335369-DefaultSettings.js';
 import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
 import { buildDataSourceOptions } from '../src/database/typeorm.options.js';
-import { SETTING_DB_KEYS, SETTINGS_DEFAULTS } from '../src/modules/settings/settings.defaults.js';
+import { CONTACT_DB_KEYS, CONTACT_DEFAULTS, SETTING_DB_KEYS, SETTINGS_DEFAULTS } from '../src/modules/settings/settings.defaults.js';
 import { resetDb } from './utils/db.js';
 
 describe('schema (e2e)', () => {
@@ -26,10 +26,13 @@ describe('schema (e2e)', () => {
     .map((field) => ({ key: SETTING_DB_KEYS[field], value: SETTINGS_DEFAULTS[field] }))
     .sort((a, b) => a.key.localeCompare(b.key));
 
-  it('has default settings after reset', async () => {
+  it('has default settings and contact seeds after reset', async () => {
+    const contactSeeds = (Object.keys(CONTACT_DB_KEYS) as (keyof typeof CONTACT_DB_KEYS)[])
+      .map((field) => ({ key: CONTACT_DB_KEYS[field], value: CONTACT_DEFAULTS[field] }));
+    const expected = [...expectedSettings, ...contactSeeds].sort((a, b) => a.key.localeCompare(b.key));
     const rows: { key: string; value: unknown }[] = await ds.query(SELECT_SETTINGS);
-    expect(rows).toHaveLength(12);
-    expect(rows).toEqual(expectedSettings);
+    expect(rows).toHaveLength(19);
+    expect(rows).toEqual(expected);
   });
 
   it('inserts the default settings in the DefaultSettings migration', async () => {

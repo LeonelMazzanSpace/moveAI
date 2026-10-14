@@ -14,7 +14,7 @@ export function ClientHeader({ user }: { user: Pick<MeDto, 'name'> }) {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur">
       <PageContainer className="flex h-16 items-center justify-between">
-        <Link href="/perfil" className="font-display text-xl font-black tracking-tight">
+        <Link href="/perfil" className="inline-flex min-h-8 items-center font-display text-xl font-black tracking-tight">
           MOVE<span className="align-super text-[10px]">®</span>
         </Link>
         <HeaderNav items={CLIENT_NAV_ITEMS} />

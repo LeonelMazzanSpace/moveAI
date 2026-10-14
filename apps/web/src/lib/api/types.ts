@@ -23,9 +23,14 @@ export type GoalsChange = 'same' | 'adjust';
 export type CheckinFlag = 'ok' | 'pain' | 'goals';
 export type ActivityType = 'attendance' | 'booking' | 'cancellation' | 'payment';
 export type NoticeKind = 'plan_expiring' | 'plan_expired' | 'checkin_pending' | 'checkin_answered' | 'pack_low';
+export type AutoDebitStatus = 'pending' | 'authorized' | 'cancelled';
+export type AutoDebitCancelReason = 'client' | 'staff' | 'provider' | 'expired';
+export type AutoDebitFrequencyType = 'months' | 'days';
+export type PaymentOrigin = 'one_time' | 'auto_debit';
+export type CalendarConnectionStatus = 'disconnected' | 'connected' | 'needs_reconnect';
 export type JobName =
   | 'followup-detect' | 'checkins-monthly' | 'expiry-reminders'
-  | 'generate-slots' | 'expire-holds' | 'reconcile-payments';
+  | 'generate-slots' | 'expire-holds' | 'reconcile-payments' | 'booking-reminders';
 
 export type ErrorCode =
   | 'VALIDATION_FAILED' | 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'INTERNAL_ERROR'
@@ -37,7 +42,9 @@ export type ErrorCode =
   | 'LOGIN_REQUIRED' | 'HOLD_LIMIT_REACHED' | 'RATE_LIMITED' | 'GUEST_DATA_REQUIRED' | 'EMAIL_ALREADY_REGISTERED' | 'USER_NOT_FOUND'
   | 'PURCHASE_NOT_FOUND' | 'INVALID_SIGNATURE' | 'PAYMENT_PROVIDER_ERROR'
   | 'CLIENT_NOT_FOUND' | 'ALERT_NOT_FOUND' | 'ALERT_ALREADY_HANDLED' | 'PAUSE_ALREADY_ACTIVE' | 'NO_ACTIVE_PAUSE'
-  | 'CHECKIN_NOT_FOUND' | 'CHECKIN_ALREADY_ANSWERED' | 'JOB_UNKNOWN';
+  | 'CHECKIN_NOT_FOUND' | 'CHECKIN_ALREADY_ANSWERED' | 'JOB_UNKNOWN'
+  | 'AUTO_DEBIT_NOT_ALLOWED' | 'AUTO_DEBIT_ACTIVE' | 'AUTO_DEBIT_NOT_FOUND'
+  | 'CALENDAR_NOT_CONFIGURED' | 'CALENDAR_NOT_CONNECTED' | 'CALENDAR_INVALID_CALENDAR' | 'CALENDAR_PROVIDER_ERROR';
 
 export interface ApiErrorBody {
   statusCode: number;
@@ -56,17 +63,22 @@ export interface PlanDto {
   id: string; service: Service; kind: PlanKind; slug: string; name: string; description: string;
   features: string[]; price: number; currency: 'UYU';
   periodMonths: number | null; periodDays: number | null; sessionsIncluded: number | null; durationMinutes: number | null;
-  featured: boolean; active: boolean; sortOrder: number;
+  featured: boolean; active: boolean; sortOrder: number; autoDebitEnabled: boolean;
 }
 
 // Body of `PATCH /staff/plans/:id`: every field is optional; `durationMinutes: null` clears the duration of a session pack (D89).
 export interface PlanUpdateBody {
   slug?: string; name?: string; description?: string; features?: string[]; price?: number;
   periodMonths?: number; periodDays?: number; sessionsIncluded?: number; durationMinutes?: number | null;
-  featured?: boolean; active?: boolean; sortOrder?: number;
+  featured?: boolean; active?: boolean; sortOrder?: number; autoDebitEnabled?: boolean;
 }
 
 export interface PublicSettingsDto { cancelLimitHours: number; bookingWindowDays: number; }
+
+export interface ContactInfoDto {
+  address: string; hours: string; whatsapp: string; instagram: string; email: string; mapsUrl: string;
+}
+export interface StaffContactInfoDto extends ContactInfoDto { staffNotificationsEmail: string; }
 
 export interface SettingsDto {
   cancelLimitHours: number; bookingWindowDays: number; pendingPaymentMinutes: number; reconcileAfterMinutes: number;
@@ -92,9 +104,15 @@ export interface AvailabilityDayDto { date: string; available: number; }
 
 export interface StaffTimeSlotDto {
   id: string; service: Service; startsAt: string; endsAt: string; capacity: number; professional: SlotProfessional | null;
-  cancelledAt: string | null;
+  cancelledAt: string | null; calendarBlocked: boolean; calendarConflict: boolean;
   booked: number; present: number; absent: number; noShow: number; cancelled: number; pendingAttendance: number;
 }
+
+export interface CalendarStatusDto {
+  configured: boolean; status: CalendarConnectionStatus; accountEmail: string | null;
+  calendarId: string | null; calendarName: string | null; lastPushAt: string | null; lastPullAt: string | null;
+}
+export interface GoogleCalendarOptionDto { id: string; name: string; primary: boolean; }
 
 export interface SubscriptionDto {
   id: string; planId: string; planName: string; service: 'performance'; startsOn: string; endsOn: string;
@@ -134,7 +152,18 @@ export interface PurchaseStatusDto {
 export interface StaffPaymentDto {
   purchaseId: string; client: { id: string; name: string; email: string }; itemName: string; service: Service;
   amount: number; method: PaymentMethod; status: PurchaseStatus; needsAttention: boolean;
-  createdAt: string; approvedAt: string | null; note: string | null;
+  createdAt: string; approvedAt: string | null; note: string | null; origin: PaymentOrigin;
+}
+
+export interface AutoDebitDto {
+  id: string; planId: string; planName: string; planSlug: string; service: 'performance' | 'recovery';
+  status: AutoDebitStatus; amount: number; frequency: number; frequencyType: AutoDebitFrequencyType;
+  nextChargeDate: string | null; createdAt: string; cancelledAt: string | null; cancelReason: AutoDebitCancelReason | null;
+}
+export interface AutoDebitCheckoutDto { externalReference: string; initPoint: string; }
+export interface AutoDebitStatusDto {
+  externalReference: string; status: AutoDebitStatus; planName: string; planSlug: string;
+  service: 'performance' | 'recovery'; amount: number; nextChargeDate: string | null;
 }
 
 export interface ClientMetricsDto {
@@ -171,6 +200,7 @@ export interface ClientDetailDto {
   subscription: SubscriptionDto | null; upcomingSubscription: SubscriptionDto | null; recoveryPacks: PackDto[];
   metrics: ClientMetricsDto; activePause: InactivityReasonDto | null;
   contacts: ContactDto[]; reasons: InactivityReasonDto[]; history: ActivityItemDto[]; upcomingBookings: BookingDto[];
+  autoDebits: AutoDebitDto[];
 }
 
 export type AlertCountsDto = Record<AlertType, number> & { total: number };

@@ -13,12 +13,12 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
     <>
       <header className="border-b border-border bg-background">
         <PageContainer className="flex h-16 items-center justify-between">
-          <Link href="/" className="font-display text-xl font-black tracking-tight">
+          <Link href="/" className="inline-flex min-h-8 items-center font-display text-xl font-black tracking-tight">
             MOVE<span className="align-super text-[10px]">®</span>
           </Link>
           <Link
             href="/"
-            className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground"
+            className="inline-flex min-h-8 items-center text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground"
           >
             ← Volver al sitio
           </Link>

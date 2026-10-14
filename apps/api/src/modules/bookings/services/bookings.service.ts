@@ -1,15 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DataSource, QueryFailedError, type EntityManager } from 'typeorm';
 import { AppError } from '../../../common/errors/app-error.js';
 import { businessTime, businessToday, toBusinessDate } from '../../../common/time/business-time.js';
-import { NotificationsService } from '../../notifications/services/notifications.service.js';
 import type { TimeSlotModel } from '../../schedule/models/time-slot.model.js';
 import { ScheduleService } from '../../schedule/services/schedule.service.js';
 import { SettingsService } from '../../settings/services/settings.service.js';
 import { SubscriptionsService } from '../../subscriptions/services/subscriptions.service.js';
 import { UsersService } from '../../users/services/users.service.js';
 import {
-  ACTIVE_STATUSES, SERVICE_LABEL, bookingLabel, canClientCancel, displayDate, durationMinutes, isBookable,
+  ACTIVE_STATUSES, SERVICE_LABEL, bookingLabel, canClientCancel, durationMinutes, isBookable,
   isClientCancellable, isWithinCancelWindow,
 } from '../domain/booking-rules.js';
 import type { AttendanceStatus } from '../entities/attendance.entity.js';
@@ -17,6 +16,7 @@ import type { BookingSource, BookingStatus } from '../entities/booking.entity.js
 import type { BookingScope } from '../dto/my-bookings.query.js';
 import type { ActivityItemDto, BookingDto, BookingModel, RosterItemDto } from '../models/booking.model.js';
 import { AttendanceService } from './attendance.service.js';
+import { BookingEmailsService } from './booking-emails.service.js';
 import { SlotStatsService } from './slot-stats.service.js';
 
 type BookingRow = BookingModel & { attendance: AttendanceStatus | null };
@@ -78,17 +78,15 @@ const isActiveDuplicate = (error: unknown): boolean => {
 
 @Injectable()
 export class BookingsService {
-  private readonly logger = new Logger(BookingsService.name);
-
   constructor(
     private readonly dataSource: DataSource,
     private readonly schedule: ScheduleService,
     private readonly subscriptions: SubscriptionsService,
     private readonly settings: SettingsService,
-    private readonly notifications: NotificationsService,
     private readonly users: UsersService,
     private readonly slotStats: SlotStatsService,
     private readonly attendance: AttendanceService,
+    private readonly bookingEmails: BookingEmailsService,
   ) {}
 
   // R6, in one transaction: the slot row lock serializes every booking of the slot.
@@ -103,7 +101,7 @@ export class BookingsService {
       const entitlement = await this.claimEntitlement(manager, userId, slot);
       return this.insert(manager, { userId, slot, status: 'confirmed', ...entitlement, holdExpiresAt: null });
     });
-    await this.sendBookingConfirmation(booking.id);
+    await this.bookingEmails.confirmed(booking.id);
     return toDto({ ...booking, attendance: null }, new Date(), cancelLimitHours);
   }
 
@@ -115,7 +113,7 @@ export class BookingsService {
     const windowDays = await this.settings.get('bookingWindowDays');
     const slot = await this.schedule.lockSlot(manager, input.timeSlotId);
     if (slot.service !== input.expectedService) throw new AppError('SERVICE_MISMATCH');
-    this.assertBookable(slot, windowDays);
+    await this.assertBookable(manager, slot, windowDays);
     await this.assertRoom(manager, input.userId, slot);
     await this.assertHoldAllowed(manager, input.userId);
     return this.insert(manager, {
@@ -144,24 +142,29 @@ export class BookingsService {
     return { ...booking, status: 'confirmed', cancelledAt: null };
   }
 
-  async releaseHold(manager: EntityManager, bookingId: string, reason: 'expired' | 'cancelled'): Promise<void> {
-    await manager.query(
-      `UPDATE bookings SET status = $2, cancelled_at = now(), cancelled_by = 'system', updated_at = now()
-       WHERE id = $1 AND status = 'pending_payment'`,
+  // Returns whether this call released the hold (a hold already cancelled, expired or confirmed is left as it is).
+  async releaseHold(manager: EntityManager, bookingId: string, reason: 'expired' | 'cancelled'): Promise<boolean> {
+    const rows: { id: string }[] = await manager.query(
+      `WITH released AS (
+         UPDATE bookings SET status = $2, cancelled_at = now(), cancelled_by = 'system', updated_at = now()
+         WHERE id = $1 AND status = 'pending_payment' RETURNING id
+       ) SELECT id FROM released`,
       [bookingId, reason],
     );
+    return rows.length > 0;
   }
 
-  async expireHolds(now: Date): Promise<number> {
-    const [{ count }]: { count: number }[] = await this.dataSource.query(
+  // The ids of the holds that just expired, so the caller can tell their clients (D93).
+  async expireHoldsWithIds(now: Date): Promise<string[]> {
+    const rows: { id: string }[] = await this.dataSource.query(
       `WITH expired AS (
          UPDATE bookings SET status = 'expired', cancelled_at = $1, cancelled_by = 'system', updated_at = now()
          WHERE status = 'pending_payment' AND hold_expires_at < $1 AND deleted_at IS NULL
          RETURNING id
-       ) SELECT count(*)::int AS count FROM expired`,
+       ) SELECT id FROM expired`,
       [now],
     );
-    return count;
+    return rows.map((row) => row.id);
   }
 
   // R7 (client). Another client's booking answers BOOKING_NOT_FOUND, like a missing one.
@@ -174,19 +177,19 @@ export class BookingsService {
       if (!isWithinCancelWindow(booking.startsAt, new Date(), cancelLimitHours)) throw new AppError('CANCEL_WINDOW_CLOSED');
       await this.cancel(manager, booking, 'client');
     });
+    await this.bookingEmails.cancelledByClient(bookingId);
     const [row] = await this.findRows(`b.id = $1`, [bookingId]);
     return toDto(row, new Date(), cancelLimitHours);
   }
 
   // R7 (staff): any active booking, no time limit; the client is emailed after the commit.
   async cancelByStaff(bookingId: string): Promise<RosterItemDto> {
-    const booking = await this.dataSource.transaction(async (manager) => {
+    await this.dataSource.transaction(async (manager) => {
       const locked = await this.lockBooking(manager, bookingId);
       if (!ACTIVE_STATUSES.includes(locked.status)) throw new AppError('BOOKING_NOT_CANCELLABLE');
       await this.cancel(manager, locked, 'staff');
-      return locked;
     });
-    await this.sendCancellation(booking);
+    await this.bookingEmails.cancelledByStaff(bookingId);
     return this.attendance.getRosterItem(bookingId);
   }
 
@@ -221,26 +224,7 @@ export class BookingsService {
 
   // Never throws: the booking is already committed when this runs.
   async sendBookingConfirmation(bookingId: string): Promise<void> {
-    try {
-      const booking = await this.getBooking(bookingId);
-      const user = await this.users.findById(booking.userId);
-      if (!user) return;
-      await this.notifications.send({
-        template: 'booking-confirmed',
-        to: { email: user.email, name: user.name },
-        userId: user.id,
-        idempotencyKey: `booking-confirmed:${booking.id}`,
-        params: {
-          name: user.name,
-          serviceName: SERVICE_LABEL[booking.service],
-          label: bookingLabel(booking.service, booking.source, durationMinutes(booking.startsAt, booking.endsAt)),
-          date: displayDate(toBusinessDate(booking.startsAt)),
-          time: businessTime(booking.startsAt),
-        },
-      });
-    } catch {
-      this.logger.error(`booking-confirmed email failed booking=${bookingId}`);
-    }
+    await this.bookingEmails.confirmed(bookingId);
   }
 
   async getBooking(bookingId: string): Promise<BookingModel> {
@@ -249,42 +233,34 @@ export class BookingsService {
     return toModel(row);
   }
 
-  private async sendCancellation(booking: BookingModel): Promise<void> {
-    try {
-      const user = await this.users.findById(booking.userId);
-      if (!user) return;
-      await this.notifications.send({
-        template: 'booking-cancelled',
-        to: { email: user.email, name: user.name },
-        userId: user.id,
-        idempotencyKey: `booking-cancelled:${booking.id}`,
-        params: {
-          name: user.name,
-          serviceName: SERVICE_LABEL[booking.service],
-          date: displayDate(toBusinessDate(booking.startsAt)),
-          time: businessTime(booking.startsAt),
-        },
-      });
-    } catch {
-      this.logger.error(`booking-cancelled email failed booking=${booking.id}`);
-    }
+  // Confirmed bookings whose slot starts inside `[from, to]`, both inclusive.
+  async listConfirmedStartingBetween(from: Date, to: Date): Promise<BookingModel[]> {
+    const rows = await this.findRows(
+      `b.status = 'confirmed' AND s.starts_at BETWEEN $1 AND $2 ORDER BY s.starts_at, b.created_at`,
+      [from, to],
+    );
+    return rows.map(toModel);
   }
 
   // R6 steps 1–2.
   private async lockBookableSlot(manager: EntityManager, slotId: string, windowDays: number): Promise<TimeSlotModel> {
     const slot = await this.schedule.lockSlot(manager, slotId);
-    this.assertBookable(slot, windowDays);
+    await this.assertBookable(manager, slot, windowDays);
     return slot;
   }
 
-  private assertBookable(slot: TimeSlotModel, windowDays: number): void {
+  // The slot must already be locked, so a Google Calendar block (D94) committed by a pull is seen here.
+  private async assertBookable(manager: EntityManager, slot: TimeSlotModel, windowDays: number): Promise<void> {
     const now = new Date();
-    if (!isBookable(slot, now, businessToday(now), windowDays)) throw new AppError('SLOT_NOT_BOOKABLE');
+    const calendarBlockedAt = await this.slotStats.calendarBlockedAt(manager, slot.id);
+    if (!isBookable({ ...slot, calendarBlockedAt }, now, businessToday(now), windowDays)) throw new AppError('SLOT_NOT_BOOKABLE');
   }
 
   private async assertRoomForExpiredHold(manager: EntityManager, booking: BookingModel): Promise<void> {
     const slot = await this.schedule.lockSlot(manager, booking.timeSlotId);
     if (slot.cancelledAt || slot.startsAt.getTime() <= Date.now()) throw new AppError('SLOT_FULL');
+    // D111: a slot busy in Google Calendar (D94) has no room either, so the late payment is flagged instead.
+    if (await this.slotStats.calendarBlockedAt(manager, slot.id)) throw new AppError('SLOT_FULL');
     try {
       await this.assertRoom(manager, booking.userId, slot);
     } catch (error) {

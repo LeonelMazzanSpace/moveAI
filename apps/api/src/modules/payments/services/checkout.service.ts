@@ -20,6 +20,7 @@ import { UsersService } from '../../users/services/users.service.js';
 import type { CheckoutBookingDto, GuestDto } from '../dto/checkout-booking.dto.js';
 import type { CheckoutResponseDto } from '../dto/payment-responses.js';
 import type { PurchaseKind } from '../entities/purchase.entity.js';
+import { AutoDebitsService } from './auto-debits.service.js';
 import { MercadoPagoService } from './mercado-pago.service.js';
 import { PLAN_PURCHASE_KINDS } from './payments.service.js';
 
@@ -40,12 +41,18 @@ export class CheckoutService {
     private readonly auth: AuthService,
     private readonly users: UsersService,
     private readonly mercadoPago: MercadoPagoService,
+    private readonly autoDebits: AutoDebitsService,
     @Inject(mercadoPagoConfig.KEY) private readonly config: ConfigType<typeof mercadoPagoConfig>,
     @Inject(appConfig.KEY) private readonly app: ConfigType<typeof appConfig>,
   ) {}
 
+  // D97: an authorized Performance debit already pays the next periods, so a one-time Performance plan is refused;
+  // Recovery packs can still be bought once.
   async checkoutPlan(userId: string, planId: string): Promise<CheckoutResponseDto> {
     const plan = await this.loadPlan(planId, PLAN_PURCHASE_KINDS);
+    if (plan.service === 'performance' && (await this.autoDebits.hasAuthorized(userId, 'performance'))) {
+      throw new AppError('AUTO_DEBIT_ACTIVE');
+    }
     const purchase = await this.insertPurchase(this.dataSource.manager, { userId, kind: 'plan', plan, bookingId: null });
     const initPoint = await this.startPayment(purchase, plan, userId, null);
     return { purchaseId: purchase.id, externalReference: purchase.externalReference, initPoint, bookingId: null, holdExpiresAt: null };
@@ -104,7 +111,8 @@ export class CheckoutService {
   private async assertSlotOpen(slot: TimeSlotModel): Promise<void> {
     const now = new Date();
     const windowDays = await this.settings.get('bookingWindowDays');
-    if (!isBookable(slot, now, businessToday(now), windowDays)) throw new AppError('SLOT_NOT_BOOKABLE');
+    const calendarBlockedAt = await this.slotStats.calendarBlockedAt(this.dataSource.manager, slot.id);
+    if (!isBookable({ ...slot, calendarBlockedAt }, now, businessToday(now), windowDays)) throw new AppError('SLOT_NOT_BOOKABLE');
     if ((await this.slotStats.countActive(this.dataSource.manager, slot.id)) >= slot.capacity) throw new AppError('SLOT_FULL');
   }
 

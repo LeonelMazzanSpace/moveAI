@@ -1,6 +1,6 @@
 import { StatusBadge, type StatusTone } from '@/components/move/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { PaymentMethod, PurchaseStatus, StaffPaymentDto } from '@/lib/api/types';
+import type { PaymentMethod, PaymentOrigin, PurchaseStatus, StaffPaymentDto } from '@/lib/api/types';
 import { formatDate, formatTime, formatUYU, SERVICE_LABEL } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { MOBILE_CELL, MOBILE_LABELLED_CELL, MOBILE_ROW, MOBILE_TABLE, MOBILE_TABLE_BODY, MOBILE_TABLE_HEAD } from '@/components/staff/shared/mobile-card';
@@ -10,6 +10,15 @@ export const METHOD_LABEL: Record<PaymentMethod, string> = {
   cash: 'Efectivo',
   transfer: 'Transferencia',
 };
+
+/** Valor de `origen` en la URL de cada origen de pago. */
+export const ORIGIN_PARAM: Record<PaymentOrigin, string> = { one_time: 'unico', auto_debit: 'debito' };
+const ORIGINS = Object.keys(ORIGIN_PARAM) as PaymentOrigin[];
+
+/** Origen del filtro `?origen=`; cualquier valor que no sea `debito` o `unico` se ignora. Lo usa también la página (servidor). */
+export function originFromParam(raw: string | undefined): PaymentOrigin | null {
+  return ORIGINS.find((origin) => ORIGIN_PARAM[origin] === raw) ?? null;
+}
 
 const STATUS_BADGE: Record<PurchaseStatus, { label: string; tone: StatusTone }> = {
   approved: { label: 'Aprobado', tone: 'success' },
@@ -39,21 +48,26 @@ export function PaymentsTable({ payments }: { payments: StaffPaymentDto[] }) {
             const badge = STATUS_BADGE[payment.status];
             return (
               <TableRow role="row" key={payment.purchaseId} className={cn(MOBILE_ROW, payment.needsAttention && 'bg-warning-muted/40')}>
-                <TableCell role="cell" data-label="Fecha" className={cn('whitespace-nowrap', MOBILE_LABELLED_CELL, 'max-md:col-span-2')}>
+                <TableCell role="cell" data-label="Fecha" className={cn('whitespace-nowrap', MOBILE_LABELLED_CELL, 'max-xl:col-span-2')}>
                   {formatDate(payment.createdAt)} <span className="text-muted-foreground">{formatTime(payment.createdAt)}</span>
                 </TableCell>
-                <TableCell role="cell" className={cn(MOBILE_CELL, 'max-md:col-span-2')}>
+                <TableCell role="cell" className={cn(MOBILE_CELL, 'max-xl:col-span-2')}>
                   <span className="sr-only">Cliente: </span>
                   <div className="font-medium">{payment.client.name}</div>
                   <div className="text-xs text-muted-foreground">{payment.client.email}</div>
                 </TableCell>
-                <TableCell role="cell" data-label="Ítem" className={cn(MOBILE_LABELLED_CELL, 'max-md:col-span-2')}>
+                <TableCell role="cell" data-label="Ítem" className={cn(MOBILE_LABELLED_CELL, 'max-xl:col-span-2')}>
                   <div>{payment.itemName}</div>
                   {payment.note ? <div className="text-xs text-muted-foreground">{payment.note}</div> : null}
                 </TableCell>
                 <TableCell role="cell" data-label="Servicio" className={MOBILE_LABELLED_CELL}>{SERVICE_LABEL[payment.service]}</TableCell>
                 <TableCell role="cell" data-label="Monto" className={cn('whitespace-nowrap', MOBILE_LABELLED_CELL)}>{formatUYU(payment.amount)}</TableCell>
-                <TableCell role="cell" data-label="Método" className={MOBILE_LABELLED_CELL}>{METHOD_LABEL[payment.method]}</TableCell>
+                <TableCell role="cell" data-label="Método" className={MOBILE_LABELLED_CELL}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span>{METHOD_LABEL[payment.method]}</span>
+                    {payment.origin === 'auto_debit' ? <StatusBadge tone="neutral">Débito automático</StatusBadge> : null}
+                  </div>
+                </TableCell>
                 <TableCell role="cell" data-label="Estado" className={MOBILE_LABELLED_CELL}>
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>

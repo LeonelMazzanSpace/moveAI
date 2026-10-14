@@ -125,6 +125,15 @@ describe('auth (e2e)', () => {
     expect((await agent.get('/api/me').expect(200)).body).toMatchObject({ name: 'Ana Pérez', phone: '099123456' });
   });
 
+  it('rejects unpaired UTF-16 surrogates on PATCH /me (D120)', async () => {
+    const { agent } = await signUp(ctx.app, { name: 'Ana Pérez' });
+    for (const body of [{ name: 'Ana\ud800' }, { name: '\udc00Ana' }, { phone: '0991\ud8002345' }]) {
+      const res = await agent.patch('/api/me').send(body).expect(400);
+      expect(res.body.code).toBe('VALIDATION_FAILED');
+    }
+    expect((await agent.get('/api/me').expect(200)).body).toMatchObject({ name: 'Ana Pérez', phone: null });
+  });
+
   it('signs up with a phone and stores trimmed profile fields', async () => {
     const res = await http().post('/api/auth/sign-up/email').set('Origin', TEST_ORIGIN)
       .send({ name: '  Ana Pérez  ', email: 'phone@test.move', password: 'Secreto123!', phone: ' 099123456 ' }).expect(200);

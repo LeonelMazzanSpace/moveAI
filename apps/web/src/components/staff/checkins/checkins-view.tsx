@@ -122,7 +122,7 @@ export function CheckinsView() {
           </Button>
         }
       />
-      <div className="grid gap-8 lg:grid-cols-[400px_1fr]">
+      <div className="grid gap-8 xl:grid-cols-[400px_minmax(0,1fr)]">
         <StudentPreview />
         <div>
           <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Respuestas y alertas para el equipo</p>

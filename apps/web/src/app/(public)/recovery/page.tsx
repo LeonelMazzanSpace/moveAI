@@ -8,6 +8,7 @@ import { HowItWorks } from '@/components/public/how-it-works';
 import { loadPlans } from '@/components/public/load-plans';
 import { PlansSkeleton } from '@/components/public/plans-section';
 import { RecoveryModalities } from '@/components/public/recovery-modalities';
+import { RecoveryRoomSection } from '@/components/public/recovery-room-section';
 
 export const metadata: Metadata = {
   title: 'Recovery',
@@ -52,6 +53,8 @@ export default function RecoveryPage() {
           ))}
         </ul>
       </Hero>
+
+      <RecoveryRoomSection />
 
       <section className="border-t border-border bg-soft">
         <PageContainer className="py-16">

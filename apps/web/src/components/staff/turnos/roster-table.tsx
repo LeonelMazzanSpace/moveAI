@@ -55,7 +55,7 @@ function RowActions({ row, canMark, markHint, onMark, onCancel }: Pick<RosterTab
     return <span className="text-xs text-muted-foreground">{inactiveLabel(row)}</span>;
   }
   return (
-    <div className="flex items-center justify-end gap-2 max-md:flex-wrap max-md:justify-start">
+    <div className="flex items-center justify-end gap-2 max-xl:flex-wrap max-xl:justify-start">
       {row.status === 'confirmed' ? (
         <AttendanceButtons value={row.attendance} canMark={canMark} hint={markHint} onMark={(status) => onMark(row.bookingId, status)} />
       ) : null}
@@ -111,7 +111,7 @@ export function RosterTable({ rows, canMark, markHint, onMark, onCancel, paginat
             const state = rowState(row);
             return (
               <TableRow role="row" key={row.bookingId} className={cn(MOBILE_ROW, isInactive(row) && 'opacity-50')}>
-                <TableCell role="cell" className={cn('px-6 py-3.5 font-medium', MOBILE_CELL, 'max-md:col-span-2', isInactive(row) && 'line-through')}>
+                <TableCell role="cell" className={cn('px-6 py-3.5 font-medium', MOBILE_CELL, 'max-xl:col-span-2', isInactive(row) && 'line-through')}>
                   <span className="sr-only">Alumno: </span>
                   {row.client.name}
                 </TableCell>
@@ -119,11 +119,11 @@ export function RosterTable({ rows, canMark, markHint, onMark, onCancel, paginat
                 <TableCell role="cell" data-label="Última asistencia" className={cn('px-6 py-3.5 text-muted-foreground', MOBILE_LABELLED_CELL)}>
                   {row.lastAttendanceOn ? formatDayMonth(row.lastAttendanceOn) : '—'}
                 </TableCell>
-                <TableCell role="cell" className={cn('px-6 py-3.5', MOBILE_CELL, 'max-md:col-span-2')}>
+                <TableCell role="cell" className={cn('px-6 py-3.5', MOBILE_CELL, 'max-xl:col-span-2')}>
                   <span className="sr-only">Estado: </span>
                   <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
                 </TableCell>
-                <TableCell role="cell" className={cn('px-6 py-3.5 text-right', MOBILE_CELL, 'max-md:col-span-2 max-md:text-left')}>
+                <TableCell role="cell" className={cn('px-6 py-3.5 text-right', MOBILE_CELL, 'max-xl:col-span-2 max-xl:text-left')}>
                   <RowActions row={row} canMark={canMark} markHint={markHint} onMark={onMark} onCancel={onCancel} />
                 </TableCell>
               </TableRow>

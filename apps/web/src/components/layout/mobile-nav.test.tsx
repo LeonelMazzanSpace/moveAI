@@ -36,6 +36,19 @@ function renderWithQuery(ui: ReactElement, queryClient = new QueryClient({ defau
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
+describe('menu breakpoints', () => {
+  it('keeps the client header menu button visible below md', () => {
+    renderWithQuery(<ClientHeader user={{ name: 'Sofía Martínez' }} />);
+    expect(screen.getByRole('button', { name: 'Abrir menú' })).toHaveClass('md:hidden');
+  });
+
+  it('shows the staff menu button below lg, where the sidebar takes over', () => {
+    renderWithQuery(<StaffTopbar name="Staff Demo" />);
+    expect(screen.getByRole('button', { name: 'Abrir menú' })).toHaveClass('lg:hidden');
+    expect(screen.getByRole('button', { name: 'Abrir menú' })).not.toHaveClass('md:hidden');
+  });
+});
+
 async function openMenu() {
   const user = userEvent.setup();
   await user.click(screen.getByRole('button', { name: 'Abrir menú' }));
@@ -179,6 +192,7 @@ describe('MobileNav in the public area', () => {
     const { dialog } = await openMenu();
     expect(linkNames(dialog)).toEqual([
       'Inicio',
+      'Equipo',
       'Performance',
       'Rehab',
       'Recovery',
@@ -186,6 +200,7 @@ describe('MobileNav in the public area', () => {
       'Ingresar',
       'Reservar',
     ]);
+    expect(within(dialog).getByRole('link', { name: 'Equipo' })).toHaveAttribute('href', '/#equipo');
     expect(within(dialog).getByRole('link', { name: 'Ingresar' })).toHaveAttribute('href', '/ingresar');
     expect(within(dialog).getByRole('link', { name: 'Reservar' })).toHaveAttribute('href', '/reservar');
   });

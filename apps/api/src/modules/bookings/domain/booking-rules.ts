@@ -43,14 +43,14 @@ export function bookingLabel(service: Service, source: BookingSource, durationMi
   return `Seguimiento fisioterapéutico · ${durationMinutes} min`;
 }
 
-// R6 step 2: not cancelled, not started and inside the booking window (business dates).
+// R6 step 2: not cancelled, not busy in Google Calendar (D94), not started and inside the booking window (business dates).
 export function isBookable(
-  slot: { startsAt: Date; cancelledAt: Date | null },
+  slot: { startsAt: Date; cancelledAt: Date | null; calendarBlockedAt: Date | null },
   now: Date,
   today: string,
   bookingWindowDays: number,
 ): boolean {
-  if (slot.cancelledAt) return false;
+  if (slot.cancelledAt || slot.calendarBlockedAt) return false;
   if (slot.startsAt.getTime() <= now.getTime()) return false;
   return toBusinessDate(slot.startsAt) <= addDays(today, bookingWindowDays);
 }

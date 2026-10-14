@@ -18,7 +18,7 @@ function makePlan(overrides: Partial<PlanDto>): PlanDto {
   return {
     id: 'plan', service: 'recovery', kind: 'single_session', slug: 'recovery-sesion', name: 'Sesión individual',
     description: '', features: [], price: 900, currency: 'UYU', periodMonths: null, periodDays: null,
-    sessionsIncluded: null, durationMinutes: 45, featured: false, active: true, sortOrder: 1, ...overrides,
+    sessionsIncluded: null, durationMinutes: 45, featured: false, active: true, sortOrder: 1, autoDebitEnabled: false, ...overrides,
   };
 }
 const plans = [

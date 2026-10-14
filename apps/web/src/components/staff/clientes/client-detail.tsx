@@ -2,18 +2,22 @@
 
 import { useMutation, useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useId, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
+import { CancelAutoDebitDialog } from '@/components/client/auto-debit-card';
+import { CANCEL_REASON_LABEL, frequencyLabel, isActiveAutoDebit } from '@/components/client/use-auto-debits';
 import { ErrorState } from '@/components/move/error-state';
 import { StaffPageHeader } from '@/components/move/staff-page-header';
 import { StatusBadge, type StatusTone } from '@/components/move/status-badge';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
 import { errorMessage } from '@/lib/api/errors';
 import type {
   ActivityItemDto,
   ActivityType,
+  AutoDebitDto,
+  AutoDebitStatus,
   BookingDto,
   ClientDetailDto,
   InactivityReasonDto,
@@ -102,6 +106,80 @@ function PlanSection({ detail }: { detail: ClientDetailDto }) {
         ) : null}
         {recoveryPacks.length > 0 ? <ul className="space-y-3 border-t border-border pt-4">{recoveryPacks.map((pack) => <PackSummary key={pack.id} pack={pack} />)}</ul> : null}
       </div>
+    </Section>
+  );
+}
+
+const AUTO_DEBIT_STATUS: Record<AutoDebitStatus, { label: string; tone: StatusTone }> = {
+  pending: { label: 'Pendiente de autorización', tone: 'warning' },
+  authorized: { label: 'Activo', tone: 'success' },
+  cancelled: { label: 'Cancelado', tone: 'neutral' },
+};
+
+function AutoDebitRow({ debit, clientId }: { debit: AutoDebitDto; clientId: string }) {
+  const refresh = useRefreshClients();
+  const [confirming, setConfirming] = useState(false);
+  const cancel = useMutation({
+    mutationFn: () =>
+      apiFetch<AutoDebitDto>(`/staff/clients/${encodeURIComponent(clientId)}/auto-debits/${encodeURIComponent(debit.id)}/cancel`, { method: 'POST' }),
+    onSuccess: async () => {
+      await refresh();
+      toast.success('Débito automático cancelado');
+      setConfirming(false);
+    },
+    // Si ya no existe o cambió de estado, se refresca para mostrar el estado real.
+    onError: () => void refresh(),
+  });
+  const status = AUTO_DEBIT_STATUS[debit.status];
+  const close = () => {
+    setConfirming(false);
+    cancel.reset();
+  };
+
+  return (
+    <li className="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
+      <div className="space-y-1">
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm font-medium">{debit.planName}</p>
+          <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+        </div>
+        <p className="text-xs text-muted-foreground">{`${formatUYU(debit.amount)} · ${frequencyLabel(debit.frequency, debit.frequencyType)}`}</p>
+        {debit.nextChargeDate && isActiveAutoDebit(debit) ? (
+          <p className="text-xs text-muted-foreground">{`Próximo cobro: ${formatDate(debit.nextChargeDate)}`}</p>
+        ) : null}
+        {debit.cancelReason ? <p className="text-xs text-muted-foreground">{CANCEL_REASON_LABEL[debit.cancelReason]}</p> : null}
+      </div>
+      {isActiveAutoDebit(debit) ? (
+        <>
+          <Button variant="outline" size="sm" onClick={() => setConfirming(true)}>
+            Cancelar débito
+          </Button>
+          <CancelAutoDebitDialog
+            open={confirming}
+            description="Lo que ya pagó sigue vigente. Mercado Pago deja de cobrar los próximos ciclos."
+            pending={cancel.isPending}
+            error={cancel.error}
+            onConfirm={() => cancel.mutate()}
+            onClose={close}
+          />
+        </>
+      ) : null}
+    </li>
+  );
+}
+
+function AutoDebitSection({ clientId, autoDebits }: { clientId: string; autoDebits: AutoDebitDto[] }) {
+  return (
+    <Section title="Débito automático">
+      {autoDebits.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Sin débitos automáticos.</p>
+      ) : (
+        <ul className="divide-y divide-border">
+          {autoDebits.map((debit) => (
+            <AutoDebitRow key={debit.id} debit={debit} clientId={clientId} />
+          ))}
+        </ul>
+      )}
     </Section>
   );
 }
@@ -207,17 +285,21 @@ function RehabToggle({ client }: { client: ClientDetailDto['client'] }) {
         aria-labelledby={labelId}
         disabled={toggle.isPending}
         onClick={() => toggle.mutate(!client.rehabFollowupEnabled)}
-        className={cn(
-          'relative h-5 w-9 shrink-0 rounded-full border border-border transition-colors disabled:opacity-50',
-          client.rehabFollowupEnabled ? 'bg-success' : 'bg-soft',
-        )}
+        className="flex h-8 w-11 shrink-0 items-center justify-center disabled:opacity-50"
       >
         <span
           className={cn(
-            'absolute top-0.5 size-3.5 rounded-full bg-foreground transition-all',
-            client.rehabFollowupEnabled ? 'left-[1.125rem]' : 'left-0.5',
+            'relative h-5 w-9 rounded-full border border-border transition-colors',
+            client.rehabFollowupEnabled ? 'bg-success' : 'bg-soft',
           )}
-        />
+        >
+          <span
+            className={cn(
+              'absolute top-0.5 size-3.5 rounded-full bg-foreground transition-all',
+              client.rehabFollowupEnabled ? 'left-[1.125rem]' : 'left-0.5',
+            )}
+          />
+        </span>
       </button>
       <span id={labelId} className="text-sm">
         Seguimiento fisioterapéutico habilitado
@@ -252,6 +334,7 @@ function DetailContent({ detail }: { detail: ClientDetailDto }) {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <PlanSection detail={detail} />
+          <AutoDebitSection clientId={detail.client.id} autoDebits={detail.autoDebits} />
           <MetricsSection metrics={detail.metrics} />
           <Section title="Próximas reservas">
             <UpcomingBookings bookings={detail.upcomingBookings} />

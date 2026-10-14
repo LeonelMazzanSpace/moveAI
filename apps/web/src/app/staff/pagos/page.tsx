@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { StaffPageHeader } from '@/components/move/staff-page-header';
+import { originFromParam } from '@/components/staff/pagos/payments-table';
 import { PaymentsView, type PaymentFilters, type PaymentStatusFilter } from '@/components/staff/pagos/payments-view';
 import type { PaymentMethod } from '@/lib/api/types';
 import { clampPage } from '@/lib/pagination';
@@ -20,6 +21,7 @@ function parseFilters(params: Awaited<SearchParams>): PaymentFilters {
   return {
     status: STATUSES.find((status) => status === first(params.estado)) ?? null,
     method: METHODS.find((method) => method === first(params.metodo)) ?? null,
+    origin: originFromParam(first(params.origen)),
     needsAttention: first(params.atencion) === '1',
     page: clampPage(first(params.pagina)),
   };

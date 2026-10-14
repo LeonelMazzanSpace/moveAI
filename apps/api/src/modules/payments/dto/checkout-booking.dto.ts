@@ -1,5 +1,6 @@
 import { Transform, Type } from 'class-transformer';
-import { IsEmail, IsOptional, IsString, IsUUID, Length, MaxLength, NotContains, ValidateNested } from 'class-validator';
+import { IsOptional, IsString, IsUUID, Length, MaxLength, NotContains, ValidateNested } from 'class-validator';
+import { IsWellFormed, IsWellFormedEmail } from '../../../common/validation/well-formed.js';
 import { EMAIL_LENGTH, NAME_LENGTH, PHONE_LENGTH } from '../../users/dto/update-me.dto.js';
 
 // Postgres text cannot store NUL bytes: reject them at the edge instead of failing with a 500.
@@ -11,18 +12,20 @@ export class GuestDto {
   @Transform(trim)
   @IsString()
   @NotContains(NUL)
+  @IsWellFormed()
   @Length(NAME_LENGTH.min, NAME_LENGTH.max)
   name: string;
 
   @Transform(trim)
   @IsString()
   @MaxLength(EMAIL_LENGTH.max)
-  @IsEmail()
+  @IsWellFormedEmail()
   email: string;
 
   @Transform(trim)
   @IsString()
   @NotContains(NUL)
+  @IsWellFormed()
   @Length(PHONE_LENGTH.min, PHONE_LENGTH.max)
   phone: string;
 }
