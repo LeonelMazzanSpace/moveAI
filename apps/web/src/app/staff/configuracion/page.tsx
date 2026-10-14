@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { moveButton } from '@/components/move/button-styles';
 import { StaffPageHeader } from '@/components/move/staff-page-header';
+import { ContactTab } from '@/components/staff/config/contact-tab';
 import { PlansTab } from '@/components/staff/config/plans-tab';
 import { ProfessionalsTab } from '@/components/staff/config/professionals-tab';
 import { RulesTab } from '@/components/staff/config/rules-tab';
@@ -15,6 +16,7 @@ const TABS = [
   { value: 'horarios', label: 'Horarios' },
   { value: 'profesionales', label: 'Profesionales' },
   { value: 'reglas', label: 'Reglas' },
+  { value: 'contacto', label: 'Contacto' },
 ] as const;
 
 type TabValue = (typeof TABS)[number]['value'];
@@ -28,6 +30,7 @@ function TabContent({ tab }: { tab: TabValue }) {
   if (tab === 'horarios') return <ScheduleTab />;
   if (tab === 'profesionales') return <ProfessionalsTab />;
   if (tab === 'reglas') return <RulesTab />;
+  if (tab === 'contacto') return <ContactTab />;
   return <PlansTab />;
 }
 
