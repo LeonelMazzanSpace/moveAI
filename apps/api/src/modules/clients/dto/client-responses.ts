@@ -3,6 +3,7 @@ import type { ActivityItemDto, BookingDto, StaffTimeSlotDto } from '../../bookin
 import type { AlertCountsDto } from '../../followup/models/alert.model.js';
 import type { ContactDto } from '../../followup/models/contact.model.js';
 import type { InactivityReasonCode, InactivityReasonDto } from '../../followup/models/inactivity.model.js';
+import type { AutoDebitDto } from '../../payments/models/auto-debit.model.js';
 import type { PackDto, SubscriptionDto } from '../../subscriptions/models/subscription.model.js';
 
 // Response shapes of the HTTP contract (clients, dashboard and client overview).
@@ -48,6 +49,7 @@ export interface ClientDetailDto {
   reasons: InactivityReasonDto[];
   history: ActivityItemDto[];
   upcomingBookings: BookingDto[];
+  autoDebits: AutoDebitDto[];
 }
 
 export interface DashboardDto {

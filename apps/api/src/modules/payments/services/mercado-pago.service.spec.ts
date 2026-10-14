@@ -109,6 +109,128 @@ describe('MercadoPagoService', () => {
     ).rejects.toMatchObject({ code: 'PAYMENT_PROVIDER_ERROR' });
   });
 
+  describe('subscriptions (preapproval)', () => {
+    const preapprovalInput = {
+      externalReference: 'ref-9', reason: 'Plan Mensual', payerEmail: 'a@test.move', frequency: 1,
+      frequencyType: 'months' as const, amount: 3900, startDate: null,
+    };
+
+    it('creates a pending preapproval with the back url and the recurring amount', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(201, { id: 'pre-1', init_point: 'https://mp.test/sub' }));
+
+      await expect(service.createPreapproval(preapprovalInput)).resolves.toEqual({ id: 'pre-1', initPoint: 'https://mp.test/sub' });
+      const { url, init } = lastCall();
+      expect(url).toBe('https://api.mercadopago.com/preapproval');
+      expect(init.method).toBe('POST');
+      expect(new Headers(init.headers).get('authorization')).toBe('Bearer TEST-token');
+      expect(JSON.parse(init.body as string)).toEqual({
+        reason: 'Plan Mensual',
+        external_reference: 'ref-9',
+        payer_email: 'a@test.move',
+        auto_recurring: { frequency: 1, frequency_type: 'months', transaction_amount: 3900, currency_id: 'UYU' },
+        back_url: 'https://move.test/checkout/resultado?debito=ref-9',
+        status: 'pending',
+      });
+    });
+
+    it('sends the start date as the start of that business day in Montevideo', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(201, { id: 'pre-2', init_point: 'https://mp.test/sub2' }));
+      await service.createPreapproval({ ...preapprovalInput, frequency: 30, frequencyType: 'days', startDate: '2026-11-16' });
+      const body = JSON.parse(lastCall().init.body as string);
+      expect(body.auto_recurring).toEqual({
+        frequency: 30, frequency_type: 'days', transaction_amount: 3900, currency_id: 'UYU', start_date: '2026-11-16T03:00:00.000Z',
+      });
+    });
+
+    it('rejects a preapproval answer without id or init point', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(201, { id: 'pre-3' }));
+      await expect(service.createPreapproval(preapprovalInput)).rejects.toMatchObject({ code: 'PAYMENT_PROVIDER_ERROR' });
+    });
+
+    it('reads a preapproval and maps its next payment date to a business date', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(200, {
+        id: 'pre-1', status: 'authorized', external_reference: 'ref-9', next_payment_date: '2026-11-16T02:30:00.000-03:00',
+      }));
+      await expect(service.getPreapproval('pre-1')).resolves.toEqual({
+        id: 'pre-1', status: 'authorized', externalReference: 'ref-9', nextPaymentDate: '2026-11-16',
+      });
+      expect(lastCall().url).toBe('https://api.mercadopago.com/preapproval/pre-1');
+      expect(lastCall().init.method).toBe('GET');
+    });
+
+    it.each(['pending', 'authorized', 'paused', 'cancelled'])('keeps the %s status', async (status) => {
+      fetchMock.mockResolvedValue(jsonResponse(200, { id: 'pre-1', status, external_reference: 'ref-9', next_payment_date: null }));
+      await expect(service.getPreapproval('pre-1')).resolves.toMatchObject({ status, nextPaymentDate: null });
+    });
+
+    it('rejects unknown preapproval statuses and malformed answers', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(200, { id: 'pre-1', status: 'finished', external_reference: 'ref-9' }));
+      await expect(service.getPreapproval('pre-1')).rejects.toMatchObject({ code: 'PAYMENT_PROVIDER_ERROR' });
+      fetchMock.mockResolvedValue(jsonResponse(200, { status: 'authorized' }));
+      await expect(service.getPreapproval('pre-1')).rejects.toMatchObject({ code: 'PAYMENT_PROVIDER_ERROR' });
+    });
+
+    it('cancels a preapproval with a PUT', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(200, { id: 'pre-1', status: 'cancelled', external_reference: 'ref-9', next_payment_date: null }));
+      await expect(service.cancelPreapproval('pre-1')).resolves.toMatchObject({ id: 'pre-1', status: 'cancelled' });
+      const { url, init } = lastCall();
+      expect(url).toBe('https://api.mercadopago.com/preapproval/pre-1');
+      expect(init.method).toBe('PUT');
+      expect(JSON.parse(init.body as string)).toEqual({ status: 'cancelled' });
+    });
+
+    it('reads an authorized payment with its payment id', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(200, { id: 7001, preapproval_id: 'pre-1', status: 'processed', payment: { id: 555, status: 'approved' } }));
+      await expect(service.getAuthorizedPayment('7001')).resolves.toEqual({
+        id: '7001', preapprovalId: 'pre-1', paymentId: '555', status: 'processed',
+      });
+      expect(lastCall().url).toBe('https://api.mercadopago.com/authorized_payments/7001');
+    });
+
+    it('reads a scheduled authorized payment without a payment yet', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(200, { id: 7002, preapproval_id: 'pre-1', status: 'scheduled' }));
+      await expect(service.getAuthorizedPayment('7002')).resolves.toEqual({
+        id: '7002', preapprovalId: 'pre-1', paymentId: null, status: 'scheduled',
+      });
+    });
+
+    it('rejects an authorized payment without its preapproval', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(200, { id: 7003, status: 'processed' }));
+      await expect(service.getAuthorizedPayment('7003')).rejects.toMatchObject({ code: 'PAYMENT_PROVIDER_ERROR' });
+    });
+
+    it('searches the charges of a preapproval created in the last days', async () => {
+      vi.useFakeTimers({ now: new Date('2026-10-14T12:00:00.000Z'), toFake: ['Date'] });
+      try {
+        fetchMock.mockResolvedValue(jsonResponse(200, {
+          results: [
+            { id: 1, preapproval_id: 'pre-1', status: 'processed', payment: { id: 11 }, date_created: '2026-10-10T10:00:00.000-03:00' },
+            { id: 2, preapproval_id: 'pre-1', status: 'processed', payment: { id: 12 }, date_created: '2026-08-01T10:00:00.000-03:00' },
+            { id: 3, preapproval_id: 'pre-1', status: 'scheduled', date_created: '2026-10-13T10:00:00.000-03:00' },
+          ],
+        }));
+        await expect(service.searchAuthorizedPayments('pre-1', 40)).resolves.toEqual([
+          { id: '1', preapprovalId: 'pre-1', paymentId: '11', status: 'processed' },
+          { id: '3', preapprovalId: 'pre-1', paymentId: null, status: 'scheduled' },
+        ]);
+        expect(lastCall().url).toBe('https://api.mercadopago.com/authorized_payments/search?preapproval_id=pre-1&limit=100');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('turns subscription failures into PAYMENT_PROVIDER_ERROR', async () => {
+      fetchMock.mockResolvedValue(jsonResponse(404, { message: 'not found' }));
+      await expect(service.getPreapproval('x')).rejects.toMatchObject({ code: 'PAYMENT_PROVIDER_ERROR' });
+      await expect(service.cancelPreapproval('x')).rejects.toMatchObject({ code: 'PAYMENT_PROVIDER_ERROR' });
+      await expect(service.getAuthorizedPayment('x')).rejects.toMatchObject({ code: 'PAYMENT_PROVIDER_ERROR' });
+      fetchMock.mockResolvedValue(jsonResponse(200, { results: 'nope' }));
+      await expect(service.searchAuthorizedPayments('x', 40)).rejects.toMatchObject({ code: 'PAYMENT_PROVIDER_ERROR' });
+      fetchMock.mockRejectedValue(new TypeError('fetch failed'));
+      await expect(service.createPreapproval(preapprovalInput)).rejects.toMatchObject({ code: 'PAYMENT_PROVIDER_ERROR' });
+    });
+  });
+
   it('never calls Mercado Pago without an access token', async () => {
     const simulator = new MercadoPagoService({ accessToken: null, webhookSecret: null, simulatorEnabled: true }, app);
     await expect(simulator.getPayment('1')).rejects.toMatchObject({ code: 'PAYMENT_PROVIDER_ERROR' });

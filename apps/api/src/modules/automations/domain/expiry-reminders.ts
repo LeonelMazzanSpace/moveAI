@@ -9,6 +9,8 @@ export interface ExpiryReminderClient {
   current: SubscriptionModel | null;
   latest: SubscriptionModel | null;
   renewed: boolean;
+  // D96: an authorized Performance automatic debit renews the plan by itself.
+  autoDebit: boolean;
 }
 
 export interface ExpiryReminder {
@@ -24,7 +26,7 @@ function reminderFor(
   const { userId, current, latest } = client;
   if (client.paused || client.renewed) return null;
   if (current) {
-    if (diffDays(today, current.endsOn) > expiringSoonDays) return null;
+    if (client.autoDebit || diffDays(today, current.endsOn) > expiringSoonDays) return null;
     return { userId, template: 'plan-expiring', subscription: current };
   }
   if (!latest) return null;
@@ -33,7 +35,8 @@ function reminderFor(
   return { userId, template: 'plan-expired', subscription: latest };
 }
 
-// R14: paused clients (D11) and clients with a later renewal get no reminder.
+// R14: paused clients (D11) and clients with a later renewal get no reminder; an authorized Performance debit (D96)
+// skips `plan-expiring` but still gets `plan-expired` if the period was cut.
 export function selectExpiryReminders(input: {
   today: string;
   expiringSoonDays: number;

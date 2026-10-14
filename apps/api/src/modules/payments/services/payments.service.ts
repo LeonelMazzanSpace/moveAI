@@ -19,10 +19,14 @@ import { SubscriptionsService } from '../../subscriptions/services/subscriptions
 import { UsersService } from '../../users/services/users.service.js';
 import type { ListStaffPaymentsQuery } from '../dto/list-staff-payments.query.js';
 import type { ManualMethod } from '../dto/manual-payment.dto.js';
-import type { PurchaseStatusDto, StaffPaymentDto } from '../dto/payment-responses.js';
+import type { PaymentOrigin, PurchaseStatusDto, StaffPaymentDto } from '../dto/payment-responses.js';
+import type { SimulatedAutoDebitAction } from '../dto/simulate-auto-debit.dto.js';
 import type { SimulatedOutcome } from '../dto/simulate-payment.dto.js';
 import type { PurchaseKind, PurchaseMethod, PurchaseStatus } from '../entities/purchase.entity.js';
+import type { AutoDebitModel, AutoDebitStatusDto } from '../models/auto-debit.model.js';
 import type { ProviderPayment } from '../models/provider-payment.model.js';
+import type { ProviderAuthorizedPayment } from '../models/provider-preapproval.model.js';
+import { AutoDebitsService } from './auto-debits.service.js';
 import { MercadoPagoService } from './mercado-pago.service.js';
 
 // Plans bought on their own (checkout and manual payments); the other kinds are paid together with a booking.
@@ -32,6 +36,8 @@ const MINUTE_MS = 60_000;
 const PLAN_PENDING_LIMIT_MS = 24 * 60 * MINUTE_MS;
 const RECONCILE_LOOKBACK_MS = 7 * 24 * 60 * MINUTE_MS;
 const BOOKING_RECONCILE_LOOKBACK_MS = 72 * 60 * MINUTE_MS;
+// Automatic debit charges Mercado Pago may still report (D96).
+const AUTO_DEBIT_RECONCILE_LOOKBACK_DAYS = 40;
 
 interface LockedPurchase {
   id: string;
@@ -77,12 +83,14 @@ interface StaffPaymentRow {
   createdAt: Date;
   approvedAt: Date | null;
   note: string | null;
+  origin: PaymentOrigin;
 }
 
 const STAFF_PAYMENT_SELECT = `
   SELECT pu.id AS "purchaseId", u.id AS "clientId", u.name AS "clientName", u.email AS "clientEmail",
     pl.name AS "itemName", pl.service, pu.amount, pu.method, pu.status, pu.needs_attention AS "needsAttention",
-    pu.created_at AS "createdAt", pu.approved_at AS "approvedAt", pu.note
+    pu.created_at AS "createdAt", pu.approved_at AS "approvedAt", pu.note,
+    CASE WHEN pu.auto_debit_id IS NULL THEN 'one_time' ELSE 'auto_debit' END AS origin
   FROM purchases pu
   JOIN users u ON u.id = pu.user_id
   JOIN plans pl ON pl.id = pu.plan_id`;
@@ -99,6 +107,7 @@ const toStaffPaymentDto = (row: StaffPaymentRow): StaffPaymentDto => ({
   createdAt: row.createdAt.toISOString(),
   approvedAt: row.approvedAt?.toISOString() ?? null,
   note: row.note,
+  origin: row.origin,
 });
 
 const toLockedPurchase = (row: LockedPurchaseRow): LockedPurchase => ({
@@ -136,6 +145,7 @@ export class PaymentsService {
     private readonly subscriptions: SubscriptionsService,
     private readonly bookings: BookingsService,
     private readonly mercadoPago: MercadoPagoService,
+    private readonly autoDebits: AutoDebitsService,
     @Inject(mercadoPagoConfig.KEY) private readonly config: ConfigType<typeof mercadoPagoConfig>,
   ) {}
 
@@ -148,14 +158,16 @@ export class PaymentsService {
   // `reconcileAfterMinutes`, and expired ones whose preference can still be paid late: plans for 7 days (D45) and
   // bookings for 72 h (D60, D70). A late booking payment is flagged for staff only when the booking can no longer
   // be placed (D23/D43). Rejected booking purchases are never rechecked. Then stale purchases expire: bookings
-  // whose hold expired or was cancelled, and plans pending for more than 24 h.
+  // whose hold expired or was cancelled, and plans pending for more than 24 h. Automatic debits (D96) take their
+  // state and their charges of the last 40 days from Mercado Pago (backup for D68), and pending ones expire after 24 h;
+  // their charges count as applied and their expirations as expired.
   async reconcilePending(now: Date): Promise<{ applied: number; expired: number }> {
     let applied = 0;
     if (!this.config.simulatorEnabled) {
       const minutes = await this.settings.get('reconcileAfterMinutes');
       const pending: { externalReference: string }[] = await this.dataSource.query(
         `SELECT external_reference AS "externalReference" FROM purchases
-         WHERE method = 'mercadopago' AND deleted_at IS NULL AND created_at > $2
+         WHERE method = 'mercadopago' AND auto_debit_id IS NULL AND deleted_at IS NULL AND created_at > $2
            AND ((status = 'pending' AND created_at < $1) OR (status = 'expired' AND (kind = 'plan' OR created_at > $3)))
          ORDER BY created_at`,
         [
@@ -167,8 +179,73 @@ export class PaymentsService {
       for (const { externalReference } of pending) {
         if (await this.reconcileOne(externalReference)) applied += 1;
       }
+      applied += await this.reconcileAutoDebits();
     }
-    return { applied, expired: await this.expireStale(now) };
+    const expired = (await this.expireStale(now)) + (await this.autoDebits.expirePending(now));
+    return { applied, expired };
+  }
+
+  // D96, idempotent per Mercado Pago payment. Under the lock of the debit: a payment already stored changes nothing;
+  // otherwise one transaction creates the purchase (the debit amount, never the current plan price), its payment and
+  // the activation (R3 chains Performance; a pack starts on the charge day). An amount other than the debit's leaves
+  // the purchase pending and flagged for staff, like R16 step 4. `payment` must be an approved one.
+  async applyAutoDebitCharge(autoDebit: Pick<AutoDebitModel, 'id'>, payment: ProviderPayment): Promise<boolean> {
+    const approval = await this.dataSource.transaction(async (manager): Promise<Approval | null> => {
+      const locked = await this.autoDebits.lockForCharge(manager, autoDebit.id);
+      if (!locked) return null;
+      const known: unknown[] = await manager.query(`SELECT 1 FROM payments WHERE mp_payment_id = $1`, [payment.id]);
+      if (known.length > 0) return null;
+      const { debit, plan } = locked;
+      const matches = payment.transactionAmount === debit.amount;
+      const [{ id }]: { id: string }[] = await manager.query(
+        `INSERT INTO purchases (user_id, kind, plan_id, amount, method, status, needs_attention, approved_at, auto_debit_id)
+         VALUES ($1, 'plan', $2, $3, 'mercadopago', $4, $5, CASE WHEN $4 = 'approved' THEN now() END, $6) RETURNING id`,
+        [debit.userId, debit.planId, debit.amount, matches ? 'approved' : 'pending', !matches, debit.id],
+      );
+      await manager.query(
+        `INSERT INTO payments (purchase_id, mp_payment_id, status, status_detail, amount, applied_at)
+         VALUES ($1, $2, $3, $4, $5, CASE WHEN $6 THEN now() END)`,
+        [id, payment.id, payment.status, payment.statusDetail, Math.round(payment.transactionAmount), matches],
+      );
+      if (!matches) {
+        this.logger.warn(`auto debit ${debit.id} charge ${payment.id} flagged: amount mismatch`);
+        return null;
+      }
+      await this.autoDebits.markAuthorized(manager, debit.id);
+      const subscription = await this.subscriptions.activateFromPurchase(manager, {
+        purchaseId: id, userId: debit.userId, plan, today: businessToday(),
+      });
+      return { purchaseId: id, userId: debit.userId, itemName: plan.name, amount: debit.amount, subscription, confirmedBookingId: null };
+    });
+    if (!approval) return false;
+    await this.sendPurchaseApproved(approval);
+    return true;
+  }
+
+  // Webhook `subscription_preapproval`: the state is read again from Mercado Pago.
+  async refreshAutoDebit(preapprovalId: string): Promise<void> {
+    await this.autoDebits.refresh(await this.mercadoPago.getPreapproval(preapprovalId));
+  }
+
+  // Webhook `subscription_authorized_payment`: the charge and its payment are read again from Mercado Pago.
+  async applyAuthorizedPayment(authorizedPaymentId: string): Promise<void> {
+    await this.applyCharge(await this.mercadoPago.getAuthorizedPayment(authorizedPaymentId));
+  }
+
+  // D4: development only. Moves the debit the way Mercado Pago would and applies it through the same paths.
+  async simulateAutoDebit(externalReference: string, action: SimulatedAutoDebitAction): Promise<AutoDebitStatusDto> {
+    if (!this.config.simulatorEnabled) throw new AppError('NOT_FOUND');
+    const debit = await this.autoDebits.findByExternalReference(externalReference);
+    if (!debit) throw new AppError('AUTO_DEBIT_NOT_FOUND');
+    const preapproval = { id: debit.mpPreapprovalId ?? `sim-${debit.id}`, externalReference, nextPaymentDate: null };
+    if (action === 'authorize' && debit.status === 'pending') {
+      await this.autoDebits.refresh({ ...preapproval, status: 'authorized' });
+      // firstChargeDate null (stored as no next charge date) = the first charge is right away.
+      if (debit.nextChargeDate === null) await this.simulateCharge(debit);
+    }
+    if (action === 'charge_approved' && debit.status === 'authorized') await this.simulateCharge(debit);
+    if (action === 'cancel') await this.autoDebits.refresh({ ...preapproval, status: 'cancelled' });
+    return this.autoDebits.getStatusByReference(externalReference);
   }
 
   // D7: a cash or transfer payment approves the purchase and activates the plan in one transaction.
@@ -225,6 +302,7 @@ export class PaymentsService {
     if (q.status) filter('pu.status', q.status);
     if (q.method) filter('pu.method', q.method);
     if (q.needsAttention !== undefined) filter('pu.needs_attention', q.needsAttention);
+    if (q.origin) conditions.push(q.origin === 'auto_debit' ? 'pu.auto_debit_id IS NOT NULL' : 'pu.auto_debit_id IS NULL');
     const where = conditions.join(' AND ');
 
     const [{ total }]: { total: number }[] = await this.dataSource.query(
@@ -412,6 +490,54 @@ export class PaymentsService {
       this.logger.warn(`reconcile failed purchase=${externalReference}`);
       return false;
     }
+  }
+
+  // Returns whether the charge activated a plan. A charge Mercado Pago has not tried to collect yet has no payment.
+  private async applyCharge(charge: ProviderAuthorizedPayment): Promise<boolean> {
+    const debit = await this.autoDebits.findByPreapprovalId(charge.preapprovalId);
+    if (!debit) {
+      this.logger.warn(`authorized payment ${charge.id} ignored: unknown auto debit`);
+      return false;
+    }
+    if (!charge.paymentId) return false;
+    const payment = await this.mercadoPago.getPayment(charge.paymentId);
+    if (payment.status !== 'approved') return false;
+    return this.applyAutoDebitCharge(debit, payment);
+  }
+
+  // A Mercado Pago failure for one debit must not stop the others. Payments already stored are not read again.
+  private async reconcileAutoDebits(): Promise<number> {
+    let applied = 0;
+    for (const debit of await this.autoDebits.listToReconcile()) {
+      try {
+        if (!debit.mpPreapprovalId) continue;
+        await this.autoDebits.refresh(await this.mercadoPago.getPreapproval(debit.mpPreapprovalId));
+        const charges = await this.mercadoPago.searchAuthorizedPayments(debit.mpPreapprovalId, AUTO_DEBIT_RECONCILE_LOOKBACK_DAYS);
+        for (const charge of charges) {
+          if (charge.paymentId && (await this.isPaymentStored(charge.paymentId))) continue;
+          if (await this.applyCharge(charge)) applied += 1;
+        }
+      } catch {
+        this.logger.warn(`reconcile failed auto debit=${debit.id}`);
+      }
+    }
+    return applied;
+  }
+
+  private async isPaymentStored(mpPaymentId: string): Promise<boolean> {
+    const rows: unknown[] = await this.dataSource.query(`SELECT 1 FROM payments WHERE mp_payment_id = $1`, [mpPaymentId]);
+    return rows.length > 0;
+  }
+
+  private async simulateCharge(debit: AutoDebitModel): Promise<void> {
+    await this.applyAutoDebitCharge(debit, {
+      id: `sim-${randomUUID()}`,
+      status: 'approved',
+      statusDetail: 'accredited',
+      externalReference: debit.externalReference,
+      transactionAmount: debit.amount,
+    });
+    await this.autoDebits.advanceNextCharge(debit.id);
   }
 
   // Booking purchases expire once their hold is gone: expired, or cancelled by staff or the system.

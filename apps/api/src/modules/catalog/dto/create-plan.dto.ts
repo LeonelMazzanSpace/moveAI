@@ -94,4 +94,8 @@ export class CreatePlanDto {
   @OptionalField()
   @IntInRange(PLAN_LIMITS.sortOrder)
   sortOrder?: number;
+
+  @OptionalField()
+  @IsBoolean()
+  autoDebitEnabled?: boolean;
 }
