@@ -47,12 +47,12 @@ describe('PaymentsTable', () => {
     expect(screen.getByText('Martina Suárez').closest('tr')).not.toHaveClass('bg-warning-muted/40');
   });
 
-  it('stacks every payment as a card on mobile so nothing needs a horizontal swipe', () => {
+  it('stacks every payment as a card below xl so nothing needs a horizontal swipe', () => {
     render(<PaymentsTable payments={[base]} />);
     const row = screen.getByText('Martina Suárez').closest('tr');
-    expect(row).toHaveClass('max-md:grid');
-    expect(row?.closest('table')).toHaveClass('max-md:block');
-    expect(screen.getByRole('columnheader', { name: 'Estado' }).closest('thead')).toHaveClass('max-md:sr-only');
+    expect(row).toHaveClass('max-xl:grid');
+    expect(row?.closest('table')).toHaveClass('max-xl:block');
+    expect(screen.getByRole('columnheader', { name: 'Estado' }).closest('thead')).toHaveClass('max-xl:sr-only');
     const labels = Array.from(row?.querySelectorAll('td') ?? []).map((cell) => cell.getAttribute('data-label'));
     expect(labels).toEqual(['Fecha', null, 'Ítem', 'Servicio', 'Monto', 'Método', 'Estado']);
   });
@@ -171,7 +171,7 @@ describe('PaymentsView filters', () => {
   });
 });
 
-describe('PaymentsTable semantics below md', () => {
+describe('PaymentsTable semantics below xl', () => {
   it('spells the table roles so they survive display block/grid', () => {
     render(<PaymentsTable payments={[base, { ...base, purchaseId: 'pu2' }]} />);
     const table = screen.getByRole('table');
@@ -197,9 +197,9 @@ describe('PaymentsTable semantics below md', () => {
     expect(within(row).getByRole('cell', { name: '$ 10.500' })).toBeInTheDocument();
   });
 
-  it('shows the cells in the same order on mobile as in the DOM', () => {
+  it('shows the cells in the same order below xl as in the DOM', () => {
     render(<PaymentsTable payments={[base]} />);
     const cells = Array.from(screen.getAllByRole('row')[1].querySelectorAll('td'));
-    for (const cell of cells) expect(cell.className).not.toMatch(/max-md:order-/);
+    for (const cell of cells) expect(cell.className).not.toMatch(/max-xl:order-/);
   });
 });

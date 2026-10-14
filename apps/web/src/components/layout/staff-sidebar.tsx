@@ -11,7 +11,7 @@ export function StaffSidebar() {
   const alertsTotal = useStaffAlertsTotal();
 
   return (
-    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 border-r border-border bg-soft md:block">
+    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 border-r border-border bg-soft lg:block">
       <div className="flex h-16 items-center border-b border-border px-6">
         <span className="font-display text-lg font-black tracking-tight">
           MOVE<span className="align-super text-[9px]">®</span>

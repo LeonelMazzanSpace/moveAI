@@ -22,6 +22,16 @@ describe('PublicHeader', () => {
     expect(screen.getByRole('link', { name: 'Panel' })).toHaveAttribute('href', '/staff');
   });
 
+  it('swaps the inline navigation for the mobile menu below lg (six links and two buttons do not fit at 768 px)', () => {
+    render(<PublicHeader user={null} />);
+    expect(screen.getByRole('navigation')).toHaveClass('lg:flex');
+    expect(screen.getByRole('navigation')).not.toHaveClass('md:flex');
+    expect(screen.getByRole('button', { name: 'Abrir menú' })).toHaveClass('lg:hidden');
+    expect(screen.getByRole('button', { name: 'Abrir menú' })).not.toHaveClass('md:hidden');
+    expect(screen.getAllByRole('link', { name: 'Ingresar' })[0]).toHaveClass('lg:inline-flex');
+    expect(screen.getAllByRole('link', { name: 'Reservar' })[0]).toHaveClass('lg:inline-flex');
+  });
+
   it('always shows the public navigation and the booking button', () => {
     render(<PublicHeader user={null} />);
     expect(screen.getByRole('link', { name: 'Reservar' })).toHaveAttribute('href', '/reservar');

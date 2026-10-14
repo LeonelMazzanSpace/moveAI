@@ -21,7 +21,8 @@
     "e2e:reset": "node scripts/e2e/reset.mjs",
     "manual:demo-data": "node scripts/manual/demo-data.mjs",
     "manual:screenshots": "node scripts/manual/capture.mjs",
-    "manual:pdf": "node scripts/manual/build-pdf.mjs"
+    "manual:pdf": "node scripts/manual/build-pdf.mjs",
+    "responsive:audit": "node scripts/responsive/audit.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.0",

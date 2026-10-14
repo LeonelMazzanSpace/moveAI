@@ -24,7 +24,7 @@ function FollowupDisabled() {
       title="Seguimiento no habilitado"
       description="El seguimiento fisioterapéutico se habilita después de tu evaluación."
       action={
-        <Link href="/rehab" className="text-xs font-semibold underline underline-offset-4">
+        <Link href="/rehab" className="inline-flex min-h-8 items-center text-xs font-semibold underline underline-offset-4">
           Ver Rehab
         </Link>
       }

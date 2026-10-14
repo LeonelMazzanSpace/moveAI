@@ -25,6 +25,13 @@ describe('StaffSidebar', () => {
     apiFetch.mockResolvedValue({ total: 23 });
   });
 
+  it('only shows the sidebar from lg, so tablets get the mobile menu and the full content width', () => {
+    const { container } = renderSidebar();
+    const aside = container.querySelector('aside');
+    expect(aside).toHaveClass('hidden', 'lg:block');
+    expect(aside).not.toHaveClass('md:block');
+  });
+
   it('renders the six sections plus the check-in subitem with their hrefs', () => {
     renderSidebar();
     const expected: [string, string][] = [

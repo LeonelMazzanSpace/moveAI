@@ -41,13 +41,13 @@ async function ConfigurationTabs({ searchParams }: { searchParams: SearchParams 
   const active = parseTab((await searchParams).tab);
   return (
     <div className="space-y-6">
-      <nav aria-label="Secciones de configuración" className="flex flex-wrap gap-2 border-b border-border pb-4">
+      <nav aria-label="Secciones de configuración" className="flex gap-2 overflow-x-auto border-b border-border pb-4">
         {TABS.map((tab) => (
           <Link
             key={tab.value}
             href={`/staff/configuracion?tab=${tab.value}`}
             aria-current={tab.value === active ? 'page' : undefined}
-            className={moveButton({ variant: tab.value === active ? 'default' : 'outline' })}
+            className={moveButton({ variant: tab.value === active ? 'default' : 'outline', className: 'shrink-0' })}
           >
             {tab.label}
           </Link>

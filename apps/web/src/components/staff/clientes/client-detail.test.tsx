@@ -155,6 +155,14 @@ describe('ClientDetail', () => {
     );
   });
 
+  it('keeps the switch hit area at 44×32 px around its 36×20 px track', async () => {
+    mockApi(detail(), () => detail().client);
+    renderDetail();
+    const toggle = await screen.findByRole('switch', { name: 'Seguimiento fisioterapéutico habilitado' });
+    expect(toggle).toHaveClass('h-8', 'w-11');
+    expect(toggle.firstElementChild).toHaveClass('h-5', 'w-9');
+  });
+
   it('reports a failed toggle with the contract message', async () => {
     apiFetch.mockImplementation((_path: string, init?: { method?: string }) => {
       if (init?.method) return Promise.reject(new ApiError(404, 'CLIENT_NOT_FOUND', 'x'));

@@ -9,6 +9,10 @@ describe('moveButtonSize', () => {
     expect(classes).toEqual(expect.arrayContaining([...LETTERING, 'h-auto', 'px-3.5', 'py-1.5']));
   });
 
+  it.each(['compact', 'cta', 'block'] as const)('keeps the %s size at least 32 px tall for touch', (size) => {
+    expect(moveButtonSize({ size }).split(' ')).toContain('min-h-8');
+  });
+
   it.each([
     ['cta', ['px-5', 'py-2.5']],
     ['block', ['w-full', 'py-2.5']],

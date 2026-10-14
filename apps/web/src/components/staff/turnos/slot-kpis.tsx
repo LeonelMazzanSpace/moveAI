@@ -27,7 +27,7 @@ function Kpi({ label, tone, children, detail }: KpiProps) {
 
 export function SlotKpis({ slot }: { slot: StaffTimeSlotDto }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Kpi label="Reservas">
         {slot.booked}
         <span className="text-base text-muted-foreground">/{slot.capacity}</span>

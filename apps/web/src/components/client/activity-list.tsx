@@ -94,7 +94,7 @@ export function ActivityList({ variant = 'compact' }: ActivityListProps) {
         <h2 className="text-sm font-semibold">Historial de actividad</h2>
         <div className="flex items-center gap-4">
           <Tabs value={filter} onValueChange={changeFilter}>
-            <TabsList>
+            <TabsList className="group-data-horizontal/tabs:h-10">
               {FILTERS.map(({ value, label }) => (
                 <TabsTrigger key={value} value={value}>
                   {label}
@@ -103,7 +103,7 @@ export function ActivityList({ variant = 'compact' }: ActivityListProps) {
             </TabsList>
           </Tabs>
           {full ? null : (
-            <Link href="/historial" className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground">
+            <Link href="/historial" className="inline-flex min-h-8 items-center text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground">
               Ver todo
             </Link>
           )}
