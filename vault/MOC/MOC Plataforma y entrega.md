@@ -1,7 +1,7 @@
 ---
 type: moc
 status: shipped
-updated: 2026-10-13
+updated: 2026-10-14
 source:
   - move/MOVE.pdf#p8
   - move/MOVE.pdf#p13
@@ -24,7 +24,8 @@ Decisiones: [[ADR monorepo pnpm sin Turborepo]] · [[ADR Next App Router en luga
 [[ADR suite E2E desktop y mobile]] (reemplaza a [[ADR sin E2E web de demos]]) · [[ADR sin archivos env nuevos]] ·
 [[ADR manual de usuario con capturas]] · [[ADR manual con guia de proveedores]] ·
 [[ADR menu movil en las tres areas]] · [[ADR errores de campo con copy propio]] ·
-[[ADR slug de plan reutilizable tras borrado]]
+[[ADR slug de plan reutilizable tras borrado]] · [[ADR auditoria responsive y cambios visuales]] ·
+[[ADR contacto editable en configuracion]]
 
 ## Producción (todo)
 [[Vercel]] · [[AWS Elastic Beanstalk]] · [[Neon Postgres]], con [[ADR Vercel para la web]],
@@ -36,9 +37,10 @@ Decisiones: [[ADR monorepo pnpm sin Turborepo]] · [[ADR Next App Router en luga
 La guía por consola está en la parte 4 del [[Manual de usuario]]; los comandos, en `docs/deploy.md`.
 
 ## Reglas transversales
-- Backend: [[Esquema solo via migraciones]], [[Nombres snake_case en DB]], [[Variables de entorno validadas al arrancar]], [[Variable de entorno parseada una sola vez]], [[Validacion de entrada con DTOs]], [[CORS restringido a la web]], [[Imports relativos con extension js]], [[Dependencias entre modulos aciclicas]], [[Entidades ORM no salen del servicio]], [[Errores internos no expuestos]], [[Soft delete en datos de negocio]], [[Queries crudas con RETURNING via CTE]]
+- Backend: [[Esquema solo via migraciones]], [[Nombres snake_case en DB]], [[Variables de entorno validadas al arrancar]], [[Variable de entorno parseada una sola vez]], [[Validacion de entrada con DTOs]], [[Textos y emails bien formados en la API]], [[CORS restringido a la web]], [[Imports relativos con extension js]], [[Dependencias entre modulos aciclicas]], [[Entidades ORM no salen del servicio]], [[Errores internos no expuestos]], [[Soft delete en datos de negocio]], [[Queries crudas con RETURNING via CTE]]
 - Seguridad: [[Sin secretos en codigo]], [[Sin datos personales en logs]], [[Conexion SSL a la base en produccion]], [[Simulador de pagos solo fuera de produccion]]
 - Frontend: [[Sistema visual MOVE]], [[Estilos via tokens del tema]], [[Paginas publicas renderizadas en servidor]], [[Helpers compartidos fuera de modulos use client]], [[Formularios validados con Zod]]
+- Scripts locales: [[Scripts nunca contra los puertos 3000 y 3001]], [[Auditoria responsive falla ante rutas inesperadas]]
 - Proceso: [[ADR alcance MVP en cuatro semanas]], [[Demo semanal de flujo visible]], [[Contrato front-back definido antes de implementar]], [[Sin infraestructura extra en MVP]], [[ADR zona horaria de negocio]]
 
 ## Lecciones del build
@@ -50,5 +52,8 @@ Tanda de deuda técnica (T-039…T-054): [[Seed rompe con indice unico parcial]]
 [[Variables del ejemplo filtran PORT a la web]] · [[Suite E2E escribe en una base real]]
 Reglas nuevas: [[Pantallas sin scroll horizontal en mobile]] · [[Mensajes de validacion de la API no llegan al usuario]] ·
 [[Suite E2E solo sobre su base propia]]
+Tanda de comentarios del cliente (T-057…T-071): [[Surrogate suelto responde 500]] ·
+[[Auditoria responsive contra la app del usuario]] · [[Auditoria responsive aprueba rutas rotas]]
+(las de calendario y débito están en [[MOC Rehab y Recovery]] y [[MOC Pagos y activacion]])
 Riesgos de deploy: [[API inalcanzable detras del proxy de Elastic Beanstalk]] ·
 [[Emails bloqueados por IP nueva en Brevo]] · [[Base de dev borrada por expiracion de rama Neon]]

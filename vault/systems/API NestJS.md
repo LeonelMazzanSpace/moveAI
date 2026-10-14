@@ -2,7 +2,7 @@
 type: system
 status: shipped
 semana: 1
-updated: 2026-10-13
+updated: 2026-10-14
 source:
   - move/apps/api/src/main.ts
   - move/apps/api/src/app.setup.ts
@@ -15,8 +15,9 @@ source:
 `@move/api`: NestJS 12 en ESM con TypeORM y pg, prefijo global `/api`, puerto por
 `PORT` (3001 en local). `app.setup.ts` arma lo transversal: `trust proxy` opcional,
 CORS a `WEB_URL`, Better Auth montado antes de los body parsers, `ValidationPipe` y
-filtro global de errores. Registra los doce módulos de dominio más el throttler del
-checkout. Tests unitarios y e2e con Vitest, lint con oxlint.
+filtro global de errores. Registra trece módulos de dominio (el último, `calendar`,
+llegó con la tanda de comentarios) más el throttler del checkout. Tests unitarios y
+e2e con Vitest, lint con oxlint.
 
 ## Structural
 - is part of → [[Monorepo MOVE]]

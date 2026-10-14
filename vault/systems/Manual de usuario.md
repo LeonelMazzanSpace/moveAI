@@ -1,7 +1,7 @@
 ---
 type: system
 status: shipped
-updated: 2026-10-13
+updated: 2026-10-14
 source:
   - move/docs/manual/manual-de-usuario.md
   - move/docs/manual/manual-de-usuario.pdf
@@ -15,12 +15,14 @@ source:
 
 Manual en Markdown y PDF para clientes, staff y equipo técnico: una guía destacada
 "Probar MOVE en local" con los usuarios de demo, estado actual frente a MOVE.pdf, una
-captura de cada pantalla, deuda conocida, cómo levantar todo, diagrama de arquitectura
-y la guía de cada proveedor. Se regenera con scripts que cargan datos de demo (por la
-API y por `psql` en el contenedor de desarrollo), capturan con Playwright y publican
-las imágenes solo si salieron todas; los scripts rechazan bases y URLs no locales.
+captura de cada pantalla en escritorio y en celular, deuda conocida, cómo levantar todo,
+diagrama de arquitectura y la guía de cada proveedor. Desde la tanda de comentarios del
+cliente (T-068) cubre también pago único o débito automático, los emails, el contacto
+editable, Google Calendar, la auditoría responsive y una "prueba real" con credenciales
+para Mercado Pago, Google Calendar y Brevo. Se regenera con scripts que cargan datos de
+demo, capturan con Playwright y publican las imágenes solo si salieron todas.
 
-## Structural
+### Structural
 - is part of → [[Monorepo MOVE]]
 - depends on → [[App web Next]] because captura las pantallas reales
 - depends on → [[API NestJS]] because carga los datos de demo por HTTP

@@ -1,7 +1,7 @@
 ---
 type: moc
 status: shipped
-updated: 2026-10-13
+updated: 2026-10-14
 source:
   - move/MOVE.pdf#p6
   - move/MOVE.pdf#p7
@@ -24,6 +24,7 @@ cliente.
 - [[Clientes en pausa excluidos de alertas]]
 - [[Check-in con molestia genera alerta]]
 - [[ADR renovacion programada no cuenta como por vencer]]
+- Mails transaccionales con pie de contacto y recordatorio de reserva (también a clientes en pausa): [[ADR mails nuevos y pie de contacto]]
 
 ## Fallas
 [[Cliente vencido sin seguimiento]] · [[Alertas de inactividad falsas]] · [[Alertas o emails duplicados]] ·

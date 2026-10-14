@@ -1,7 +1,7 @@
 ---
 type: moc
 status: shipped
-updated: 2026-10-13
+updated: 2026-10-14
 source:
   - move/MOVE.pdf#p11
   - move/MOVE.pdf#p12
@@ -15,6 +15,7 @@ de más ni de menos.
 - [[Compra]] → [[Pago]] → [[Webhook de Mercado Pago]] → [[Modulo pagos]] → [[Modulo suscripciones]] o [[Modulo reservas]]
 - El navegador vuelve a [[Pantalla checkout de pago]], que solo consulta el estado.
 - Sin credenciales, el [[Simulador de pagos de desarrollo]] reemplaza a [[Mercado Pago]].
+- Débito automático: [[Debito automatico]] (suscripción `preapproval`) → cada cobro es una [[Compra]] nueva que activa o encadena el plan; decisión [[ADR debito automatico con preapproval]]
 
 ## Decisiones
 - [[ADR Mercado Pago como procesador de pagos]]
@@ -37,6 +38,7 @@ de más ni de menos.
 - [[Reserva confirmada solo con pago aprobado]]
 - [[Retenciones de pago limitadas por usuario]] y [[Checkout publico limitado por IP]]
 - [[Simulador de pagos solo fuera de produccion]]
+- Débito: [[Un debito activo por servicio]] y [[Debito cancelado sigue conciliandose]]
 
 ## Diagnóstico
 Síntoma "pagó y no tiene plan": [[Pago aprobado sin activar plan]] ← [[Webhook legitimo rechazado]],
@@ -45,3 +47,5 @@ gratis": [[Plan activado sin pago confirmado]] ← [[Webhook falsificado]] o
 [[Simulador de pagos montado en produccion]]. Síntoma "plan doble": [[Vigencia extendida dos veces]] ←
 [[Webhook duplicado procesado dos veces]] o [[Guard muerto por UPDATE RETURNING sin CTE]].
 Síntoma "nadie puede pagar": [[Throttling por IP ve la IP del proxy]].
+Con débito automático, "pagó y no tiene plan" también ← [[Cobro de debito cancelado sin aplicar]], y
+"me cobran dos veces" ← [[Debito reemplazado cobrado en paralelo]] (ambas resueltas).

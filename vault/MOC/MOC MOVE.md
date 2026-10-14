@@ -1,7 +1,7 @@
 ---
 type: moc
 status: shipped
-updated: 2026-10-13
+updated: 2026-10-14
 source:
   - move/MOVE.pdf#p2
 ---
@@ -26,7 +26,7 @@ renovación. Ver [[Circuito principal MOVE]].
 Modelado en profundidad: las cuatro espinas de arriba y la plataforma, más las
 lecciones del build del MVP como fallas con su fix.
 Deliberadamente no modelado:
-- Contenido editorial del sitio (textos, fotos, ubicación).
+- Contenido editorial del sitio (textos, fotos, ubicación): solo se modela dónde vive, ver [[ADR Equipo y Recovery Room como contenido fijo]] y [[ADR contacto editable en configuracion]].
 - Precios reales: los de la semilla son provisorios.
 - Planificaciones de entrenamiento e IA: fuera del MVP, ver [[IA y planificaciones fuera del MVP]].
 - Detalle de cada endpoint: va en el contrato HTTP del plan, ver [[Contrato front-back definido antes de implementar]].

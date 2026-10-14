@@ -6,6 +6,9 @@ copy lives in the origin note, this is only the reverse lookup.
 ## ADR arquitectura hexagonal por modulo
 - ADR modulos simples por dominio — supersedes → ADR arquitectura hexagonal por modulo
 
+## ADR calendario propio
+- ADR Google Calendar bidireccional con un calendario de MOVE — contrasts with → ADR calendario propio because la agenda sigue siendo de MOVE; Google solo bloquea turnos y recibe copias
+
 ## ADR conciliacion de compras de plan vencidas
 - ADR conciliacion re-consulta compras vencidas — supersedes → ADR conciliacion de compras de plan vencidas
 
@@ -47,9 +50,9 @@ copy lives in the origin note, this is only the reverse lookup.
 - Entidades ORM no salen del servicio — constrains → API NestJS
 - Errores internos no expuestos — constrains → API NestJS
 - Esquema solo via migraciones — constrains → API NestJS
+- Google Calendar — is part of → API NestJS
 - IP real del cliente detras del proxy — constrains → API NestJS
 - Imports relativos con extension js — constrains → API NestJS
-- Manual de usuario — depends on → API NestJS because carga los datos de demo por HTTP
 - Modulo agenda — is part of → API NestJS
 - Modulo auth — is part of → API NestJS
 - Modulo automatizaciones — is part of → API NestJS
@@ -69,6 +72,7 @@ copy lives in the origin note, this is only the reverse lookup.
 - Sin secretos en codigo — constrains → API NestJS
 - Soft delete en datos de negocio — constrains → API NestJS
 - Suite E2E Playwright — depends on → API NestJS
+- Textos y emails bien formados en la API — constrains → API NestJS
 - Validacion de entrada con DTOs — constrains → API NestJS
 - Variable de entorno parseada una sola vez — constrains → API NestJS
 - Variables de entorno validadas al arrancar — constrains → API NestJS
@@ -112,6 +116,7 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## App web Next
 - ADR Next App Router en lugar de Vite — constrains → App web Next
+- ADR auditoria responsive y cambios visuales — constrains → App web Next
 - ADR capa de datos del frontend — constrains → App web Next
 - ADR errores de campo con copy propio — constrains → App web Next
 - ADR shadcn base-nova sobre Base UI — constrains → App web Next
@@ -122,7 +127,6 @@ copy lives in the origin note, this is only the reverse lookup.
 - Estilos via tokens del tema — constrains → App web Next
 - Formularios validados con Zod — constrains → App web Next
 - Helpers compartidos fuera de modulos use client — constrains → App web Next
-- Manual de usuario — depends on → App web Next because captura las pantallas reales
 - Mensajes de validacion de la API no llegan al usuario — constrains → App web Next
 - Panel staff web — is part of → App web Next
 - Pantallas sin scroll horizontal en mobile — constrains → App web Next
@@ -136,6 +140,8 @@ copy lives in the origin note, this is only the reverse lookup.
 - Pantalla perfil cliente — is part of → Area cliente web
 
 ## Area publica web
+- ADR Equipo y Recovery Room como contenido fijo — constrains → Area publica web
+- ADR contacto editable en configuracion — constrains → Area publica web
 - ADR menu movil en las tres areas — constrains → Area publica web
 - Paginas publicas renderizadas en servidor — constrains → Area publica web
 - Pantalla Performance — is part of → Area publica web
@@ -158,6 +164,12 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Asistencia no registrada
 - Asistencia pendiente visible para staff — mitigates → Asistencia no registrada
 
+## Auditoria responsive aprueba rutas rotas
+- Auditoria responsive falla ante rutas inesperadas — prevents → Auditoria responsive aprueba rutas rotas
+
+## Auditoria responsive falla ante rutas inesperadas
+- ADR auditoria responsive y cambios visuales — establishes → Auditoria responsive falla ante rutas inesperadas
+
 ## Autorizacion validada en la API
 - ADR Better Auth con Google OAuth — establishes → Autorizacion validada en la API
 
@@ -176,6 +188,9 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Build de Next falla con NODE_ENV development
 - ADR sin archivos env nuevos — enables → Build de Next falla con NODE_ENV development
+
+## Calendario perdido se olvida al reconectar
+- ADR Google Calendar bidireccional con un calendario de MOVE — establishes → Calendario perdido se olvida al reconectar
 
 ## Cancelacion
 - Cancelacion con limite configurable — constrains → Cancelacion
@@ -203,6 +218,9 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Cliente vencido sin seguimiento
 - Regla de automatizacion — mitigates → Cliente vencido sin seguimiento because detecta por vencer y vencidos sin renovar
 
+## Cobro de debito cancelado sin aplicar
+- Debito cancelado sigue conciliandose — prevents → Cobro de debito cancelado sin aplicar
+
 ## Compra
 - Pago — is part of → Compra
 - Renovacion de plan — is a case of → Compra
@@ -213,11 +231,15 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Conexion SSL a la base en produccion
 - ADR Neon como base productiva — establishes → Conexion SSL a la base en produccion
 
+## Conexion de calendario re-verificada antes de escribir
+- ADR Google Calendar bidireccional con un calendario de MOVE — establishes → Conexion de calendario re-verificada antes de escribir
+
 ## Config leida al importar antes de cargar el entorno
 - Variables de entorno validadas al arrancar — mitigates → Config leida al importar antes de cargar el entorno
 
 ## Configuracion operativa administrada por staff
 - ADR calendario propio — establishes → Configuracion operativa administrada por staff
+- ADR contacto editable en configuracion — establishes → Configuracion operativa administrada por staff
 
 ## Contacto de seguimiento
 - Historial del cliente — depends on → Contacto de seguimiento
@@ -243,6 +265,19 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Datos personales expuestos en logs
 - Sin datos personales en logs — prevents → Datos personales expuestos en logs
+
+## Debito automatico
+- ADR debito automatico con preapproval — constrains → Debito automatico
+- Debito cancelado sigue conciliandose — constrains → Debito automatico
+- Pantalla checkout de pago — depends on → Debito automatico
+- Pantalla perfil cliente — depends on → Debito automatico
+- Un debito activo por servicio — constrains → Debito automatico
+
+## Debito cancelado sigue conciliandose
+- ADR debito automatico con preapproval — establishes → Debito cancelado sigue conciliandose
+
+## Debito reemplazado cobrado en paralelo
+- Debito cancelado sigue conciliandose — prevents → Debito reemplazado cobrado en paralelo
 
 ## Demo semanal de flujo visible
 - ADR alcance MVP en cuatro semanas — establishes → Demo semanal de flujo visible
@@ -272,6 +307,7 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Doble reserva del mismo horario Rehab
 - Horario Rehab se bloquea al reservar — prevents → Doble reserva del mismo horario Rehab
+- Turno bloqueado por Google no reservable — mitigates → Doble reserva del mismo horario Rehab
 
 ## Drift de esquema entre ambientes
 - Esquema solo via migraciones — prevents → Drift de esquema entre ambientes
@@ -314,6 +350,12 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Formularios validados con Zod
 - ADR capa de datos del frontend — establishes → Formularios validados con Zod
+
+## Google Calendar
+- ADR Google Calendar bidireccional con un calendario de MOVE — constrains → Google Calendar
+- Calendario perdido se olvida al reconectar — constrains → Google Calendar
+- Conexion de calendario re-verificada antes de escribir — constrains → Google Calendar
+- Pantalla configuracion staff — depends on → Google Calendar
 
 ## Google OAuth
 - ADR desarrollo sin accesos a proveedores — constrains → Google OAuth
@@ -393,6 +435,7 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Mercado Pago
 - ADR desarrollo sin accesos a proveedores — constrains → Mercado Pago
+- Debito automatico — depends on → Mercado Pago
 - Modulo pagos — depends on → Mercado Pago
 - Pago — depends on → Mercado Pago
 
@@ -409,6 +452,7 @@ copy lives in the origin note, this is only the reverse lookup.
 - ADR profesionales inactivos fuera de la agenda — constrains → Modulo agenda
 - Accesos y definiciones operativas al inicio — constrains → Modulo agenda because horarios y cupos reales
 - Configuracion operativa administrada por staff — constrains → Modulo agenda
+- Google Calendar — depends on → Modulo agenda because escribe la marca de bloqueo de los turnos
 - Horario — is part of → Modulo agenda
 - Modulo reservas — depends on → Modulo agenda
 - Pantalla Performance — depends on → Modulo agenda
@@ -430,6 +474,7 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Modulo automatizaciones
 - ADR automatizaciones con NestJS Scheduler — constrains → Modulo automatizaciones
+- ADR mails nuevos y pie de contacto — constrains → Modulo automatizaciones
 - ADR renovacion programada no cuenta como por vencer — constrains → Modulo automatizaciones
 - Clientes en pausa excluidos de alertas — constrains → Modulo automatizaciones
 - Fechas en zona horaria de Uruguay — constrains → Modulo automatizaciones
@@ -460,14 +505,21 @@ copy lives in the origin note, this is only the reverse lookup.
 - Pantalla perfil cliente — depends on → Modulo clientes
 
 ## Modulo configuracion
+- ADR contacto editable en configuracion — constrains → Modulo configuracion
 - Configuracion operativa administrada por staff — constrains → Modulo configuracion
+- Google Calendar — depends on → Modulo configuracion because la ventana de reserva fija el rango que lee
 - Modulo agenda — depends on → Modulo configuracion because ventana de reserva y valores operativos
+- Modulo notificaciones — depends on → Modulo configuracion because lee los datos de contacto y el email de avisos al staff
 - Modulo reservas — depends on → Modulo configuracion because límite de cancelación y vencimiento de retenciones
 - Modulo seguimiento — depends on → Modulo configuracion because umbrales de detección
 - Pantalla configuracion staff — depends on → Modulo configuracion
+- Pantalla sitio publico — depends on → Modulo configuracion because los datos de contacto salen de settings
 
 ## Modulo notificaciones
 - ADR Brevo para emails — constrains → Modulo notificaciones
+- ADR contacto editable en configuracion — constrains → Modulo notificaciones
+- ADR mails nuevos y pie de contacto — constrains → Modulo notificaciones
+- Google Calendar — depends on → Modulo notificaciones because avisa al staff de conflictos y desconexiones
 - Integraciones externas encapsuladas en un servicio — constrains → Modulo notificaciones
 - Modulo automatizaciones — depends on → Modulo notificaciones
 - Modulo reservas — depends on → Modulo notificaciones because emails de confirmación y cancelación
@@ -487,6 +539,7 @@ copy lives in the origin note, this is only the reverse lookup.
 - Checkout publico limitado por IP — constrains → Modulo pagos
 - Compra — is part of → Modulo pagos
 - Conciliacion periodica de pagos pendientes — constrains → Modulo pagos
+- Debito automatico — is part of → Modulo pagos
 - Integraciones externas encapsuladas en un servicio — constrains → Modulo pagos
 - Logica de negocio fuera de Mercado Pago — constrains → Modulo pagos
 - Modulo clientes — depends on → Modulo pagos
@@ -501,9 +554,11 @@ copy lives in the origin note, this is only the reverse lookup.
 - Webhook de Mercado Pago — is part of → Modulo pagos
 
 ## Modulo reservas
+- ADR mails nuevos y pie de contacto — constrains → Modulo reservas
 - ADR retencion vencida sin lugar no se reconfirma — constrains → Modulo reservas
 - Asistencia — is part of → Modulo reservas
 - Cancelacion — is part of → Modulo reservas
+- Google Calendar — depends on → Modulo reservas because lee las reservas de Rehab confirmadas
 - Modulo clientes — depends on → Modulo reservas
 - Modulo pagos — depends on → Modulo reservas because confirma reservas pagas de Rehab y Recovery
 - Modulo seguimiento — depends on → Modulo reservas
@@ -514,6 +569,7 @@ copy lives in the origin note, this is only the reverse lookup.
 - Pantalla turnos y asistencia — depends on → Modulo reservas
 - Reserva con bloqueo transaccional — constrains → Modulo reservas
 - Reserva — is part of → Modulo reservas
+- Turno bloqueado por Google no reservable — constrains → Modulo reservas
 
 ## Modulo seguimiento
 - Alerta de seguimiento — is part of → Modulo seguimiento
@@ -526,6 +582,7 @@ copy lives in the origin note, this is only the reverse lookup.
 - Pantalla seguimiento — depends on → Modulo seguimiento
 
 ## Modulo suscripciones
+- Debito automatico — depends on → Modulo suscripciones because cada cobro activa o encadena el plan
 - Modulo clientes — depends on → Modulo suscripciones
 - Modulo pagos — depends on → Modulo suscripciones because activa o renueva planes
 - Modulo reservas — depends on → Modulo suscripciones
@@ -551,7 +608,7 @@ copy lives in the origin note, this is only the reverse lookup.
 - ADR push a GitHub y merge por PR — constrains → Monorepo MOVE
 - API NestJS — is part of → Monorepo MOVE
 - App web Next — is part of → Monorepo MOVE
-- Manual de usuario — is part of → Monorepo MOVE
+- Auditoria responsive falla ante rutas inesperadas — constrains → Monorepo MOVE
 - Pipeline CI Bitbucket — is part of → Monorepo MOVE
 - Postgres local Docker — is part of → Monorepo MOVE
 - Suite E2E Playwright — is part of → Monorepo MOVE
@@ -577,6 +634,7 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Operaciones de pago idempotentes
 - ADR Mercado Pago como procesador de pagos — establishes → Operaciones de pago idempotentes
 - Conciliacion periodica de pagos pendientes — requires → Operaciones de pago idempotentes because webhook y conciliación pueden aplicar el mismo pago
+- Debito cancelado sigue conciliandose — requires → Operaciones de pago idempotentes because webhook y conciliación pueden ver el mismo cobro
 
 ## PORT explicito en Elastic Beanstalk
 - ADR Elastic Beanstalk para la API — establishes → PORT explicito en Elastic Beanstalk
@@ -592,6 +650,7 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Pago aprobado sin activar plan
 - Activacion en la misma transaccion que el pago — prevents → Pago aprobado sin activar plan
+- Cobro de debito cancelado sin aplicar — causes → Pago aprobado sin activar plan
 - Conciliacion periodica de pagos pendientes — mitigates → Pago aprobado sin activar plan
 - Pago tardio perdido tras expirar la compra — causes → Pago aprobado sin activar plan
 - Webhook de Mercado Pago — enables → Pago aprobado sin activar plan because si la notificación nunca llega o falla a mitad
@@ -615,13 +674,27 @@ copy lives in the origin note, this is only the reverse lookup.
 - Pantalla seguimiento — is part of → Panel staff web
 - Pantalla turnos y asistencia — is part of → Panel staff web
 
+## Pantalla Performance
+- ADR regla Plan vigente en Performance — constrains → Pantalla Performance
+
+## Pantalla Recovery
+- ADR Equipo y Recovery Room como contenido fijo — constrains → Pantalla Recovery
+
+## Pantalla check-in
+- ADR radio propio en el tema oscuro — constrains → Pantalla check-in
+
 ## Pantalla checkout de pago
+- ADR radio propio en el tema oscuro — constrains → Pantalla checkout de pago
 - ADR reintento visible para plan rechazado — constrains → Pantalla checkout de pago
 
 ## Pantalla pagos staff
 - ADR pago tardio sin lugar queda para el staff — constrains → Pantalla pagos staff
 
+## Pantalla sitio publico
+- ADR Equipo y Recovery Room como contenido fijo — constrains → Pantalla sitio publico
+
 ## Pantallas sin scroll horizontal en mobile
+- ADR auditoria responsive y cambios visuales — establishes → Pantallas sin scroll horizontal en mobile
 - ADR menu movil en las tres areas — establishes → Pantallas sin scroll horizontal en mobile
 - ADR suite E2E desktop y mobile — establishes → Pantallas sin scroll horizontal en mobile
 
@@ -664,8 +737,14 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Queries crudas con RETURNING via CTE
 - Operaciones de pago idempotentes — requires → Queries crudas con RETURNING via CTE because el guard lee las filas devueltas
 
+## Radio nativo se lee al reves en el tema oscuro
+- ADR radio propio en el tema oscuro — prevents → Radio nativo se lee al reves en el tema oscuro
+
 ## Rama dev de Neon sin expiracion
 - ADR Neon como base productiva — establishes → Rama dev de Neon sin expiracion
+
+## Reconexion vuelve al calendario perdido
+- Calendario perdido se olvida al reconectar — prevents → Reconexion vuelve al calendario perdido
 
 ## Regla de automatizacion
 - Alerta de seguimiento — depends on → Regla de automatizacion
@@ -692,6 +771,7 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Reserva con bloqueo transaccional
 - ADR calendario propio — establishes → Reserva con bloqueo transaccional
+- Conexion de calendario re-verificada antes de escribir — resembles → Reserva con bloqueo transaccional
 
 ## Reserva con plan vencido
 - Fechas corridas por zona horaria — causes → Reserva con plan vencido
@@ -717,6 +797,9 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Scheduler corre en una sola instancia
 - ADR automatizaciones con NestJS Scheduler — establishes → Scheduler corre en una sola instancia
 - Conciliacion periodica de pagos pendientes — requires → Scheduler corre en una sola instancia
+
+## Scripts nunca contra los puertos 3000 y 3001
+- ADR auditoria responsive y cambios visuales — establishes → Scripts nunca contra los puertos 3000 y 3001
 
 ## Secretos filtrados
 - Sin secretos en codigo — prevents → Secretos filtrados
@@ -754,6 +837,9 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Sin secretos en codigo
 - ADR Elastic Beanstalk para la API — establishes → Sin secretos en codigo
 
+## Sistema visual MOVE
+- ADR radio propio en el tema oscuro — constrains → Sistema visual MOVE
+
 ## Sobreventa de cupos
 - Cupo maximo por horario — mitigates → Sobreventa de cupos
 - Reserva con bloqueo transaccional — prevents → Sobreventa de cupos
@@ -772,6 +858,9 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Suite E2E solo sobre su base propia
 - ADR suite E2E desktop y mobile — establishes → Suite E2E solo sobre su base propia
 
+## Surrogate suelto responde 500
+- Textos y emails bien formados en la API — prevents → Surrogate suelto responde 500
+
 ## Suscripcion
 - Estado del cliente — depends on → Suscripcion
 - Fechas en zona horaria de Uruguay — constrains → Suscripcion
@@ -788,9 +877,18 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Tratamiento vendido sin evaluacion
 - Rehab no vende tratamientos online — prevents → Tratamiento vendido sin evaluacion
 
+## Turno bloqueado por Google no reservable
+- ADR Google Calendar bidireccional con un calendario de MOVE — establishes → Turno bloqueado por Google no reservable
+
+## Turnos bloqueados sin conexion de calendario
+- Conexion de calendario re-verificada antes de escribir — prevents → Turnos bloqueados sin conexion de calendario
+
 ## UI inconsistente con el diseno
 - Estilos via tokens del tema — prevents → UI inconsistente con el diseno
 - Pantallas sin scroll horizontal en mobile — mitigates → UI inconsistente con el diseno
+
+## Un debito activo por servicio
+- ADR debito automatico con preapproval — establishes → Un debito activo por servicio
 
 ## Una cuenta por email
 - ADR Better Auth con Google OAuth — establishes → Una cuenta por email
@@ -803,6 +901,9 @@ copy lives in the origin note, this is only the reverse lookup.
 - Reserva — depends on → Usuario
 - Roles persistidos cliente y staff — constrains → Usuario
 - Una cuenta por email — constrains → Usuario
+
+## Validacion de entrada con DTOs
+- Textos y emails bien formados en la API — is a case of → Validacion de entrada con DTOs
 
 ## Variable de entorno parseada dos veces con reglas distintas
 - Variable de entorno parseada una sola vez — prevents → Variable de entorno parseada dos veces con reglas distintas
@@ -817,7 +918,9 @@ copy lives in the origin note, this is only the reverse lookup.
 - Ambientes dev y produccion separados — constrains → Vercel
 
 ## Vigencia extendida dos veces
+- Debito reemplazado cobrado en paralelo — causes → Vigencia extendida dos veces
 - Guard muerto por UPDATE RETURNING sin CTE — causes → Vigencia extendida dos veces
+- Un debito activo por servicio — mitigates → Vigencia extendida dos veces
 - Webhook duplicado procesado dos veces — causes → Vigencia extendida dos veces
 
 ## Web y API bajo el mismo dominio raiz

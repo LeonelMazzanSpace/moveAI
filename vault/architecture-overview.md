@@ -27,7 +27,7 @@ flowchart LR
     PUB[Área pública] --- CLI[Área cliente] --- STF[Panel staff]
   end
   subgraph api["apps/api · NestJS → Elastic Beanstalk (sin desplegar)"]
-    SET[configuración]
+    SET[configuración + contacto]
     NOT[notificaciones] --> SET
     USR[usuarios]
     AUTH[auth + guard global] --> USR & NOT
@@ -35,28 +35,30 @@ flowchart LR
     AGE[agenda] --> CAT & SET
     SUS[suscripciones] --> SET
     RES[reservas + asistencia] --> AGE & SUS & NOT
-    PAG[pagos + throttler checkout] --> SUS & RES
+    PAG[pagos + débito automático + throttler checkout] --> SUS & RES
     SIM[simulador de pagos · solo fuera de production] --> PAG
     SEG[seguimiento] --> RES & SUS
     CLT[clientes] --> SEG & PAG
     AUT[automatizaciones] --> SEG & NOT
+    CAL[calendario · último módulo] --> SET & NOT
   end
   web -->|HTTPS /api · cookie de sesión| api
   api --> DB[(PostgreSQL<br/>Docker dev · Neon prod)]
   AUTH --> BA[Better Auth en /api/auth · Google opcional]
-  PAG --> MP[Mercado Pago · apagado sin token]
+  PAG --> MP[Mercado Pago · pago único y preapproval · apagado sin token]
   NOT --> BR[Brevo · dry-run sin clave]
   AUT --> SCH[NestJS Scheduler + JobRunner con advisory lock]
+  CAL --> GC[Google Calendar · apagado sin credenciales]
 ```
 
 - [[Monorepo MOVE]]: pnpm workspaces, con [[Pipeline CI Bitbucket]] y los scripts del [[Manual de usuario]].
 - [[App web Next]]: una sola app con [[Area publica web]], [[Area cliente web]] y [[Panel staff web]]; `proxy.ts` reenvía la ruta para volver a ella al ingresar.
-- [[API NestJS]]: doce módulos simples por dominio en `src/modules/`, en un orden de dependencias fijo. `app.setup.ts` arma `trust proxy` ([[IP real del cliente detras del proxy]]), CORS, Better Auth, validación y el filtro de errores.
-- Módulos: [[Modulo configuracion]], [[Modulo notificaciones]], [[Modulo usuarios]], [[Modulo auth]], [[Modulo catalogo]], [[Modulo agenda]], [[Modulo suscripciones]], [[Modulo reservas]], [[Modulo pagos]] (con el [[Simulador de pagos de desarrollo]]), [[Modulo seguimiento]], [[Modulo clientes]], [[Modulo automatizaciones]].
+- [[API NestJS]]: trece módulos simples por dominio en `src/modules/`, en un orden de dependencias fijo. `app.setup.ts` arma `trust proxy` ([[IP real del cliente detras del proxy]]), CORS, Better Auth, validación y el filtro de errores.
+- Módulos: [[Modulo configuracion]], [[Modulo notificaciones]], [[Modulo usuarios]], [[Modulo auth]], [[Modulo catalogo]], [[Modulo agenda]], [[Modulo suscripciones]], [[Modulo reservas]], [[Modulo pagos]] (con el [[Simulador de pagos de desarrollo]] y el [[Debito automatico]]), [[Modulo seguimiento]], [[Modulo clientes]], [[Modulo automatizaciones]], [[Google Calendar]] (módulo `calendar`; lee reservas y turnos por SQL y solo escribe la marca de bloqueo).
 - Datos: [[Postgres local Docker]] en desarrollo, [[Neon Postgres]] en producción (sin configurar).
-- Externos: [[Better Auth]], [[Google OAuth]], [[Mercado Pago]], [[Brevo]], [[NestJS Scheduler]], [[Vercel]], [[AWS Elastic Beanstalk]].
+- Externos: [[Better Auth]], [[Google OAuth]], [[Mercado Pago]], [[Brevo]], [[NestJS Scheduler]], [[Vercel]], [[AWS Elastic Beanstalk]]; Google Calendar con su propio OAuth de staff.
 
-- Pruebas de navegador: [[Suite E2E Playwright]] (desktop y mobile, base `move_e2e` propia, puertos 3150/3250; no corre en el pipeline).
+- Pruebas de navegador: [[Suite E2E Playwright]] (desktop y mobile, base `move_e2e` propia, puertos 3150/3250; no corre en el pipeline) y `pnpm responsive:audit` ([[ADR auditoria responsive y cambios visuales]]).
 
 ## Vocabulario
 
@@ -77,6 +79,8 @@ flowchart LR
 | Check-in | Encuesta breve a alumnos activos ([[Check-in]]). |
 | Estado del cliente | Activo, por vencer, vencido, inactivo o en pausa. Es derivado ([[Estado del cliente]]). |
 | Needs attention | Compra aprobada que el staff resuelve a mano ([[ADR pago tardio sin lugar queda para el staff]]). |
+| Débito automático | Suscripción `preapproval` de Mercado Pago a un plan; cada cobro es una compra nueva ([[Debito automatico]]). Convive con el pago único. |
+| Turno bloqueado | Turno de Rehab ocupado en el Google Calendar de MOVE: no se reserva, pero no cancela reservas existentes ([[Turno bloqueado por Google no reservable]]). |
 
 ## Las decisiones, conectadas
 
@@ -130,25 +134,39 @@ Planes rechazados: [[ADR pago de plan rechazado deja la compra pendiente]] →
 [[ADR sin archivos env nuevos]] · [[ADR manual de usuario con capturas]] ·
 [[ADR manual con guia de proveedores]] · [[ADR push a GitHub y merge por PR]].
 
+**Tanda de comentarios del cliente (2026-10-14).** [[ADR Equipo y Recovery Room como contenido fijo]] ·
+[[ADR regla Plan vigente en Performance]] · [[ADR contacto editable en configuracion]] →
+[[Configuracion operativa administrada por staff]] · [[ADR mails nuevos y pie de contacto]] ·
+[[ADR Google Calendar bidireccional con un calendario de MOVE]] → [[Turno bloqueado por Google no reservable]],
+[[Conexion de calendario re-verificada antes de escribir]] y [[Calendario perdido se olvida al reconectar]] ·
+[[ADR debito automatico con preapproval]] → [[Un debito activo por servicio]] y
+[[Debito cancelado sigue conciliandose]] · [[ADR auditoria responsive y cambios visuales]] →
+[[Scripts nunca contra los puertos 3000 y 3001]] y [[Auditoria responsive falla ante rutas inesperadas]].
+Transversal: [[Textos y emails bien formados en la API]] (contra [[Surrogate suelto responde 500]]).
+
 ## Lo que todavía no existe
 
 Al 2026-10-13 (`feature/move-mvp`, commit be89bc5) el MVP completo corre en local y
 está cubierto por tests unitarios y e2e de la API y tests de componentes de la web. El
+2026-10-14 la tanda de comentarios del cliente (`feature/move-feedback`, commit dbf6d89,
+todavía sin merge a `main`) sumó Equipo, Recovery Room, contacto editable, mails
+nuevos, Google Calendar ↔ Rehab, débito automático y la auditoría responsive. El
 [[Manual de usuario]] documenta el estado frente al PDF, cómo levantar todo y la guía
 por proveedor. Falta:
 
 - Deploy (`todo`): [[Vercel]], [[AWS Elastic Beanstalk]], [[Neon Postgres]], [[Ambientes dev y produccion separados]], [[Web y API bajo el mismo dominio raiz]].
-- Apagado hasta tener credenciales o configuración (`built-off-by-default`): [[Google OAuth]], [[Mercado Pago]], [[Brevo]], [[Conexion SSL a la base en produccion]], [[IP real del cliente detras del proxy]].
+- Apagado hasta tener credenciales o configuración (`built-off-by-default`): [[Google OAuth]], [[Google Calendar]], [[Mercado Pago]] (pago único y débito automático), [[Brevo]], [[Conexion SSL a la base en produccion]], [[IP real del cliente detras del proxy]].
 - Documentado en el runbook y el manual, sin aplicar (`proposed`): [[PORT explicito en Elastic Beanstalk]], [[Rama dev de Neon sin expiracion]], [[Ambiente dev en dominio registrable propio]], [[Paridad de version Postgres dev y prod]].
 - CI configurado pero nunca ejecutado: [[Pipeline CI Bitbucket]].
-- Deuda conocida (`todo`): [[Variable de entorno parseada una sola vez]] para `PORT`, `DB_PORT` y `DB_SSL`; [[Build de Next falla con NODE_ENV development]] sin defensa en scripts.
+- Deuda conocida (`todo`): [[Variable de entorno parseada una sola vez]] para `PORT`, `DB_PORT` y `DB_SSL`; [[Build de Next falla con NODE_ENV development]] sin defensa en scripts. De la tanda de comentarios (D121): validaciones web de email y Maps más laxas que la API, que igual rechaza con su mensaje.
 
 Abierto (`draft`, preguntar al usuario o a MOVE):
-- [[ADR notificaciones de Mercado Pago por ambiente]] (D68): IPN sin firma o URL del panel por ambiente.
+- [[ADR notificaciones de Mercado Pago por ambiente]] (D68): IPN sin firma o URL del panel por ambiente. Las suscripciones de débito tampoco llevan `notification_url`; la conciliación es el respaldo.
 - [[Bloqueo de IPs de Brevo resuelto antes de produccion]].
 - [[Prioridad de horarios Recovery]]: quitada de los textos hasta que MOVE la defina.
 - [[ADR push a GitHub y merge por PR]] está aprobada pero sin remoto, y deja abierto dónde corre [[Pipeline CI Bitbucket]].
 - Dominio final y dominio registrable de desarrollo; valores provisorios a confirmar con MOVE: [[Accesos y definiciones operativas al inicio]], [[Umbrales de seguimiento]], precios y horarios de la semilla.
+- Observación de producto (D118): un débito de pack usa las sesiones actuales del pack; si el staff cambia la cantidad, los débitos existentes la heredan con el monto viejo.
 
 ## Para profundizar
 

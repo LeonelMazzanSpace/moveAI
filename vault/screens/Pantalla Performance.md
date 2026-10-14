@@ -2,7 +2,7 @@
 type: screen
 status: shipped
 semana: 2
-updated: 2026-10-13
+updated: 2026-10-14
 source:
   - move/imagenes/htmls/03-performance.html
   - move/apps/web/src/app/(public)/performance/page.tsx
@@ -12,7 +12,8 @@ source:
 
 Página del servicio con los planes de período y la grilla de turnos del día con
 ocupación `n / cupo`, botón Reservar o "Completo". Sin plan vigente muestra el bloqueo
-con el llamado a contratar o renovar.
+con el llamado a contratar o renovar. La caja fija de la regla dice "Plan vigente:" y
+ya no "Plan vencido:", que se leía como estado del visitante.
 
 ## Structural
 - is part of → [[Area publica web]]

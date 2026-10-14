@@ -2,11 +2,12 @@
 type: system
 status: shipped
 semana: 2
-updated: 2026-10-13
+updated: 2026-10-14
 source:
   - move/apps/api/src/modules/payments/payments.module.ts
   - move/apps/api/src/modules/payments/services/checkout.service.ts
   - move/apps/api/src/modules/payments/services/payments.service.ts
+  - move/apps/api/src/modules/payments/services/auto-debits.service.ts
   - move/apps/api/src/modules/payments/controllers/webhook.controller.ts
   - move/apps/api/src/modules/payments/jobs/reconcile-payments.job.ts
 ---
@@ -15,7 +16,8 @@ source:
 Checkout de planes y de reservas pagas (con invitado que crea la cuenta), webhook
 firmado de Mercado Pago, conciliación periódica y pagos manuales del staff. Aplica el
 pago aprobado activando la suscripción o confirmando la reserva en la misma
-transacción.
+transacción. Desde la tanda de comentarios también maneja el [[Debito automatico]], y
+`/staff/payments` distingue el origen (`one_time` o `auto_debit`).
 
 ## Structural
 - is part of → [[API NestJS]]

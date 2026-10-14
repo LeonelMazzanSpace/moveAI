@@ -5,6 +5,6 @@ Punto de sincronización del vault con cada repo que sigue. El próximo sync dif
 las demás no se tocan.
 
 ## move
-branch: main
-commit: 0d09ee6
-date: 2026-10-13
+branch: feature/move-feedback
+commit: b872552
+date: 2026-10-14
