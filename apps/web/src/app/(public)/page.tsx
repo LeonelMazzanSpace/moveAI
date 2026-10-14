@@ -8,6 +8,7 @@ import { CtaLink, Hero } from '@/components/public/hero';
 import { loadPlans } from '@/components/public/load-plans';
 import { PlansSection, PlansSkeleton } from '@/components/public/plans-section';
 import { ServiceCards } from '@/components/public/service-cards';
+import { TeamSection } from '@/components/public/team-section';
 
 export const metadata: Metadata = {
   title: { absolute: 'MOVE — Performance, Rehab & Recovery' },
@@ -55,11 +56,13 @@ export default function HomePage() {
         </PageContainer>
       </section>
 
+      <TeamSection />
+
       <section className="border-t border-border">
         <PageContainer className="py-20">
           <div className="flex flex-wrap items-end justify-between gap-6">
             <div>
-              <Eyebrow index="02">Planes</Eyebrow>
+              <Eyebrow index="03">Planes</Eyebrow>
               <div className="mt-4">
                 <DisplayTitle>Elegí tu plan.</DisplayTitle>
               </div>
