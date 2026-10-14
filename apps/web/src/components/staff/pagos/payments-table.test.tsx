@@ -47,7 +47,7 @@ describe('PaymentsTable', () => {
     expect(screen.getByText('Martina Suárez').closest('tr')).not.toHaveClass('bg-warning-muted/40');
   });
 
-  it('stacks every payment as a card on mobile so nothing needs a horizontal swipe', () => {
+  it('stacks every payment as a card below xl so nothing needs a horizontal swipe', () => {
     render(<PaymentsTable payments={[base]} />);
     const row = screen.getByText('Martina Suárez').closest('tr');
     expect(row).toHaveClass('max-xl:grid');
@@ -171,7 +171,7 @@ describe('PaymentsView filters', () => {
   });
 });
 
-describe('PaymentsTable semantics below md', () => {
+describe('PaymentsTable semantics below xl', () => {
   it('spells the table roles so they survive display block/grid', () => {
     render(<PaymentsTable payments={[base, { ...base, purchaseId: 'pu2' }]} />);
     const table = screen.getByRole('table');
@@ -197,7 +197,7 @@ describe('PaymentsTable semantics below md', () => {
     expect(within(row).getByRole('cell', { name: '$ 10.500' })).toBeInTheDocument();
   });
 
-  it('shows the cells in the same order on mobile as in the DOM', () => {
+  it('shows the cells in the same order below xl as in the DOM', () => {
     render(<PaymentsTable payments={[base]} />);
     const cells = Array.from(screen.getAllByRole('row')[1].querySelectorAll('td'));
     for (const cell of cells) expect(cell.className).not.toMatch(/max-xl:order-/);

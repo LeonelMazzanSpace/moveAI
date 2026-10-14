@@ -108,7 +108,7 @@ describe('RosterTable', () => {
   });
 });
 
-describe('RosterTable on mobile', () => {
+describe('RosterTable as cards below xl', () => {
   it('stacks each booking as a card so the attendance and cancel buttons need no horizontal swipe', () => {
     render(<RosterTable rows={[row({ bookingId: 'b1' })]} canMark onMark={vi.fn()} onCancel={vi.fn()} />);
     const first = screen.getByRole('row', { name: /Martina Suárez/ });
@@ -120,7 +120,7 @@ describe('RosterTable on mobile', () => {
     expect(within(first).getByRole('button', { name: 'Cancelar reserva de Martina Suárez' }).closest('td')).toBe(actions);
   });
 
-  it('labels the cells whose header is hidden on mobile', () => {
+  it('labels the cells whose header is hidden below xl', () => {
     render(<RosterTable rows={[row({ bookingId: 'b1' })]} canMark onMark={vi.fn()} />);
     const cells = Array.from(screen.getByRole('row', { name: /Martina Suárez/ }).querySelectorAll('td'));
     expect(cells.map((cell) => cell.getAttribute('data-label'))).toEqual([null, 'Plan', 'Última asistencia', null, null]);
@@ -164,7 +164,7 @@ describe('RosterTable button hover tints', () => {
   });
 });
 
-describe('RosterTable semantics below md', () => {
+describe('RosterTable semantics below xl', () => {
   const renderRows = () =>
     render(<RosterTable rows={[row({ bookingId: 'b1' }), row({ bookingId: 'b2', client: { id: 'r', name: 'Rodrigo Silva' } })]} canMark onMark={vi.fn()} />);
 
@@ -191,7 +191,7 @@ describe('RosterTable semantics below md', () => {
     expect(within(first).getByRole('cell', { name: /^Estado:\s*Pendiente$/ })).toBeInTheDocument();
   });
 
-  it('shows the cells in the same order on mobile as in the DOM', () => {
+  it('shows the cells in the same order below xl as in the DOM', () => {
     renderRows();
     const cells = Array.from(screen.getAllByRole('row')[1].querySelectorAll('td'));
     expect(cells.map((cell) => cell.getAttribute('data-label'))).toEqual([null, 'Plan', 'Última asistencia', null, null]);
