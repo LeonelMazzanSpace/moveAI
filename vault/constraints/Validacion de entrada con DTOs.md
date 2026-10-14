@@ -12,7 +12,8 @@ source:
 `ValidationPipe` global con `whitelist`, `forbidNonWhitelisted` y `transform`; cada
 endpoint recibe un DTO de class-validator con cota superior en todo número y largo
 (D38). Un body de más de 1 MB responde 400, y el registro de Better Auth valida sus
-campos en un hook propio.
+campos en un hook propio. La API solo parsea JSON: un POST form-encoded a una ruta
+Nest responde 400 (T-039).
 
 ## Structural
 - constrains → [[API NestJS]]

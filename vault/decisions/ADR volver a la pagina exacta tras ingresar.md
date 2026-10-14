@@ -14,7 +14,9 @@ source:
 D39, diferida en T-006 y aplicada en T-033: `proxy.ts` reenvía la ruta actual en un
 header y las guardas la usan como `next`, validada como ruta interna permitida para el
 rol. Sin sesión, el checkout de un plan o el link de check-in del email vuelven a esa
-misma página después de ingresar.
+misma página después de ingresar. Desde T-043 el `next` se normaliza con
+`safeNextPath` (segmentos `..`, barras dobles y caracteres de control) antes de
+excluir las rutas de acceso.
 
 ## Structural
 - constrains → [[App web Next]]

@@ -56,6 +56,8 @@ flowchart LR
 - Datos: [[Postgres local Docker]] en desarrollo, [[Neon Postgres]] en producción (sin configurar).
 - Externos: [[Better Auth]], [[Google OAuth]], [[Mercado Pago]], [[Brevo]], [[NestJS Scheduler]], [[Vercel]], [[AWS Elastic Beanstalk]].
 
+- Pruebas de navegador: [[Suite E2E Playwright]] (desktop y mobile, base `move_e2e` propia, puertos 3150/3250; no corre en el pipeline).
+
 ## Vocabulario
 
 | Término | Significado exacto en este proyecto |
@@ -86,7 +88,9 @@ flowchart LR
 [[ADR modulos simples por dominio]] → [[Entidades ORM no salen del servicio]],
 [[Integraciones externas encapsuladas en un servicio]] y [[Dependencias entre modulos aciclicas]].
 Configuración y errores: [[ADR errores 4xx fuera de contrato como validacion]],
-[[ADR un parser por variable de entorno]] → [[Variable de entorno parseada una sola vez]].
+[[ADR un parser por variable de entorno]] → [[Variable de entorno parseada una sola vez]],
+[[ADR errores de campo con copy propio]] → [[Mensajes de validacion de la API no llegan al usuario]].
+Mobile: [[ADR menu movil en las tres areas]] → [[Pantallas sin scroll horizontal en mobile]].
 
 **Desarrollo sin accesos.** [[ADR desarrollo sin accesos a proveedores]] y
 [[ADR simulador registrado con ConditionalModule]] → [[Simulador de pagos solo fuera de produccion]],
@@ -97,7 +101,8 @@ deja Vercel, Elastic Beanstalk y Neon en `todo`.
 **Identidad.** [[ADR Better Auth con Google OAuth]] y [[ADR ubicacion de Better Auth]]
 (en Nest) → [[Autorizacion validada en la API]], [[Una cuenta por email]] y
 [[Web y API bajo el mismo dominio raiz]]. [[ADR Better Auth endurecido]],
-[[ADR volver a la pagina exacta tras ingresar]] y [[ADR create-staff exige promote-existing]].
+[[ADR volver a la pagina exacta tras ingresar]], [[ADR create-staff exige promote-existing]] y
+[[ADR invitacion de 72 horas]].
 
 **Agenda y reservas.** [[ADR calendario propio]] → [[Cupo maximo por horario]] y
 [[Reserva con bloqueo transaccional]] (previenen [[Sobreventa de cupos]]).
@@ -105,12 +110,14 @@ deja Vercel, Elastic Beanstalk y Neon en `todo`.
 [[ADR IP real detras del proxy y ventana horaria]] → [[Retenciones de pago limitadas por usuario]],
 [[Checkout publico limitado por IP]] e [[IP real del cliente detras del proxy]] (contra
 [[Retenciones masivas de invitados]] y [[Throttling por IP ve la IP del proxy]]).
+Catálogo: [[ADR slug de plan reutilizable tras borrado]].
 
 **Pagos.** [[ADR Mercado Pago como procesador de pagos]] →
 [[Pago confirmado solo por webhook validado]], [[Operaciones de pago idempotentes]]
 (requiere [[Queries crudas con RETURNING via CTE]]), [[Activacion en la misma transaccion que el pago]]
 y [[Conciliacion periodica de pagos pendientes]]. Pagos tardíos: [[ADR pago tardio sin lugar queda para el staff]],
-[[ADR retencion vencida sin lugar no se reconfirma]] y [[ADR conciliacion re-consulta compras vencidas]].
+[[ADR retencion vencida sin lugar no se reconfirma]] y [[ADR conciliacion de reservas vencidas por 72 horas]]
+(reemplaza a [[ADR conciliacion re-consulta compras vencidas]]).
 Planes rechazados: [[ADR pago de plan rechazado deja la compra pendiente]] →
 [[ADR reintento visible para plan rechazado]].
 
@@ -118,7 +125,8 @@ Planes rechazados: [[ADR pago de plan rechazado deja la compra pendiente]] →
 [[Reglas de automatizacion en Postgres]], [[Jobs programados idempotentes]] y
 [[Scheduler corre en una sola instancia]] (advisory lock). [[ADR renovacion programada no cuenta como por vencer]].
 
-**Alcance y entrega.** [[ADR alcance MVP en cuatro semanas]] · [[ADR sin E2E web de demos]] ·
+**Alcance y entrega.** [[ADR alcance MVP en cuatro semanas]] · [[ADR suite E2E desktop y mobile]]
+(reemplaza a [[ADR sin E2E web de demos]]) → [[Suite E2E solo sobre su base propia]] ·
 [[ADR sin archivos env nuevos]] · [[ADR manual de usuario con capturas]] ·
 [[ADR manual con guia de proveedores]] · [[ADR push a GitHub y merge por PR]].
 
