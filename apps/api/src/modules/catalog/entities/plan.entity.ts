@@ -14,6 +14,7 @@ export type PlanKind = 'period_plan' | 'session_pack' | 'single_session' | 'eval
 @Check(`"kind" <> 'session_pack' OR ("service" = 'recovery' AND "period_days" IS NOT NULL AND "period_days" > 0 AND "sessions_included" IS NOT NULL AND "sessions_included" > 0)`)
 @Check(`"kind" <> 'single_session' OR ("service" = 'recovery' AND "duration_minutes" IS NOT NULL AND "duration_minutes" > 0)`)
 @Check(`"kind" <> 'evaluation' OR ("service" = 'rehab' AND "duration_minutes" IS NOT NULL AND "duration_minutes" > 0)`)
+@Check(`NOT "auto_debit_enabled" OR "kind" IN ('period_plan','session_pack')`)
 export class Plan {
   @PrimaryGeneratedColumn('uuid') id: string;
   @Column('text') service: Service;
@@ -30,6 +31,7 @@ export class Plan {
   @Column({ type: 'boolean', default: false }) featured: boolean;
   @Column({ type: 'boolean', default: true }) active: boolean;
   @Column({ type: 'smallint', default: 0 }) sortOrder: number;
+  @Column({ type: 'boolean', default: false }) autoDebitEnabled: boolean;
   @CreateDateColumn({ type: 'timestamptz' }) createdAt: Date;
   @UpdateDateColumn({ type: 'timestamptz' }) updatedAt: Date;
   @DeleteDateColumn({ type: 'timestamptz' }) deletedAt: Date | null;

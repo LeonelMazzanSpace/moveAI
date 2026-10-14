@@ -1,6 +1,8 @@
 import type { Service } from '../../catalog/entities/plan.entity.js';
 import type { PurchaseKind, PurchaseMethod, PurchaseStatus } from '../entities/purchase.entity.js';
 
+export type PaymentOrigin = 'one_time' | 'auto_debit';
+
 // Response shapes of the HTTP contract.
 
 export interface CheckoutResponseDto {
@@ -36,4 +38,5 @@ export interface StaffPaymentDto {
   createdAt: string;
   approvedAt: string | null;
   note: string | null;
+  origin: PaymentOrigin;
 }

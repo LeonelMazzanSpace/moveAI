@@ -7,10 +7,12 @@ import { AgendaModule } from '../schedule/agenda.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module.js';
 import { UsersModule } from '../users/users.module.js';
+import { AutoDebitsController } from './controllers/auto-debits.controller.js';
 import { CheckoutController } from './controllers/checkout.controller.js';
 import { StaffPaymentsController } from './controllers/staff-payments.controller.js';
 import { WebhookController } from './controllers/webhook.controller.js';
 import { ReconcilePaymentsJob } from './jobs/reconcile-payments.job.js';
+import { AutoDebitsService } from './services/auto-debits.service.js';
 import { CheckoutService } from './services/checkout.service.js';
 import { MercadoPagoService } from './services/mercado-pago.service.js';
 import { PaymentsService } from './services/payments.service.js';
@@ -19,8 +21,8 @@ import { PaymentsService } from './services/payments.service.js';
   imports: [
     SettingsModule, NotificationsModule, UsersModule, AuthModule, CatalogModule, AgendaModule, SubscriptionsModule, BookingsModule,
   ],
-  controllers: [CheckoutController, WebhookController, StaffPaymentsController],
-  providers: [PaymentsService, CheckoutService, MercadoPagoService, ReconcilePaymentsJob],
-  exports: [PaymentsService, ReconcilePaymentsJob],
+  controllers: [CheckoutController, AutoDebitsController, WebhookController, StaffPaymentsController],
+  providers: [PaymentsService, AutoDebitsService, CheckoutService, MercadoPagoService, ReconcilePaymentsJob],
+  exports: [PaymentsService, AutoDebitsService, ReconcilePaymentsJob],
 })
 export class PaymentsModule {}

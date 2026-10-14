@@ -64,3 +64,8 @@ export function assertDurationClearable(kind: PlanKind): void {
   const rule = RULES[kind] as KindRule | undefined;
   if (!rule?.optional.includes('durationMinutes')) throw new AppError('PLAN_KIND_INVALID');
 }
+
+// D96: only the plans bought on their own (Performance periods and Recovery packs) can be charged automatically.
+export function assertAutoDebitAllowed(kind: PlanKind, enabled: boolean): void {
+  if (enabled && kind !== 'period_plan' && kind !== 'session_pack') throw new AppError('PLAN_KIND_INVALID');
+}
