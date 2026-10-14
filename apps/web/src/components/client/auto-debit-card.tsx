@@ -48,6 +48,17 @@ function statusLabel({ status, nextChargeDate }: AutoDebitDto): string {
   return nextChargeDate ? `Débito automático activo · próximo cobro ${formatDayMonth(nextChargeDate)}` : 'Débito automático activo';
 }
 
+function AutoDebitLoadError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded border border-border bg-danger-muted px-4 py-3">
+      <p className="text-sm text-danger">No pudimos cargar tu débito automático.</p>
+      <Button variant="outline" size="sm" onClick={onRetry}>
+        Reintentar
+      </Button>
+    </div>
+  );
+}
+
 interface AutoDebitCardProps {
   service: AutoDebitDto['service'];
   /** Último día cubierto por lo ya pagado, o `null` si no hay un plan o paquete vigente. */
@@ -60,6 +71,8 @@ export function AutoDebitCard({ service, endsOn }: AutoDebitCardProps) {
   const cancel = useCancelAutoDebit();
   const [confirming, setConfirming] = useState(false);
   const debit = debits.data?.find((candidate) => candidate.service === service && isActiveAutoDebit(candidate));
+  // Sin datos y con error no se sabe si hay un débito: se avisa en vez de esconderlo, así nadie queda sin poder cancelarlo.
+  if (!debit && debits.isError && debits.data === undefined) return <AutoDebitLoadError onRetry={() => void debits.refetch()} />;
   if (!debit) return null;
 
   const close = () => {

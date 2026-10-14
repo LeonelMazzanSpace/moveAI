@@ -10,6 +10,18 @@ const CALENDAR_KEY = ['staff', 'calendar'] as const;
 const CALENDARS_KEY = ['staff', 'calendar', 'calendars'] as const;
 const SLOTS_KEY = ['staff', 'time-slots'] as const;
 
+export const CONSENT_ERROR_MESSAGE = 'No pudimos conectar Google Calendar. Probá de nuevo.';
+
+class InvalidConsentUrlError extends Error {}
+
+function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export function useCalendarStatus() {
   return useQuery({ queryKey: CALENDAR_KEY, queryFn: () => apiFetch<CalendarStatusDto>('/staff/calendar') });
 }
@@ -22,12 +34,19 @@ export function useCalendarOptions(enabled: boolean) {
   });
 }
 
-/** Asks the API for the Google consent URL and sends the browser there. */
+/**
+ * Asks the API for the Google consent URL and sends the browser there, only if it is an https URL. `isSuccess` stays true
+ * until the browser leaves the page, so the button cannot start a second consent.
+ */
 export function useConnectCalendar() {
   return useMutation({
-    mutationFn: () => apiFetch<{ authUrl: string }>('/staff/calendar/connect', { method: 'POST' }),
-    onSuccess: ({ authUrl }) => window.location.assign(authUrl),
-    onError: (error) => toast.error(errorMessage(error)),
+    mutationFn: async () => {
+      const { authUrl } = await apiFetch<{ authUrl: string }>('/staff/calendar/connect', { method: 'POST' });
+      if (!isHttpsUrl(authUrl)) throw new InvalidConsentUrlError();
+      return authUrl;
+    },
+    onSuccess: (authUrl) => window.location.assign(authUrl),
+    onError: (error) => toast.error(error instanceof InvalidConsentUrlError ? CONSENT_ERROR_MESSAGE : errorMessage(error)),
   });
 }
 

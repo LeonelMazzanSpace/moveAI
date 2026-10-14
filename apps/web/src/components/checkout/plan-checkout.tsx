@@ -100,25 +100,48 @@ function PaymentModeOption({
   children?: React.ReactNode;
 }) {
   const id = `${name}-${value}`;
+  const descriptionId = children ? `${id}-description` : undefined;
   return (
     <div className="flex items-start gap-3 rounded border border-border bg-card p-4">
-      <input id={id} type="radio" name={name} value={value} checked={checked} onChange={() => onSelect(value)} className={RADIO_CLASS} />
+      <input
+        id={id}
+        type="radio"
+        name={name}
+        value={value}
+        checked={checked}
+        onChange={() => onSelect(value)}
+        aria-describedby={descriptionId}
+        className={RADIO_CLASS}
+      />
       <div className="space-y-1.5">
         <label htmlFor={id} className="flex min-h-8 items-center text-sm font-medium">
           {label}
         </label>
-        {children}
+        {children ? (
+          <div id={descriptionId} className="space-y-1.5">
+            {children}
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
-function PaymentModeField({ plan, firstChargeOn, mode, onChange }: { plan: PlanDto; firstChargeOn: string | null; mode: PaymentMode; onChange: (mode: PaymentMode) => void }) {
+interface PaymentModeFieldProps {
+  plan: PlanDto;
+  firstChargeOn: string | null;
+  mode: PaymentMode;
+  onChange: (mode: PaymentMode) => void;
+  /** Con un checkout en curso no se puede cambiar de modo: empezaría un segundo checkout. */
+  disabled: boolean;
+}
+
+function PaymentModeField({ plan, firstChargeOn, mode, onChange, disabled }: PaymentModeFieldProps) {
   const name = useId();
   const frequency = chargeFrequency(plan);
 
   return (
-    <fieldset className="space-y-3">
+    <fieldset disabled={disabled} className="space-y-3">
       <legend className="sr-only">Forma de pago</legend>
       <PaymentModeOption name={name} value="one_time" checked={mode === 'one_time'} onSelect={onChange} label="Pago único" />
       <PaymentModeOption name={name} value="auto_debit" checked={mode === 'auto_debit'} onSelect={onChange} label="Débito automático">
@@ -161,7 +184,7 @@ function PlanUnavailable() {
       title="Plan no disponible"
       description="Este plan no existe o no se puede contratar online."
       action={
-        <Link href="/planes" className="text-xs font-semibold underline underline-offset-4">
+        <Link href="/planes" className="inline-flex min-h-8 items-center text-xs font-semibold underline underline-offset-4">
           Ver planes
         </Link>
       }
@@ -195,6 +218,8 @@ export function PlanCheckout({ slug }: { slug: string }) {
   const startsOn = renewalStart(plan.data, subscriptions.data);
   const debitMode = autoDebitAllowed && mode === 'auto_debit';
   const mutation = debitMode ? autoDebitCheckout : checkout;
+  // Un checkout en curso, o ya enviado a Mercado Pago, bloquea todo: el modo y el botón del otro camino también.
+  const checkoutStarted = [checkout, autoDebitCheckout].some((started) => started.isPending || started.isSuccess);
   const blocked =
     hasActivePerformanceDebit(plan.data, debits.data) ||
     (plan.data.service === 'performance' && (isAutoDebitActiveError(checkout.error) || isAutoDebitActiveError(autoDebitCheckout.error)));
@@ -206,14 +231,16 @@ export function PlanCheckout({ slug }: { slug: string }) {
         <AutoDebitActiveNotice plan={plan.data} />
       ) : (
         <>
-          {autoDebitAllowed ? <PaymentModeField plan={plan.data} firstChargeOn={startsOn} mode={mode} onChange={setMode} /> : null}
+          {autoDebitAllowed ? (
+            <PaymentModeField plan={plan.data} firstChargeOn={startsOn} mode={mode} onChange={setMode} disabled={checkoutStarted} />
+          ) : null}
           {mutation.isError ? (
             <p role="alert" className="text-sm text-danger">
               {errorMessage(mutation.error)}
             </p>
           ) : null}
           <Button
-            disabled={mutation.isPending || mutation.isSuccess || (plan.data.service === 'performance' && debits.isLoading)}
+            disabled={checkoutStarted || (plan.data.service === 'performance' && debits.isLoading)}
             onClick={() => (debitMode ? autoDebitCheckout.mutate(plan.data.slug) : checkout.mutate(plan.data.id))}
             className={moveButtonSize({ size: 'block' })}
           >

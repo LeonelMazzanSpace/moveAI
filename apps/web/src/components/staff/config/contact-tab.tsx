@@ -88,6 +88,7 @@ function ContactForm({ contact }: { contact: StaffContactInfoDto }) {
         {CONTACT_FIELDS.map((field) => {
           const id = `${uid}-${field.name}`;
           const message = errors[field.name]?.message;
+          const hintId = field.hint ? `${id}-hint` : undefined;
           return (
             <div key={field.name} className="space-y-1.5">
               <FormField id={id} label={field.label} error={message}>
@@ -96,11 +97,15 @@ function ContactForm({ contact }: { contact: StaffContactInfoDto }) {
                   inputMode={field.inputMode}
                   placeholder={field.placeholder}
                   autoComplete="off"
-                  {...fieldA11y(id, message)}
+                  {...fieldA11y(id, message, hintId)}
                   {...register(field.name)}
                 />
               </FormField>
-              {field.hint ? <p className="text-xs text-muted-foreground">{field.hint}</p> : null}
+              {field.hint ? (
+                <p id={hintId} className="text-xs text-muted-foreground">
+                  {field.hint}
+                </p>
+              ) : null}
             </div>
           );
         })}

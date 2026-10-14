@@ -28,7 +28,7 @@ function renderCard(props: Partial<Parameters<typeof AutoDebitCard>[0]> = {}) {
     </QueryClientProvider>,
   );
   const settled = () => waitFor(() => expect(queryClient.getQueryState(['me', 'auto-debits'])?.fetchStatus).toBe('idle'));
-  return { invalidate, settled, ...view };
+  return { invalidate, settled, queryClient, ...view };
 }
 
 function mockDebits(debits: AutoDebitDto[], cancel: () => unknown = () => debit({ status: 'cancelled' })) {
@@ -85,12 +85,44 @@ describe('AutoDebitCard', () => {
     expect(view.container).toBeEmptyDOMElement();
   });
 
-  it('renders nothing when the debits cannot be loaded', async () => {
+  it('renders nothing while the debits are loading', () => {
+    apiFetch.mockImplementation(() => new Promise(() => undefined));
+    const view = renderCard();
+
+    expect(view.container).toBeEmptyDOMElement();
+  });
+
+  it('tells the client the debit could not be loaded, instead of hiding it, and offers to retry', async () => {
     apiFetch.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR', 'x'));
     const view = renderCard();
     await view.settled();
 
-    expect(view.container).toBeEmptyDOMElement();
+    expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cargar tu débito automático.');
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Cancelar débito' })).toBeNull();
+  });
+
+  it('shows the debit and its cancel button once the retry works', async () => {
+    mockDebits([debit()]);
+    apiFetch.mockRejectedValueOnce(new ApiError(500, 'INTERNAL_ERROR', 'x'));
+    renderCard();
+    await userEvent.click(await screen.findByRole('button', { name: 'Reintentar' }));
+
+    expect(await screen.findByText('Débito automático activo · próximo cobro 15/11')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancelar débito' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('keeps showing a known debit when a later refresh fails', async () => {
+    mockDebits([debit()]);
+    const view = renderCard();
+    await screen.findByText('Débito automático activo · próximo cobro 15/11');
+    apiFetch.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR', 'x'));
+    await view.queryClient.invalidateQueries({ queryKey: ['me', 'auto-debits'] });
+    await view.settled();
+
+    expect(screen.getByText('Débito automático activo · próximo cobro 15/11')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('asks for confirmation before cancelling and says what stays valid', async () => {

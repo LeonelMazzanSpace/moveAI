@@ -17,9 +17,16 @@ export const INTEGER_PATTERN = /^\d+$/;
 
 const errorId = (id: string): string => `${id}-error`;
 
-/** `aria-invalid` and `aria-describedby` for the control of a `FormField` that shows `error`. */
-export function fieldA11y(id: string, error?: string): { 'aria-invalid'?: true; 'aria-describedby'?: string } {
-  return error ? { 'aria-invalid': true, 'aria-describedby': errorId(id) } : {};
+/**
+ * `aria-invalid` and `aria-describedby` for the control of a `FormField` that shows `error`; `hintId` is the id of a hint
+ * paragraph next to the field, which stays linked whether or not there is an error.
+ */
+export function fieldA11y(id: string, error?: string, hintId?: string): { 'aria-invalid'?: true; 'aria-describedby'?: string } {
+  const describedBy = [error ? errorId(id) : null, hintId ?? null].filter((part) => part !== null).join(' ');
+  return {
+    ...(error ? { 'aria-invalid': true as const } : {}),
+    ...(describedBy ? { 'aria-describedby': describedBy } : {}),
+  };
 }
 
 interface FormFieldProps {

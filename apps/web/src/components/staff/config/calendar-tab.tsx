@@ -11,6 +11,7 @@ import { errorMessage } from '@/lib/api/errors';
 import type { CalendarStatusDto } from '@/lib/api/types';
 import { businessDateOf, formatDate, formatTime } from '@/lib/format';
 import {
+  CONSENT_ERROR_MESSAGE,
   useCalendarOptions,
   useCalendarStatus,
   useConnectCalendar,
@@ -22,7 +23,7 @@ import {
 const TAB_PATH = '/staff/configuracion?tab=calendario';
 const CONNECT_RESULTS = {
   connected: () => toast.success('Google Calendar conectado'),
-  error: () => toast.error('No pudimos conectar Google Calendar. Probá de nuevo.'),
+  error: () => toast.error(CONSENT_ERROR_MESSAGE),
 } as const;
 
 function isConnectResult(value: string | null): value is keyof typeof CONNECT_RESULTS {
@@ -57,7 +58,7 @@ function lastSync(status: CalendarStatusDto): string {
 function ConnectButton({ label }: { label: string }) {
   const connect = useConnectCalendar();
   return (
-    <button type="button" className={BUTTON_PRIMARY} disabled={connect.isPending} onClick={() => connect.mutate()}>
+    <button type="button" className={BUTTON_PRIMARY} disabled={connect.isPending || connect.isSuccess} onClick={() => connect.mutate()}>
       {label}
     </button>
   );
@@ -103,12 +104,20 @@ function ChooseCalendar({ status }: { status: CalendarStatusDto }) {
   return (
     <div className="max-w-3xl space-y-4">
       <p className="text-sm text-muted-foreground">
-        Cuenta conectada: <span className="font-medium text-foreground">{status.accountEmail}</span>. Elegí el calendario donde MOVE va a
-        crear las reservas de Rehab.
+        Cuenta conectada: <span className="break-all font-medium text-foreground">{status.accountEmail}</span>. Elegí el calendario donde MOVE va
+        a crear las reservas de Rehab.
       </p>
       {options.isError ? <ErrorState error={options.error} onRetry={() => void options.refetch()} /> : null}
       {options.isPending ? <Skeleton className="h-16" /> : null}
-      {options.data ? (
+      {options.data?.length === 0 ? (
+        <div className="space-y-4">
+          <p role="status" className="rounded border border-border bg-card p-4 text-sm text-muted-foreground">
+            Esta cuenta no tiene calendarios donde MOVE pueda escribir. Probá con otra cuenta.
+          </p>
+          <ConnectButton label="Reconectar" />
+        </div>
+      ) : null}
+      {options.data && options.data.length > 0 ? (
         <form
           className="flex flex-wrap items-end gap-3"
           onSubmit={(event) => {
@@ -185,15 +194,15 @@ function Connected({ status }: { status: CalendarStatusDto }) {
   return (
     <div className="max-w-3xl space-y-6">
       <dl className="grid gap-4 rounded border border-border bg-card p-4 text-sm sm:grid-cols-3">
-        <div>
+        <div className="min-w-0">
           <dt className="text-xs text-muted-foreground">Cuenta</dt>
           <dd className="break-all font-medium">{status.accountEmail}</dd>
         </div>
-        <div>
+        <div className="min-w-0">
           <dt className="text-xs text-muted-foreground">Calendario</dt>
-          <dd className="font-medium">{status.calendarName}</dd>
+          <dd className="break-words font-medium">{status.calendarName}</dd>
         </div>
-        <div>
+        <div className="min-w-0">
           <dt className="text-xs text-muted-foreground">Última sincronización</dt>
           <dd className="font-medium">{lastSync(status)}</dd>
         </div>

@@ -136,11 +136,20 @@ function PurchaseStatus({ reference }: { reference: string }) {
   return <ErrorState error={purchase.error} onRetry={() => void purchase.refetch()} />;
 }
 
-export function PaymentResult() {
+function ResultContent() {
   const params = useSearchParams();
   const debit = params.get('debito');
   if (debit) return <AutoDebitResult reference={debit} />;
   const reference = params.get('ref');
   if (!reference) return <EmptyState title="No encontramos la operación" description="Revisá el link o contactá a MOVE." />;
   return <PurchaseStatus reference={reference} />;
+}
+
+/** La región vive desde el primer render: así los lectores de pantalla anuncian el cambio de pendiente a aprobado, activo o cancelado. */
+export function PaymentResult() {
+  return (
+    <div role="status" aria-live="polite">
+      <ResultContent />
+    </div>
+  );
 }

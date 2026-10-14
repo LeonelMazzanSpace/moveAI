@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import { DisplayTitle } from '@/components/move/display-title';
 import { PageContainer } from '@/components/move/page-container';
 import { RECOVERY_EQUIPMENT, RECOVERY_ROOM_PHOTOS, RECOVERY_ROOM_TEXT } from './recovery-room-data';
 
@@ -6,9 +7,9 @@ export function RecoveryRoomSection() {
   return (
     <section id="recovery-room" className="scroll-mt-20 border-t border-border">
       <PageContainer className="py-16">
-        <h2 className="font-display text-3xl font-black uppercase tracking-tight">
+        <DisplayTitle size="lg">
           Recovery Room <span className="text-muted-foreground">by MOVE</span>
-        </h2>
+        </DisplayTitle>
         <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground">{RECOVERY_ROOM_TEXT}</p>
         <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
           {RECOVERY_ROOM_PHOTOS.map((photo) => (

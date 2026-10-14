@@ -33,9 +33,9 @@ export function ContactDetails({ contact, className }: { contact: ContactInfoDto
   return (
     <dl className={className}>
       {rows.map((row) => (
-        <div key={row.label}>
+        <div key={row.label} className="min-w-0">
           <dt className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground">{row.label}</dt>
-          <dd className="mt-1 text-sm text-foreground">{row.value}</dd>
+          <dd className="mt-1 text-sm text-foreground [overflow-wrap:anywhere]">{row.value}</dd>
         </div>
       ))}
     </dl>
