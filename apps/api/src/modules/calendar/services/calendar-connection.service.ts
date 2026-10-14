@@ -12,7 +12,7 @@ import { OAUTH_STATE_TTL_MS, signState, verifyState } from '../domain/oauth-stat
 import { decryptToken, encryptToken } from '../domain/token-cipher.js';
 import { CalendarConnection, type StoredConnectionStatus } from '../entities/calendar-connection.entity.js';
 import type { CalendarStatusDto, GoogleCalendarOptionDto } from '../models/calendar-status.model.js';
-import { GoogleCalendarError, GoogleCalendarService } from './google-calendar.service.js';
+import { GoogleCalendarError, GoogleCalendarService, REQUIRED_CALENDAR_SCOPES } from './google-calendar.service.js';
 
 export interface OAuthCallbackQuery { code: unknown; state: unknown; error: unknown }
 
@@ -43,15 +43,15 @@ async function clearBlocks(manager: EntityManager): Promise<void> {
   await manager.query(`UPDATE time_slots SET calendar_blocked_at = NULL WHERE calendar_blocked_at IS NOT NULL`);
 }
 
+interface LockedConnection { status: StoredConnectionStatus; calendarId: string | null; refreshTokenEnc: string }
+
 // Every write that changes the connection locks its row before touching links or blocks. A sync holds the same row
 // FOR SHARE while it writes (`holdForSync`), so it either commits first (and its writes are cleared here) or runs
 // after and sees the change.
-async function lockConnection(
-  manager: EntityManager,
-  connectionId: string,
-): Promise<{ status: StoredConnectionStatus; calendarId: string | null } | null> {
-  const [row]: { status: StoredConnectionStatus; calendarId: string | null }[] = await manager.query(
-    `SELECT status, calendar_id AS "calendarId" FROM calendar_connections WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+async function lockConnection(manager: EntityManager, connectionId: string): Promise<LockedConnection | null> {
+  const [row]: LockedConnection[] = await manager.query(
+    `SELECT status, calendar_id AS "calendarId", refresh_token_enc AS "refreshTokenEnc"
+     FROM calendar_connections WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
     [connectionId],
   );
   return row ?? null;
@@ -105,17 +105,20 @@ export class CalendarConnectionService {
     return this.getStatus();
   }
 
-  // The token is revoked in Google when possible; the events MOVE already created stay in the calendar.
+  // The token is revoked in Google when possible; the events MOVE already created stay in the calendar. The revoke runs
+  // after the connection is gone (M-3), so a pass that gets the resulting invalid_grant finds nothing to mark.
   async disconnect(): Promise<CalendarStatusDto> {
     const connection = await this.findActive();
     if (connection) {
-      await this.revoke(connection);
-      await this.dataSource.transaction(async (manager) => {
-        if (!(await lockConnection(manager, connection.id))) return;
+      const refreshTokenEnc = await this.dataSource.transaction(async (manager) => {
+        const locked = await lockConnection(manager, connection.id);
+        if (!locked) return null;
         await resetSync(manager);
         await manager.update(CalendarConnection, connection.id, { refreshTokenEnc: '' });
         await manager.softDelete(CalendarConnection, connection.id);
+        return locked.refreshTokenEnc;
       });
+      if (refreshTokenEnc) await this.revokeStored(refreshTokenEnc);
     }
     return this.getStatus();
   }
@@ -168,13 +171,17 @@ export class CalendarConnectionService {
   }
 
   // Sync pauses, every slot is freed and staff is told to reconnect (once per connection, day and reason, D115). The UPDATE
-  // locks the connection row before anything is cleared.
+  // locks the connection row before anything is cleared. Only if the connection still holds the token the failing
+  // pass used (M-3): an answer about an older token says nothing about a reconnect made meanwhile.
   // - invalid_grant: the calendar and the links are kept, so reconnecting the same account resumes where it stopped.
   // - lost calendar (D113): only if the connection still points to the calendar that failed (a 404 for a calendar staff
   //   already replaced changes nothing). The calendar and its links are dropped, so a reconnect lands in "connected
   //   without a calendar" and staff picks one.
   // Returns whether the connection changed.
-  async markNeedsReconnect(connectionId: string, reason: ReconnectReason = { kind: 'invalid_grant' }): Promise<boolean> {
+  async markNeedsReconnect(
+    connection: Pick<CalendarConnection, 'id' | 'refreshTokenEnc'>,
+    reason: ReconnectReason = { kind: 'invalid_grant' },
+  ): Promise<boolean> {
     const lostCalendar = reason.kind !== 'invalid_grant';
     const changed = await this.dataSource.transaction(async (manager) => {
       const rows: { id: string }[] = await manager.query(
@@ -184,22 +191,42 @@ export class CalendarConnectionService {
              calendar_id = CASE WHEN $3::text IS NULL THEN calendar_id END,
              calendar_name = CASE WHEN $3::text IS NULL THEN calendar_name END
            WHERE id = $1 AND status = 'connected' AND deleted_at IS NULL AND ($3::text IS NULL OR calendar_id = $3)
+             AND refresh_token_enc = $4
            RETURNING id
          ) SELECT id FROM changed`,
-        [connectionId, reason.kind, lostCalendar ? reason.calendarId : null],
+        [connection.id, reason.kind, lostCalendar ? reason.calendarId : null, connection.refreshTokenEnc],
       );
       if (rows.length === 0) return false;
       await (lostCalendar ? resetSync(manager) : clearBlocks(manager));
       return true;
     });
     if (!changed) return false;
-    this.logger.warn(`calendar connection ${connectionId} needs reconnect: ${reason.kind}`);
+    this.logger.warn(`calendar connection ${connection.id} needs reconnect: ${reason.kind}`);
+    await this.notifyDisconnected(connection.id, reason.kind);
+    return true;
+  }
+
+  // M-5: Google keeps failing with an error that is neither transient nor a lost grant or calendar (for example a
+  // misconfigured OAuth client). The blocks can no longer be trusted, so every slot is freed and staff is told; the
+  // connection stays as it is, and a pull that works again blocks what is busy.
+  async releaseBlocksAfterPersistentError(connectionId: string): Promise<void> {
+    const released = await this.dataSource.transaction(async (manager) => {
+      const locked = await lockConnection(manager, connectionId);
+      if (locked?.status !== 'connected') return false;
+      await clearBlocks(manager);
+      return true;
+    });
+    if (!released) return;
+    this.logger.warn(`calendar connection ${connectionId} blocks released: persistent error`);
+    await this.notifyDisconnected(connectionId, 'other');
+  }
+
+  private async notifyDisconnected(connectionId: string, kind: ReconnectReason['kind'] | 'other'): Promise<void> {
     await this.notifications.sendToStaff({
       template: 'staff-calendar-disconnected',
-      idempotencyKey: `staff-calendar-disconnected:${connectionId}:${businessToday()}:${reason.kind}`,
+      idempotencyKey: `staff-calendar-disconnected:${connectionId}:${businessToday()}:${kind}`,
       params: { configUrl: `${this.app.webUrl}/staff/configuracion?tab=calendario` },
     });
-    return true;
   }
 
   private async tryConnect(staffId: string, query: OAuthCallbackQuery): Promise<boolean> {
@@ -209,6 +236,12 @@ export class CalendarConnectionService {
     if (!verifyState(state, key, staffId, new Date())) return false;
     try {
       const tokens = await this.google.exchangeCode(code);
+      if (!REQUIRED_CALENDAR_SCOPES.every((scope) => tokens.scopes.includes(scope))) {
+        // M-7: staff unticked a calendar permission; a connection that cannot list calendars or write events is useless.
+        this.logger.warn(`calendar connect refused staff=${staffId}: calendar scope not granted`);
+        await this.revoke(tokens.refreshToken);
+        return false;
+      }
       const email = await this.google.getAccountEmail(tokens.accessToken);
       await this.saveConnection(staffId, email, encryptToken(tokens.refreshToken, key));
       return true;
@@ -235,11 +268,23 @@ export class CalendarConnectionService {
     });
   }
 
-  private async revoke(connection: CalendarConnection): Promise<void> {
+  private async revokeStored(refreshTokenEnc: string): Promise<void> {
     const key = this.configuredKey();
-    if (!key || connection.refreshTokenEnc === '') return;
+    if (!key || refreshTokenEnc === '') return;
+    let refreshToken: string;
     try {
-      await this.google.revoke(decryptToken(connection.refreshTokenEnc, key));
+      refreshToken = decryptToken(refreshTokenEnc, key);
+    } catch {
+      this.logger.warn('calendar revoke failed: internal');
+      return;
+    }
+    await this.revoke(refreshToken);
+  }
+
+  // Best effort: a failure is only logged.
+  private async revoke(refreshToken: string): Promise<void> {
+    try {
+      await this.google.revoke(refreshToken);
     } catch (failure) {
       this.logger.warn(`calendar revoke failed: ${failure instanceof GoogleCalendarError ? failure.kind : 'internal'}`);
     }
@@ -257,7 +302,7 @@ export class CalendarConnectionService {
     } catch (error) {
       if (!(error instanceof GoogleCalendarError)) throw error;
       if (error.kind !== 'invalid_grant') throw new AppError('CALENDAR_PROVIDER_ERROR');
-      await this.markNeedsReconnect(connection.id);
+      await this.markNeedsReconnect(connection);
       throw new AppError('CALENDAR_NOT_CONNECTED');
     }
   }

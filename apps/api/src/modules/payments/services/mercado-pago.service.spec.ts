@@ -213,10 +213,45 @@ describe('MercadoPagoService', () => {
           { id: '1', preapprovalId: 'pre-1', paymentId: '11', status: 'processed' },
           { id: '3', preapprovalId: 'pre-1', paymentId: null, status: 'scheduled' },
         ]);
-        expect(lastCall().url).toBe('https://api.mercadopago.com/authorized_payments/search?preapproval_id=pre-1&limit=100');
+        expect(lastCall().url).toBe(
+          'https://api.mercadopago.com/authorized_payments/search?preapproval_id=pre-1&sort=date_created&criteria=desc&limit=100&offset=0',
+        );
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    // M-9: latest first, one page after another while every charge of the page is inside the window, at most 10 pages.
+    describe('charge search pages', () => {
+      const charge = (id: number, dateCreated: string) =>
+        ({ id, preapproval_id: 'pre-1', status: 'processed', payment: { id: id + 1000 }, date_created: dateCreated });
+      const recent = '2026-10-13T10:00:00.000-03:00';
+      const fullPage = (first: number) =>
+        jsonResponse(200, { results: Array.from({ length: 100 }, (_, i) => charge(first + i, recent)) });
+      const offsets = () => fetchMock.mock.calls.map(([url]) => new URL(url as string).searchParams.get('offset'));
+
+      beforeEach(() => { vi.useFakeTimers({ now: new Date('2026-10-14T12:00:00.000Z'), toFake: ['Date'] }); });
+      afterEach(() => { vi.useRealTimers(); });
+
+      it('reads the next page while the last one was full and recent', async () => {
+        fetchMock.mockResolvedValueOnce(fullPage(1)).mockResolvedValueOnce(jsonResponse(200, { results: [charge(500, recent)] }));
+        await expect(service.searchAuthorizedPayments('pre-1', 40)).resolves.toHaveLength(101);
+        expect(offsets()).toEqual(['0', '100']);
+      });
+
+      it('stops at the first page that reaches charges older than the window', async () => {
+        fetchMock.mockResolvedValueOnce(jsonResponse(200, {
+          results: [...Array.from({ length: 99 }, (_, i) => charge(i + 1, recent)), charge(100, '2026-08-01T10:00:00.000-03:00')],
+        }));
+        await expect(service.searchAuthorizedPayments('pre-1', 40)).resolves.toHaveLength(99);
+        expect(offsets()).toEqual(['0']);
+      });
+
+      it('reads at most 10 pages', async () => {
+        fetchMock.mockImplementation(async (url) => fullPage(Number(new URL(url as string).searchParams.get('offset'))));
+        await expect(service.searchAuthorizedPayments('pre-1', 40)).resolves.toHaveLength(1000);
+        expect(offsets()).toEqual(['0', '100', '200', '300', '400', '500', '600', '700', '800', '900']);
+      });
     });
 
     it('turns subscription failures into PAYMENT_PROVIDER_ERROR', async () => {

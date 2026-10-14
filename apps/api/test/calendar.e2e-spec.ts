@@ -13,6 +13,7 @@ import { OAUTH_STATE_TTL_MS, signState } from '../src/modules/calendar/domain/oa
 import { decryptToken } from '../src/modules/calendar/domain/token-cipher.js';
 import { CalendarPushJob } from '../src/modules/calendar/jobs/calendar-push.job.js';
 import { CalendarConnectionService } from '../src/modules/calendar/services/calendar-connection.service.js';
+import { CalendarSyncService } from '../src/modules/calendar/services/calendar-sync.service.js';
 import { GoogleCalendarService } from '../src/modules/calendar/services/google-calendar.service.js';
 import { createTestApp, raisedCheckoutLimit } from './utils/app.js';
 import { signUp, signUpClient, signUpStaff, type TestAgent } from './utils/auth.js';
@@ -203,6 +204,34 @@ describe('Google Calendar ↔ Rehab (e2e)', () => {
       const res = await callback(agent, { code: 'abc', state }).expect(302);
       expect(res.headers.location).toBe(`${CONFIG_URL}&calendar=error`);
       expect(await count('calendar_connections')).toBe(0);
+    });
+
+    it('redirects with calendar=error, stores nothing and revokes the token when a calendar scope was not granted (M-7)', async () => {
+      const { agent } = await signUpStaff(app, ds);
+      const cases: [string, string[]][] = [
+        ['abc', ['openid', 'email', 'https://www.googleapis.com/auth/calendar.calendarlist.readonly']],
+        ['def', ['openid', 'email', 'https://www.googleapis.com/auth/calendar.events']],
+      ];
+      for (const [code, scopes] of cases) {
+        google.grantedScopes = scopes;
+        const res = await callback(agent, { code, state: await startConnect(agent) }).expect(302);
+        expect(res.headers.location).toBe(`${CONFIG_URL}&calendar=error`);
+      }
+      expect(await count('calendar_connections')).toBe(0);
+      expect(google.revoked).toEqual(['1//refresh-abc', '1//refresh-def']);
+    });
+
+    it('keeps at most one connection that is not deleted in the database (M-8)', async () => {
+      const { agent, userId } = await signUpStaff(app, ds);
+      await connect(agent);
+      const insert = () => ds.query(
+        `INSERT INTO calendar_connections (google_account_email, refresh_token_enc, connected_by) VALUES ('otra@move.test', 'x', $1)`,
+        [userId],
+      );
+      await expect(insert()).rejects.toThrow(/UQ_calendar_connections_single_active/);
+      await ds.query(`UPDATE calendar_connections SET deleted_at = now()`);
+      await insert();
+      expect(await count('calendar_connections')).toBe(2);
     });
 
     it('stores the refresh token encrypted and redirects with calendar=connected', async () => {
@@ -476,6 +505,57 @@ describe('Google Calendar ↔ Rehab (e2e)', () => {
       const [row] = await ds.query(`SELECT status, last_error_code FROM calendar_connections`);
       expect(row).toEqual({ status: 'connected', last_error_code: 'transient' });
     });
+
+    // M-5: e.g. a misconfigured OAuth client makes every token refresh fail with a 400 that is not invalid_grant.
+    describe('persistent errors', () => {
+      const pull = () => app.get(CalendarSyncService).pull();
+      const disconnectedEmails = () => count(`email_logs WHERE template = 'staff-calendar-disconnected'`);
+
+      const blockedThenFailing = async () => {
+        const staff = await signUpStaff(app, ds);
+        await connectAndChoose(staff.agent);
+        const slotId = await rehabSlot('10:00');
+        busyOver('10:00');
+        await sync(staff.agent);
+        expect(await blockedAt(slotId)).not.toBeNull();
+        google.failWith('other', 'refreshAccessToken');
+        return slotId;
+      };
+
+      it('frees the slots and tells staff after 6 failed pulls in a row, and blocks again once Google answers', async () => {
+        const slotId = await blockedThenFailing();
+        for (let pass = 1; pass <= 5; pass += 1) await pull();
+        expect(await blockedAt(slotId)).not.toBeNull();
+        expect(await disconnectedEmails()).toBe(0);
+
+        await pull();
+        expect(await blockedAt(slotId)).toBeNull();
+        const [row] = await ds.query(`SELECT id, status FROM calendar_connections`);
+        expect(row.status).toBe('connected');
+        expect(await emails(`staff-calendar-disconnected:${row.id}:${businessToday()}:other`)).toBe(1);
+        await pull();
+        expect(await disconnectedEmails()).toBe(1);
+
+        google.clearFailures();
+        await pull();
+        expect(await blockedAt(slotId)).not.toBeNull();
+      });
+
+      it('starts counting again after a pull that worked or failed transiently', async () => {
+        const slotId = await blockedThenFailing();
+        for (let pass = 1; pass <= 5; pass += 1) await pull();
+        google.clearFailures();
+        await pull();
+        google.failWith('other', 'refreshAccessToken');
+        for (let pass = 1; pass <= 5; pass += 1) await pull();
+        google.failWith('transient', 'refreshAccessToken');
+        await pull();
+        google.failWith('other', 'refreshAccessToken');
+        for (let pass = 1; pass <= 5; pass += 1) await pull();
+        expect(await blockedAt(slotId)).not.toBeNull();
+        expect(await disconnectedEmails()).toBe(0);
+      });
+    });
   });
 
   describe('lost access and disconnection', () => {
@@ -635,8 +715,8 @@ describe('Google Calendar ↔ Rehab (e2e)', () => {
 
     it('losing access during a pull leaves no block behind', async () => {
       const slotId = await duringPull(async () => {
-        const [{ id }] = await ds.query(`SELECT id FROM calendar_connections`);
-        await app.get(CalendarConnectionService).markNeedsReconnect(id as string);
+        const [connection] = await ds.query(`SELECT id, refresh_token_enc AS "refreshTokenEnc" FROM calendar_connections`);
+        await app.get(CalendarConnectionService).markNeedsReconnect(connection as { id: string; refreshTokenEnc: string });
       });
       const [row] = await ds.query(`SELECT status FROM calendar_connections`);
       expect(row.status).toBe('needs_reconnect');
@@ -656,6 +736,37 @@ describe('Google Calendar ↔ Rehab (e2e)', () => {
       const [row] = await ds.query(`SELECT status, calendar_id, last_error_code FROM calendar_connections`);
       expect(row).toMatchObject({ status: 'connected', calendar_id: 'agenda@move.test' });
       expect(row.last_error_code).not.toBe('calendar_not_found');
+      expect(await count(`email_logs WHERE template = 'staff-calendar-disconnected'`)).toBe(0);
+    });
+
+    // M-3, scenario A: the pull refreshed with the old token; staff reconnected the same account before Google answered.
+    it('an invalid_grant for the token a pull read before a reconnect does not undo the reconnect (M-3)', async () => {
+      await duringPull(async (agent) => {
+        await connect(agent, 'def');
+        google.failWith('invalid_grant', 'listEvents');
+      });
+      const [row] = await ds.query(`SELECT status, refresh_token_enc FROM calendar_connections WHERE deleted_at IS NULL`);
+      expect(row.status).toBe('connected');
+      expect(decryptToken(row.refresh_token_enc as string, tokenKey)).toBe('1//refresh-def');
+      expect(await count(`email_logs WHERE template = 'staff-calendar-disconnected'`)).toBe(0);
+    });
+
+    // M-3, scenario B: the revoke of a disconnect makes the pull fail with invalid_grant.
+    it('a disconnect never ends in a "disconnected" notice from the pull it interrupted (M-3)', async () => {
+      const staff = await signUpStaff(app, ds);
+      await connectAndChoose(staff.agent);
+      const pullHeld = google.hold('listEvents');
+      const pull = staff.agent.post('/api/staff/calendar/sync').then((r) => r);
+      await pullHeld.reached;
+      const revokeHeld = google.hold('revoke');
+      const disconnect = staff.agent.delete('/api/staff/calendar').then((r) => r);
+      await revokeHeld.reached;
+      google.failWith('invalid_grant', 'listEvents');
+      pullHeld.release();
+      expect((await pull).status).toBe(200);
+      revokeHeld.release();
+      expect((await disconnect).status).toBe(200);
+      expect(await live()).toBe(0);
       expect(await count(`email_logs WHERE template = 'staff-calendar-disconnected'`)).toBe(0);
     });
 

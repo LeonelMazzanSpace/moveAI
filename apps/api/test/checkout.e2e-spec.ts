@@ -3,6 +3,7 @@ import request from 'supertest';
 import { addDays, businessDateTime, businessToday } from '../src/common/time/business-time.js';
 import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
 import { ExpireHoldsJob } from '../src/modules/bookings/jobs/expire-holds.job.js';
+import { NotificationsService } from '../src/modules/notifications/services/notifications.service.js';
 import { createTestApp, type TestApp } from './utils/app.js';
 import { signUpClient, signUpStaff } from './utils/auth.js';
 import { resetDb } from './utils/db.js';
@@ -251,6 +252,37 @@ describe('checkout (e2e)', () => {
       const res = await agent.post('/api/checkout/plan').send({ planId }).expect(201);
       await simulate(res.body.externalReference, 'rejected');
       expect(await ctx.dataSource.query(`SELECT 1 FROM email_logs WHERE template = 'booking-not-confirmed'`)).toEqual([]);
+    });
+
+    it('does not tell the client that a hold staff already cancelled was not confirmed when its payment is rejected (T-060 M-1)', async () => {
+      const slotId = await rehabSlot();
+      const planId = await planIdBySlug(ctx.dataSource, 'rehab-evaluacion');
+      const { agent } = await signUpClient(ctx.app);
+      const res = await agent.post('/api/checkout/booking').send({ planId, timeSlotId: slotId }).expect(201);
+      const staff = await signUpStaff(ctx.app, ctx.dataSource);
+      await staff.agent.post(`/api/staff/bookings/${res.body.bookingId}/cancel`).expect(200);
+
+      await simulate(res.body.externalReference, 'rejected');
+      expect(await ctx.dataSource.query(`SELECT template FROM email_logs WHERE template LIKE 'booking-%'`)).toEqual([
+        { template: 'booking-cancelled' },
+      ]);
+    });
+
+    it('explains the confirmation of a hold that expired before its late payment arrived (T-060 M-2)', async () => {
+      const slotId = await rehabSlot();
+      const planId = await planIdBySlug(ctx.dataSource, 'rehab-evaluacion');
+      const { agent } = await signUpClient(ctx.app);
+      const res = await agent.post('/api/checkout/booking').send({ planId, timeSlotId: slotId }).expect(201);
+      await ctx.dataSource.query(`UPDATE bookings SET hold_expires_at = now() - interval '1 minute' WHERE id = $1`, [res.body.bookingId]);
+      await ctx.app.get(ExpireHoldsJob).execute({ force: true });
+      const send = vi.spyOn(ctx.app.get(NotificationsService), 'send');
+      try {
+        await simulate(res.body.externalReference, 'approved');
+        const confirmed = send.mock.calls.map(([input]) => input).filter((input) => input.template === 'booking-confirmed');
+        expect(confirmed).toMatchObject([{ idempotencyKey: `booking-confirmed:${res.body.bookingId}`, params: { afterExpiredHold: true } }]);
+      } finally {
+        send.mockRestore();
+      }
     });
 
     it('emails a client whose hold expired once, even if the job runs again (D93)', async () => {

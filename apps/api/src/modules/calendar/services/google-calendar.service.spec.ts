@@ -43,9 +43,14 @@ describe('GoogleCalendarService', () => {
     });
   });
 
-  it('exchanges the code for tokens', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(200, { access_token: 'access', refresh_token: 'refresh', expires_in: 3599 }));
-    await expect(service.exchangeCode('the-code')).resolves.toEqual({ accessToken: 'access', refreshToken: 'refresh' });
+  it('exchanges the code for tokens and the scopes Google granted', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, {
+      access_token: 'access', refresh_token: 'refresh', expires_in: 3599,
+      scope: 'openid https://www.googleapis.com/auth/calendar.events email',
+    }));
+    await expect(service.exchangeCode('the-code')).resolves.toEqual({
+      accessToken: 'access', refreshToken: 'refresh', scopes: ['openid', 'https://www.googleapis.com/auth/calendar.events', 'email'],
+    });
     const { url, init } = call();
     expect(url).toBe('https://oauth2.googleapis.com/token');
     expect(init.method).toBe('POST');
@@ -62,6 +67,11 @@ describe('GoogleCalendarService', () => {
   it('fails the exchange when Google returns no refresh token', async () => {
     fetchMock.mockResolvedValue(jsonResponse(200, { access_token: 'access' }));
     await expect(service.exchangeCode('the-code')).rejects.toMatchObject({ kind: 'other' });
+  });
+
+  it('reads no scopes when Google does not list them', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, { access_token: 'access', refresh_token: 'refresh' }));
+    await expect(service.exchangeCode('the-code')).resolves.toMatchObject({ scopes: [] });
   });
 
   it('refreshes the access token', async () => {
@@ -125,10 +135,41 @@ describe('GoogleCalendarService', () => {
     const first = new URL(call(0).url);
     expect(first.origin + first.pathname).toBe('https://www.googleapis.com/calendar/v3/calendars/rehab%40group/events');
     expect(Object.fromEntries(first.searchParams)).toEqual({
-      timeMin: from.toISOString(), timeMax: to.toISOString(), singleEvents: 'true', maxResults: '2500',
+      timeMin: from.toISOString(), timeMax: to.toISOString(), singleEvents: 'true', maxResults: '250',
     });
     expect(new URL(call(1).url).searchParams.get('pageToken')).toBe('p2');
     expect(header(call(1).init, 'authorization')).toBe('Bearer access');
+  });
+
+  // M-6: a pull must not loop (and hold the job lock) on an endless or repeated page token; the last blocks are kept.
+  describe('page limit', () => {
+    const from = new Date('2026-10-14T12:00:00.000Z');
+    const to = new Date('2026-10-29T12:00:00.000Z');
+
+    it('reads at most 10 pages and then fails as transient', async () => {
+      let page = 0;
+      fetchMock.mockImplementation(async () => {
+        page += 1;
+        return jsonResponse(200, { items: [{ id: `e${page}` }], nextPageToken: `p${page + 1}` });
+      });
+      await expect(service.listEvents('access', 'rehab@group', from, to)).rejects.toMatchObject({ kind: 'transient' });
+      expect(fetchMock).toHaveBeenCalledTimes(10);
+    });
+
+    it('reads all 10 pages when the last one ends the list', async () => {
+      let page = 0;
+      fetchMock.mockImplementation(async () => {
+        page += 1;
+        return jsonResponse(200, { items: [{ id: `e${page}` }], ...(page < 10 ? { nextPageToken: `p${page + 1}` } : {}) });
+      });
+      await expect(service.listEvents('access', 'rehab@group', from, to)).resolves.toHaveLength(10);
+    });
+
+    it('fails as transient when Google repeats a page token', async () => {
+      fetchMock.mockImplementation(async () => jsonResponse(200, { items: [{ id: 'e' }], nextPageToken: 'same' }));
+      await expect(service.listEvents('access', 'rehab@group', from, to)).rejects.toMatchObject({ kind: 'transient' });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('inserts an event with the MOVE booking id', async () => {

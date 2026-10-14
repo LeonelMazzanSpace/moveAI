@@ -16,7 +16,7 @@ export class BookingRemindersService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  // `sent`: reminders handed to the mail provider (or logged in dry-run); `skipped`: already sent, failed or no user.
+  // `sent`: reminders the mail provider accepted (T-060 M-4); `skipped`: dry-run, already sent, failed or no user.
   async run(now: Date = new Date()): Promise<{ sent: number; skipped: number }> {
     const today = businessToday(now);
     const { from, to } = reminderWindow(today);
@@ -41,7 +41,7 @@ export class BookingRemindersService {
             },
           })
         : 'failed';
-      counts[result === 'sent' || result === 'skipped' ? 'sent' : 'skipped'] += 1;
+      counts[result === 'sent' ? 'sent' : 'skipped'] += 1;
     }
     return counts;
   }

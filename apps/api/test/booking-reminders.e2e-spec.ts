@@ -40,6 +40,7 @@ describe('booking reminders (e2e)', () => {
     );
   const run = (staff: { agent: ReturnType<typeof request.agent> }) => staff.agent.post('/api/staff/automations/run/booking-reminders');
 
+  // Brevo runs in dry-run here (no API key): every reminder is logged but none counts as `sent` (T-060 M-4).
   it('sends one reminder per Rehab and Recovery booking of tomorrow, and not a second time', async () => {
     const staff = await signUpStaff(ctx.app, ctx.dataSource);
     const ana = await signUpClient(ctx.app);
@@ -48,7 +49,7 @@ describe('booking reminders (e2e)', () => {
     const rehab = await book({ userId: beto.userId, service: 'rehab', date: tomorrow(), time: '16:00' });
 
     const first = await run(staff).expect(200);
-    expect(first.body).toEqual({ job: 'booking-reminders', ran: true, result: { sent: 2, skipped: 0 } });
+    expect(first.body).toEqual({ job: 'booking-reminders', ran: true, result: { sent: 0, skipped: 2 } });
     expect(await reminders()).toEqual(
       [
         { userId: ana.userId, key: `booking-reminder:${recovery}`, template: 'booking-reminder' },
@@ -72,7 +73,7 @@ describe('booking reminders (e2e)', () => {
     await book({ userId, service: 'rehab', date: addDays(today(), 2), time: '00:00' });
 
     const res = await run(staff).expect(200);
-    expect(res.body.result).toEqual({ sent: 1, skipped: 0 });
+    expect(res.body.result).toEqual({ sent: 0, skipped: 1 });
     expect((await reminders()).map((r) => r.key)).toEqual([`booking-reminder:${included}`]);
   });
 
@@ -92,7 +93,7 @@ describe('booking reminders (e2e)', () => {
     const bookingId = await book({ userId: paused.userId, service: 'rehab', date: tomorrow(), time: '10:00' });
 
     const res = await run(staff).expect(200);
-    expect(res.body.result).toEqual({ sent: 1, skipped: 0 });
+    expect(res.body.result).toEqual({ sent: 0, skipped: 1 });
     expect(await reminders()).toEqual([{ userId: paused.userId, key: `booking-reminder:${bookingId}`, template: 'booking-reminder' }]);
   });
 

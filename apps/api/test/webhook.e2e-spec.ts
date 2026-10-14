@@ -487,7 +487,7 @@ describe('Mercado Pago webhook (e2e)', () => {
       const booking = await rehabCheckout((await signUpClient(app)).agent);
       // The hold runs out and the expiry job releases it, as in production.
       await ds.query(`UPDATE bookings SET hold_expires_at = now() - interval '1 minute' WHERE id = $1`, [booking.bookingId]);
-      await expect(app.get(BookingsService).expireHolds(new Date())).resolves.toBe(1);
+      await expect(app.get(BookingsService).expireHoldsWithIds(new Date())).resolves.toHaveLength(1);
       await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 2 });
       expect((await purchaseOf(ref)).status).toBe('expired');
       expect(await purchaseOf(booking.ref)).toEqual({ status: 'expired', needs_attention: false });

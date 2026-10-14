@@ -7,13 +7,13 @@ import { BookingEmailsService } from './booking-emails.service.js';
 
 type Row = {
   id: string; userId: string; service: 'performance' | 'rehab' | 'recovery'; source: 'plan' | 'package' | 'payment' | 'followup';
-  startsAt: Date; endsAt: Date; professionalName: string | null; confirmedAt: Date | null;
+  startsAt: Date; endsAt: Date; professionalName: string | null; confirmedAt: Date | null; holdExpiresAt: Date | null;
 };
 
 const row = (overrides: Partial<Row> = {}): Row => ({
   id: 'b1', userId: 'u1', service: 'recovery', source: 'package',
   startsAt: businessDateTime('2026-10-15', '10:00'), endsAt: businessDateTime('2026-10-15', '10:45'),
-  professionalName: null, confirmedAt: new Date('2026-10-10T12:00:00Z'), ...overrides,
+  professionalName: null, confirmedAt: new Date('2026-10-10T12:00:00Z'), holdExpiresAt: null, ...overrides,
 });
 
 const setup = (rows: Row[], options: { user?: boolean } = {}) => {
@@ -71,6 +71,35 @@ describe('BookingEmailsService', () => {
       await missingUser.service.confirmed('b1');
       expect(missingUser.send).not.toHaveBeenCalled();
       expect(missingUser.sendToStaff).not.toHaveBeenCalled();
+    });
+
+    // T-060 M-2: the hold expired (and its client may have been told) before the late payment confirmed it.
+    it('says so when the booking was confirmed after its hold expired', async () => {
+      const late = setup([row({ source: 'payment', holdExpiresAt: new Date('2026-10-10T11:00:00Z') })]);
+      await late.service.confirmed('b1');
+      expect(calls(late.send)[0].params).toMatchObject({ afterExpiredHold: true });
+
+      const inTime = setup([row({ source: 'payment', holdExpiresAt: new Date('2026-10-10T12:15:00Z') })]);
+      await inTime.service.confirmed('b1');
+      expect(calls(inTime.send)[0].params).not.toHaveProperty('afterExpiredHold');
+    });
+  });
+
+  // M-15: the staff address hears about a Rehab booking even when the client's user can no longer be read.
+  describe('staff notice without the client user', () => {
+    const rehab = row({ service: 'rehab', source: 'payment', professionalName: 'Fisio Test', endsAt: businessDateTime('2026-10-15', '11:00') });
+
+    it.each([
+      ['confirmed', 'confirmed'],
+      ['cancelledByClient', 'cancelled'],
+      ['cancelledByStaff', 'cancelled'],
+    ] as const)('%s notifies the staff address as "Cliente"', async (method, event) => {
+      const { service, send, sendToStaff } = setup([rehab], { user: false });
+      await service[method]('b1');
+      expect(send).not.toHaveBeenCalled();
+      expect(calls(sendToStaff)).toMatchObject([
+        { idempotencyKey: `staff-rehab-booking:b1:${event}`, params: { event, clientName: 'Cliente', professionalName: 'Fisio Test' } },
+      ]);
     });
   });
 

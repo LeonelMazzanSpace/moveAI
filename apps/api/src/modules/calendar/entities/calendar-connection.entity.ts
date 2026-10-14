@@ -8,7 +8,10 @@ export type StoredConnectionStatus = 'connected' | 'needs_reconnect';
 
 // D94: the single Google account MOVE syncs with (at most one row not deleted). The refresh token is stored
 // encrypted (AES-256-GCM, `iv:tag:ciphertext`), never in clear.
+// M-8: the database enforces the single row with a unique index on a constant where `deleted_at IS NULL`. TypeORM cannot
+// describe that index, so its migration is written by hand and `synchronize: false` keeps schema diffs from dropping it.
 @Entity('calendar_connections')
+@Index('UQ_calendar_connections_single_active', { synchronize: false })
 @Check(`"status" IN ('connected','needs_reconnect')`)
 export class CalendarConnection {
   @PrimaryGeneratedColumn('uuid') id: string;

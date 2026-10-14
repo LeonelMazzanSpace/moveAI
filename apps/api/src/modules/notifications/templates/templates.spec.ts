@@ -133,6 +133,15 @@ describe('new templates', () => {
     expect(renderEmail('booking-confirmed', base).text).not.toContain('Profesional');
   });
 
+  // T-060 M-2: a late payment re-confirms a hold that may already have been reported as not confirmed.
+  it('booking-confirmed explains a confirmation that came after the hold expired', () => {
+    const base = { name: 'Ana', serviceName: 'Rehab', label: 'Evaluación', date: '15/10/2026', time: '09:00' };
+    const late = renderEmail('booking-confirmed', { ...base, afterExpiredHold: true }).text;
+    expect(late).toContain('Tu pago llegó después de que venció el tiempo para completarlo, pero el lugar seguía libre.');
+    expect(late).toContain('Si te llegó un aviso de que la reserva no se confirmó, no lo tengas en cuenta.');
+    expect(renderEmail('booking-confirmed', base).text).not.toContain('venció');
+  });
+
   it('booking-cancelled points to the footer channels instead of a generic contact line', () => {
     const email = renderEmail('booking-cancelled', { name: 'Ana', serviceName: 'Performance', date: '15/10/2026', time: '18:00' });
     expect(email.text).toContain('Si tenés dudas, escribinos por los canales de abajo.');
