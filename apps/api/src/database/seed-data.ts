@@ -1,6 +1,6 @@
 import type { DataSource, EntityManager } from 'typeorm';
 import type { PlanKind, Service } from '../modules/catalog/entities/plan.entity.js';
-import { SETTING_DB_KEYS, SETTINGS_DEFAULTS } from '../modules/settings/settings.defaults.js';
+import { CONTACT_DB_KEYS, CONTACT_DEFAULTS, SETTING_DB_KEYS, SETTINGS_DEFAULTS } from '../modules/settings/settings.defaults.js';
 
 // Provisional catalog and schedule taken from the mockups (D4/D10): confirm with MOVE.
 
@@ -111,9 +111,14 @@ const SEED_TEMPLATE_GROUPS: SeedTemplateGroup[] = [
 ];
 
 export async function insertDefaultSettings(dataSource: DataSource): Promise<void> {
-  const keys = Object.keys(SETTINGS_DEFAULTS) as (keyof typeof SETTINGS_DEFAULTS)[];
-  const placeholders = keys.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2}::jsonb)`).join(', ');
-  const params = keys.flatMap((key) => [SETTING_DB_KEYS[key], JSON.stringify(SETTINGS_DEFAULTS[key])]);
+  const settingKeys = Object.keys(SETTINGS_DEFAULTS) as (keyof typeof SETTINGS_DEFAULTS)[];
+  const contactKeys = Object.keys(CONTACT_DEFAULTS) as (keyof typeof CONTACT_DEFAULTS)[];
+  const rows = [
+    ...settingKeys.map((key) => [SETTING_DB_KEYS[key], JSON.stringify(SETTINGS_DEFAULTS[key])]),
+    ...contactKeys.map((key) => [CONTACT_DB_KEYS[key], JSON.stringify(CONTACT_DEFAULTS[key])]),
+  ];
+  const placeholders = rows.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2}::jsonb)`).join(', ');
+  const params = rows.flat();
   await dataSource.query(`INSERT INTO settings (key, value) VALUES ${placeholders} ON CONFLICT (key) DO NOTHING`, params);
 }
 

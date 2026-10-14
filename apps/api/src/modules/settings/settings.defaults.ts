@@ -1,3 +1,4 @@
+import type { StaffContactInfo } from './models/contact-info.model.js';
 import type { SettingsValues } from './models/settings.model.js';
 
 // Provisional values (D10), editable by staff.
@@ -29,4 +30,26 @@ export const SETTING_DB_KEYS: Record<keyof SettingsValues, string> = {
   frequencyBaselineWeeks: 'frequency_baseline_weeks',
   checkinMonthlyEnabled: 'checkin_monthly_enabled',
   valuesProvisional: 'values_provisional',
+};
+
+// Initial contact data (current moveperformance.uy site); editable by staff.
+export const CONTACT_DEFAULTS: StaffContactInfo = {
+  address: 'Máximo Tajes 6397 esquina Beranger',
+  hours: 'Lunes a viernes · 7:00 – 11:00 · 15:00 – 20:00',
+  whatsapp: '+598 99 140 299',
+  instagram: '@move_strengthconditioning',
+  email: '',
+  mapsUrl:
+    'https://www.google.com/maps/place/MOVE+Strength%26Conditioning/@-34.8773036,-56.0787995,17z/data=!4m6!3m5!1s0x959f8730c171b183:0x6e7a19d4869b4b26!8m2!3d-34.8773036!4d-56.0787995!16s%2Fg%2F11g22zyvcy',
+  staffNotificationsEmail: '',
+};
+
+export const CONTACT_DB_KEYS: Record<keyof StaffContactInfo, string> = {
+  address: 'contact_address',
+  hours: 'contact_hours',
+  whatsapp: 'contact_whatsapp',
+  instagram: 'contact_instagram',
+  email: 'contact_email',
+  mapsUrl: 'contact_maps_url',
+  staffNotificationsEmail: 'staff_notifications_email',
 };

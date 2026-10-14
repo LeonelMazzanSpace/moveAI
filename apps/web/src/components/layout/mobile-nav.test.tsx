@@ -179,6 +179,7 @@ describe('MobileNav in the public area', () => {
     const { dialog } = await openMenu();
     expect(linkNames(dialog)).toEqual([
       'Inicio',
+      'Equipo',
       'Performance',
       'Rehab',
       'Recovery',
@@ -186,6 +187,7 @@ describe('MobileNav in the public area', () => {
       'Ingresar',
       'Reservar',
     ]);
+    expect(within(dialog).getByRole('link', { name: 'Equipo' })).toHaveAttribute('href', '/#equipo');
     expect(within(dialog).getByRole('link', { name: 'Ingresar' })).toHaveAttribute('href', '/ingresar');
     expect(within(dialog).getByRole('link', { name: 'Reservar' })).toHaveAttribute('href', '/reservar');
   });
