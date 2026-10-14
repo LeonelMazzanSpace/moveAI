@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { CtaLink } from '@/components/public/hero';
 import { EmptyState } from '@/components/move/empty-state';
 import { ErrorState } from '@/components/move/error-state';
@@ -9,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
 import type { MySubscriptionsDto, SubscriptionDto, SubscriptionStatus } from '@/lib/api/types';
 import { formatDate } from '@/lib/format';
+import { AutoDebitCard } from './auto-debit-card';
 
 const RENEW_HREF = '/planes?service=performance';
 
@@ -33,17 +35,22 @@ function daysLeftLabel(daysLeft: number): string {
 interface ClientPlanCardProps {
   subscription: SubscriptionDto | null;
   upcoming: SubscriptionDto | null;
+  /** Bloque al pie de la tarjeta (el débito automático); se oculta solo si no renderiza nada. */
+  footer?: ReactNode;
 }
 
-export function ClientPlanCard({ subscription, upcoming }: ClientPlanCardProps) {
+export function ClientPlanCard({ subscription, upcoming, footer }: ClientPlanCardProps) {
   const main = subscription ?? upcoming;
   if (!main) {
     return (
-      <EmptyState
-        title="Todavía no tenés un plan Performance"
-        description="Elegí un plan para reservar tus entrenamientos."
-        action={<CtaLink href={RENEW_HREF}>Ver planes</CtaLink>}
-      />
+      <div className="space-y-4">
+        <EmptyState
+          title="Todavía no tenés un plan Performance"
+          description="Elegí un plan para reservar tus entrenamientos."
+          action={<CtaLink href={RENEW_HREF}>Ver planes</CtaLink>}
+        />
+        <div className="empty:hidden">{footer}</div>
+      </div>
     );
   }
 
@@ -89,6 +96,7 @@ export function ClientPlanCard({ subscription, upcoming }: ClientPlanCardProps) 
           </div>
         </div>
       )}
+      <div className="mt-6 empty:hidden">{footer}</div>
     </div>
   );
 }
@@ -97,5 +105,12 @@ export function ClientPlanSection() {
   const { data, isPending, isError, error, refetch } = useMySubscriptions();
   if (isPending) return <Skeleton className="h-44 w-full" />;
   if (isError) return <ErrorState error={error} onRetry={() => void refetch()} />;
-  return <ClientPlanCard subscription={data.performance} upcoming={data.upcomingPerformance} />;
+  const lastPaidDay = (data.upcomingPerformance ?? data.performance)?.endsOn ?? null;
+  return (
+    <ClientPlanCard
+      subscription={data.performance}
+      upcoming={data.upcomingPerformance}
+      footer={<AutoDebitCard service="performance" endsOn={lastPaidDay} />}
+    />
+  );
 }

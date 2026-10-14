@@ -19,6 +19,9 @@ export const KIND_LABEL: Record<PlanKind, string> = {
   evaluation: 'Evaluación',
 };
 
+/** Solo los planes por período y los paquetes pueden cobrarse con débito automático. */
+export const AUTO_DEBIT_KINDS: PlanKind[] = ['period_plan', 'session_pack'];
+
 type NumericPlanField = 'periodMonths' | 'periodDays' | 'sessionsIncluded' | 'durationMinutes';
 type FieldUsage = 'required' | 'optional' | 'hidden';
 
@@ -87,6 +90,7 @@ export interface PlanFormPayload {
   featured: boolean;
   active: boolean;
   sortOrder: number;
+  autoDebitEnabled: boolean;
 }
 
 export const planFormSchema = z
@@ -110,6 +114,7 @@ export const planFormSchema = z
     sortOrder: z.string(),
     featured: z.boolean(),
     active: z.boolean(),
+    autoDebitEnabled: z.boolean(),
   })
   .superRefine((values, ctx) => {
     const issue = (path: keyof typeof values) => (message: string) => ctx.addIssue({ code: 'custom', path: [path], message });
@@ -150,6 +155,7 @@ export const planFormSchema = z
       featured: values.featured,
       active: values.active,
       sortOrder: readInteger(values.sortOrder, 'sortOrder', false, silent) ?? 0,
+      autoDebitEnabled: AUTO_DEBIT_KINDS.includes(values.kind) && values.autoDebitEnabled,
     };
   });
 
@@ -171,6 +177,7 @@ export function emptyPlanFormValues(): PlanFormInput {
     sortOrder: '0',
     featured: false,
     active: true,
+    autoDebitEnabled: false,
   };
 }
 
@@ -192,5 +199,6 @@ export function planToFormValues(plan: PlanDto): PlanFormInput {
     sortOrder: String(plan.sortOrder),
     featured: plan.featured,
     active: plan.active,
+    autoDebitEnabled: plan.autoDebitEnabled,
   };
 }

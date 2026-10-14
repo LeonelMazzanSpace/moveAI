@@ -6,7 +6,7 @@ import { RecoveryModalities } from './recovery-modalities';
 const plan = (over: Partial<PlanDto>): PlanDto => ({
   id: over.slug ?? 'x', service: 'recovery', kind: 'session_pack', slug: 'x', name: 'Plan', description: '',
   features: [], price: 3200, currency: 'UYU', periodMonths: null, periodDays: 30, sessionsIncluded: 4,
-  durationMinutes: 45, featured: false, active: true, sortOrder: 1, ...over,
+  durationMinutes: 45, featured: false, active: true, sortOrder: 1, autoDebitEnabled: false, ...over,
 });
 
 const plans: PlanDto[] = [

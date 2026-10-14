@@ -219,3 +219,35 @@ describe('PaymentResult', () => {
     expect(screen.getByText('¡Listo! Tu pago fue aprobado.')).toBeInTheDocument();
   });
 });
+
+describe('PaymentResult for an automatic debit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('shows the debit result when the link carries ?debito=', async () => {
+    searchParams.value = new URLSearchParams('debito=deb-1');
+    apiFetch.mockResolvedValue({
+      externalReference: 'deb-1', status: 'authorized', planName: 'Plan Mensual', planSlug: 'performance-mensual', service: 'performance',
+      amount: 3900, nextChargeDate: '2026-11-15',
+    });
+    renderResult();
+    await advance(0);
+
+    expect(screen.getByText('Débito automático activo')).toBeInTheDocument();
+    expect(apiFetch).toHaveBeenCalledWith('/checkout/auto-debits/deb-1');
+    expect(statusCalls()).toBe(0);
+  });
+
+  it('keeps showing the purchase result for ?ref=', async () => {
+    searchParams.value = new URLSearchParams('ref=ref-1');
+    apiFetch.mockResolvedValue({ ...base });
+    renderResult();
+    await advance(0);
+
+    expect(screen.getByText('¡Listo! Tu pago fue aprobado.')).toBeInTheDocument();
+    expect(apiFetch).not.toHaveBeenCalledWith(expect.stringContaining('/checkout/auto-debits/'));
+  });
+});

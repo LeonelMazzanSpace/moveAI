@@ -1,12 +1,13 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { useState } from 'react';
 import { mondayOf } from '@/components/booking/week-selector';
 import { useBusinessToday } from '@/components/booking/day-selector';
 import { apiFetch } from '@/lib/api/client';
 import { ApiError } from '@/lib/api/errors';
 import type {
+  AutoDebitCheckoutDto,
   AvailabilityDayDto,
   CheckoutResponseDto,
   MeDto,
@@ -19,8 +20,43 @@ import type { GuestValues } from './guest-form.schema';
 
 const WEEK_DAYS = 7;
 
-function redirectToPayment({ initPoint }: CheckoutResponseDto): void {
+export const POLL_INTERVAL_MS = 3000;
+export const MAX_POLL_ATTEMPTS = 20;
+
+function redirectToPayment({ initPoint }: { initPoint: string }): void {
   window.location.assign(initPoint);
+}
+
+/** Cada consulta cuenta, salga bien o mal: así los errores persistentes también terminan el polling. */
+function attemptsOf(state: { dataUpdateCount: number; errorUpdateCount: number } | undefined): number {
+  return state ? state.dataUpdateCount + state.errorUpdateCount : 0;
+}
+
+interface PolledStatusOptions<T> {
+  queryKey: QueryKey;
+  queryFn: () => Promise<T>;
+  /** Mientras devuelva `true` se vuelve a consultar cada 3 s, hasta `MAX_POLL_ATTEMPTS` consultas. */
+  isPending: (data: T) => boolean;
+}
+
+/** Consulta un estado que cambia solo (pago o débito) con tope de intentos que cuenta éxitos y errores. */
+export function usePolledStatus<T>({ queryKey, queryFn, isPending }: PolledStatusOptions<T>) {
+  const queryClient = useQueryClient();
+  const query = useQuery({
+    queryKey,
+    queryFn,
+    retry: false,
+    staleTime: 0,
+    refetchInterval: (current) =>
+      current.state.data !== undefined && isPending(current.state.data) && attemptsOf(current.state) < MAX_POLL_ATTEMPTS
+        ? POLL_INTERVAL_MS
+        : false,
+  });
+  // Leer estas marcas suscribe el render a cada respuesta o error, aunque `data` sea idéntico (structural sharing);
+  // sin eso el último intento no vuelve a renderizar y `attempts` queda viejo.
+  void query.dataUpdatedAt;
+  void query.errorUpdatedAt;
+  return { query, attempts: attemptsOf(queryClient.getQueryState(queryKey)) };
 }
 
 /**
@@ -57,6 +93,14 @@ export function useBookingCheckout() {
 export function usePlanCheckout() {
   return useMutation({
     mutationFn: (planId: string) => apiFetch<CheckoutResponseDto>('/checkout/plan', { method: 'POST', body: { planId } }),
+    onSuccess: redirectToPayment,
+  });
+}
+
+export function useAutoDebitCheckout() {
+  return useMutation({
+    mutationFn: (planSlug: string) =>
+      apiFetch<AutoDebitCheckoutDto>('/checkout/auto-debit', { method: 'POST', body: { planSlug } }),
     onSuccess: redirectToPayment,
   });
 }
