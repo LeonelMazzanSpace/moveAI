@@ -30,7 +30,7 @@ Guarda una captura de página completa por combinación en `tmp/responsive/` (ig
 No cubre:
 
 - diálogos y formularios que se abren con un clic (alta de plan, pago manual, etc.), estados de error de la API y datos vacíos;
-- los estados de las pantallas nuevas que `manual:demo-data` no genera (no crea débitos automáticos): la tarjeta de débito en `/perfil`, los débitos en la ficha del cliente, el badge y el filtro de origen en `/staff/pagos`, y `/checkout/resultado?debito=` y `/checkout/simulado?debito=` (con un UUID inventado muestran el estado de error, igual que las variantes `?ref=`);
+- los estados de las pantallas nuevas que la auditoría no recorre aunque `manual:demo-data` ya crea dos débitos automáticos simulados (Martín y Camila; la auditoría entra como Sofía, que no tiene ninguno): la tarjeta de débito en `/perfil`, los débitos en la ficha del cliente, el badge y el filtro de origen en `/staff/pagos`, y `/checkout/resultado?debito=` y `/checkout/simulado?debito=` (con un UUID inventado muestran el estado de error, igual que las variantes `?ref=`);
 - los badges de Google Calendar en `/staff/turnos` y en la tabla del turno: aparecen solo si el día elegido tiene un turno bloqueado o en conflicto, y los datos de demostración no tienen conexión con Google;
 - el enlace a un `?ref=`/`?debito=` real: las rutas `/checkout/resultado` y `/checkout/simulado` se auditan siempre en su estado "no encontrado".
 

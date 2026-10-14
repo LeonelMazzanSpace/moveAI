@@ -1,42 +1,50 @@
-// Captura una imagen (1440×900) de cada pantalla del route map de la web, para el manual de usuario.
+// Captura una imagen (1440×900) de cada pantalla del route map de la web, para el manual de usuario, más una pasada mobile
+// (390×844) de las pantallas principales y dos vistas de los emails (vista previa de las plantillas).
 //
-// Requisitos: API y web corriendo contra una base con los datos de `pnpm manual:demo-data`, y Chromium de Playwright
-// instalado (`pnpm exec playwright install chromium`).
+// Requisitos: API y web corriendo contra una base con los datos de `pnpm manual:demo-data`, Chromium de Playwright
+// instalado (`pnpm exec playwright install chromium`) y la vista previa de emails generada
+// (`pnpm --filter @move/api emails:preview`, deja los HTML en apps/api/tmp/email-preview/).
 //
 // Variables de entorno:
 //   MANUAL_STAFF_PASSWORD   (obligatoria) contraseña del staff de demostración
 //   MANUAL_CLIENT_PASSWORD  (obligatoria) contraseña de los clientes de demostración
 //   MANUAL_STAFF_EMAIL      (opcional) default staff@example.com
-//   WEB_URL                 (opcional) default http://localhost:3000
-//   API_URL                 (opcional) default http://localhost:3001/api
-//   (WEB_URL y API_URL tienen que ser locales: localhost, 127.0.0.1 o ::1; el script imprime el destino antes de empezar)
+//   WEB_URL                 (obligatoria) origen de TU web, por ejemplo http://localhost:3268
+//   API_URL                 (obligatoria) URL de TU API con /api, por ejemplo http://localhost:3168/api
+//   (sin valor por defecto: se rechazan siempre los puertos 3000 y 3001, los de la app de desarrollo, sin excepción.
+//   WEB_URL y API_URL tienen que ser locales: localhost, 127.0.0.1 o ::1; el script imprime el destino antes de empezar)
 //
 // Las capturas se toman primero en un directorio temporal. Solo si salieron todas (EXPECTED_IMAGE_COUNT) se arma una
 // carpeta nueva junto a docs/manual/img/ y se la renombra en su lugar (nombres estables; arquitectura.png y cualquier
 // otro archivo que no sea una captura se conservan). Si algo falla, las imágenes actuales quedan como estaban.
 // La última parte recorre el checkout de un paquete Recovery con un cliente sin paquete (Nicolás Acosta): crea una
-// compra y la aprueba con el simulador de pagos.
+// compra y la aprueba con el simulador de pagos, y después contrata un débito automático y lo autoriza con el simulador.
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { chromium, devices } from 'playwright';
 
-const WEB_URL = (process.env.WEB_URL ?? 'http://localhost:3000').replace(/\/$/, '');
-const API_URL = (process.env.API_URL ?? 'http://localhost:3001/api').replace(/\/$/, '');
+const WEB_URL = (process.env.WEB_URL ?? '').replace(/\/$/, '');
+const API_URL = (process.env.API_URL ?? '').replace(/\/$/, '');
 const STAFF_EMAIL = process.env.MANUAL_STAFF_EMAIL ?? 'staff@example.com';
 const IMG_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../docs/manual/img');
 const VIEWPORT = { width: 1440, height: 900 };
+const MOBILE_VIEWPORT = { width: 390, height: 844 };
+const EMAIL_PREVIEW_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../apps/api/tmp/email-preview');
 const KEPT_IMAGES = new Set(['arquitectura.png']);
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
-// Cantidad de capturas de este script (01–38): actualizarla al agregar o quitar una pantalla.
-const EXPECTED_IMAGE_COUNT = 38;
+// Puertos de la app de desarrollo del usuario: el script nunca captura ni compra contra ellos.
+const PROTECTED_PORTS = new Set(['3000', '3001']);
+// Cantidad de capturas de este script (01–54 de escritorio y m01–m10 de celular): actualizarla al agregar o quitar una pantalla.
+const EXPECTED_IMAGE_COUNT = 64;
 
 const CLIENT_EMAILS = {
   sofia: 'sofia.martinez@example.com',
   federico: 'federico.alvarez@example.com',
   valentina: 'valentina.gomez@example.com',
   nicolas: 'nicolas.acosta@example.com',
+  martin: 'martin.rodriguez@example.com',
 };
 
 function requireEnv(name) {
@@ -45,16 +53,21 @@ function requireEnv(name) {
   return value;
 }
 
-// Se niega a capturar si la API o la web no son locales: el recorrido final compra un paquete a través de API_URL.
-function assertLocalTarget(name, value) {
-  let host;
+// Se niega a capturar si la API o la web no son locales, no están definidas o son las de la app de desarrollo: el
+// recorrido final compra un paquete y un débito a través de API_URL.
+function assertLocalTarget(name, value, example) {
+  if (!value) throw new Error(`Falta la variable de entorno ${name} (por ejemplo ${example}): no tiene valor por defecto.`);
+  let url;
   try {
-    host = new URL(value).hostname;
+    url = new URL(value);
   } catch {
-    throw new Error(`${name} no es una URL válida (por ejemplo http://localhost:3001/api).`);
+    throw new Error(`${name} no es una URL válida (por ejemplo ${example}).`);
   }
-  if (!LOCAL_HOSTS.has(host.toLowerCase())) {
+  if (!LOCAL_HOSTS.has(url.hostname.toLowerCase())) {
     throw new Error(`${name} no es local: las capturas solo se toman contra una API y una web locales.`);
+  }
+  if (PROTECTED_PORTS.has(url.port)) {
+    throw new Error(`${name} apunta al puerto ${url.port}, el de la app de desarrollo: usá los puertos de tu propia API y web.`);
   }
 }
 
@@ -99,8 +112,11 @@ function publishImages() {
 
 const todayLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Montevideo' }).format(new Date());
 
-async function newContext(browser, credentials) {
-  const context = await browser.newContext({ viewport: VIEWPORT, locale: 'es-UY', timezoneId: 'America/Montevideo' });
+async function newContext(browser, credentials, { mobile = false } = {}) {
+  const options = mobile
+    ? { ...devices['iPhone 15'], viewport: MOBILE_VIEWPORT, defaultBrowserType: undefined }
+    : { viewport: VIEWPORT };
+  const context = await browser.newContext({ ...options, locale: 'es-UY', timezoneId: 'America/Montevideo' });
   if (credentials) {
     const response = await context.request.post(`${API_URL}/auth/sign-in/email`, {
       headers: { origin: WEB_URL },
@@ -142,6 +158,12 @@ async function scrollTo(page, locator) {
   await page.evaluate(() => window.scrollBy(0, -90));
 }
 
+// Deja `locator` en el borde de arriba de la pantalla (las secciones con anclas ya traen su margen de scroll).
+async function scrollToTop(page, locator, offset = 0) {
+  await locator.evaluate((element) => element.scrollIntoView({ block: 'start' }));
+  if (offset) await page.evaluate((delta) => window.scrollBy(0, -delta), offset);
+}
+
 // Hace clic hasta que aparece `target`: un clic antes de que React hidrate la página no hace nada.
 async function clickUntilVisible(button, target) {
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -163,9 +185,44 @@ async function pickDayAndSlot(page, locator) {
   await scrollTo(page, locator);
 }
 
+// Elige "Débito automático" en el checkout de un plan: un clic antes de que React hidrate la página no hace nada.
+async function chooseDebit(page) {
+  const radio = page.getByRole('radio', { name: /Débito automático/ });
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await radio.check();
+    if (await radio.isChecked()) return;
+    await page.waitForTimeout(500);
+  }
+  throw new Error('El checkout no respondió al elegir el débito automático.');
+}
+
+// Primer turno de Rehab de los próximos días marcado como ocupado en Google Calendar y con una reserva (conflicto).
+async function findConflictSlot(context, today) {
+  for (let offset = 0; offset < 14; offset += 1) {
+    const date = addDays(today, offset);
+    const slot = (await apiGet(context, `/staff/time-slots?date=${date}&service=rehab`)).find((item) => item.calendarConflict);
+    if (slot) return { date, slot };
+  }
+  throw new Error('Falta el turno de Rehab en conflicto con Google Calendar: corré pnpm manual:demo-data.');
+}
+
+const addDays = (ymd, days) => {
+  const [year, month, day] = ymd.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+};
+
+async function visitFile(page, name, file) {
+  await page.goto(pathToFileURL(resolve(EMAIL_PREVIEW_DIR, file)).href, { waitUntil: 'load' });
+  await page.screenshot({ path: resolve(outputDir, `${name}.png`) });
+  console.log(`• ${name}.png  (${file})`);
+}
+
 async function main() {
-  assertLocalTarget('API_URL', API_URL);
-  assertLocalTarget('WEB_URL', WEB_URL);
+  assertLocalTarget('API_URL', API_URL, 'http://localhost:3168/api');
+  assertLocalTarget('WEB_URL', WEB_URL, 'http://localhost:3268');
+  if (!existsSync(resolve(EMAIL_PREVIEW_DIR, 'index.html'))) {
+    throw new Error('Falta la vista previa de emails: corré pnpm --filter @move/api emails:preview.');
+  }
   console.log(`• Destino: API ${API_URL}; web ${WEB_URL}`);
   const staffPassword = requireEnv('MANUAL_STAFF_PASSWORD');
   const clientPassword = requireEnv('MANUAL_CLIENT_PASSWORD');
@@ -173,18 +230,24 @@ async function main() {
 
   const browser = await chromium.launch();
   try {
-    const login = (key) => newContext(browser, { email: CLIENT_EMAILS[key], password: clientPassword });
-    const [anon, sofia, federico, valentina, nicolas, staff] = await Promise.all([
+    const login = (key, options) => newContext(browser, { email: CLIENT_EMAILS[key], password: clientPassword }, options);
+    const staffLogin = (options) => newContext(browser, { email: STAFF_EMAIL, password: staffPassword }, options);
+    const mobile = { mobile: true };
+    const [anon, sofia, federico, valentina, nicolas, martin, staff, anonM, sofiaM, martinM, staffM] = await Promise.all([
       newContext(browser),
       login('sofia'),
       login('federico'),
       login('valentina'),
       login('nicolas'),
-      newContext(browser, { email: STAFF_EMAIL, password: staffPassword }),
+      login('martin'),
+      staffLogin(),
+      newContext(browser, undefined, mobile),
+      login('sofia', mobile),
+      login('martin', mobile),
+      staffLogin(mobile),
     ]);
-    const [anonPage, sofiaPage, federicoPage, valentinaPage, nicolasPage, staffPage] = await Promise.all(
-      [anon, sofia, federico, valentina, nicolas, staff].map((context) => context.newPage()),
-    );
+    const [anonPage, sofiaPage, federicoPage, valentinaPage, nicolasPage, martinPage, staffPage, anonMPage, sofiaMPage, martinMPage, staffMPage] =
+      await Promise.all([anon, sofia, federico, valentina, nicolas, martin, staff, anonM, sofiaM, martinM, staffM].map((context) => context.newPage()));
 
     // Sitio público
     await visit(anonPage, '01-inicio', '/');
@@ -245,6 +308,61 @@ async function main() {
     await visit(staffPage, '37-staff-configuracion-profesionales', '/staff/configuracion?tab=profesionales');
     await visit(staffPage, '38-staff-configuracion-reglas', '/staff/configuracion?tab=reglas');
 
+    // Equipo, Recovery Room, Dónde estamos y contacto (lo editable desde Configuración → Contacto y Calendario)
+    await anonPage.goto(`${WEB_URL}/`, { waitUntil: 'domcontentloaded' });
+    await settle(anonPage);
+    await scrollToTop(anonPage, anonPage.locator('#equipo'));
+    await shot(anonPage, '39-inicio-equipo');
+    await scrollToTop(anonPage, anonPage.locator('#contacto'));
+    await shot(anonPage, '40-inicio-donde-estamos');
+    await anonPage.goto(`${WEB_URL}/recovery`, { waitUntil: 'domcontentloaded' });
+    await settle(anonPage);
+    await scrollToTop(anonPage, anonPage.locator('#recovery-room'));
+    await shot(anonPage, '41-recovery-room');
+    await visit(staffPage, '42-staff-configuracion-contacto', '/staff/configuracion?tab=contacto');
+    await visit(staffPage, '43-staff-configuracion-calendario', '/staff/configuracion?tab=calendario');
+
+    // Débito automático ya contratado (datos de demostración): perfil de Martín, su ficha y los cobros en Pagos
+    await visit(martinPage, '47-perfil-debito', '/perfil');
+    const martinId = (await apiGet(staff, '/staff/clients?q=martin&pageSize=5')).items.find((client) => client.email === CLIENT_EMAILS.martin)?.id;
+    if (!martinId) throw new Error('Falta el cliente de demostración Martín: corré pnpm manual:demo-data.');
+    await staffPage.goto(`${WEB_URL}/staff/clientes/${martinId}`, { waitUntil: 'domcontentloaded' });
+    await settle(staffPage);
+    await scrollTo(staffPage, staffPage.getByText('Débito automático', { exact: true }).first());
+    await shot(staffPage, '48-staff-cliente-debito');
+    await visit(staffPage, '49-staff-pagos-debito', '/staff/pagos?origen=debito');
+
+    // Turno de Rehab ocupado en Google Calendar con una reserva (marca de demostración): conflicto
+    const conflict = await findConflictSlot(staff, today);
+    await visit(staffPage, '50-staff-turnos-conflicto', `/staff/turnos?fecha=${conflict.date}&servicio=rehab&turno=${conflict.slot.id}`);
+
+    // Vista previa de emails (HTML generado por emails:preview, sin red ni base)
+    await visitFile(anonPage, '51-emails-vista-previa', 'index.html');
+    await visitFile(anonPage, '52-email-recordatorio', 'booking-reminder.html');
+    await visitFile(anonPage, '53-email-debito-rechazado', 'auto-debit-charge-failed.html');
+    await visitFile(anonPage, '54-email-aviso-staff-rehab', 'staff-rehab-booking.html');
+
+    // Pasada mobile (390×844) de las pantallas principales
+    await visit(anonMPage, 'm01-inicio', '/');
+    await anonMPage.getByRole('button', { name: 'Abrir menú' }).click();
+    await anonMPage.getByRole('navigation', { name: 'Menú principal' }).waitFor();
+    await shot(anonMPage, 'm02-menu-publico');
+    await anonMPage.goto(`${WEB_URL}/recovery`, { waitUntil: 'domcontentloaded' });
+    await settle(anonMPage);
+    await scrollToTop(anonMPage, anonMPage.locator('#recovery-room'));
+    await shot(anonMPage, 'm03-recovery-room');
+    await visit(anonMPage, 'm04-planes', '/planes');
+    await visit(martinMPage, 'm05-perfil', '/perfil');
+    await sofiaMPage.goto(`${WEB_URL}/checkout/plan/recovery-paquete-8`, { waitUntil: 'domcontentloaded' });
+    await settle(sofiaMPage);
+    await chooseDebit(sofiaMPage);
+    await scrollToTop(sofiaMPage, sofiaMPage.getByRole('radio', { name: 'Pago único' }), 90);
+    await shot(sofiaMPage, 'm06-checkout-plan-debito');
+    await visit(staffMPage, 'm07-staff-dashboard', '/staff');
+    await visit(staffMPage, 'm08-staff-turnos', `/staff/turnos?fecha=${today}&servicio=performance&turno=${busiestSlot.id}`);
+    await visit(staffMPage, 'm09-staff-pagos', '/staff/pagos');
+    await visit(staffMPage, 'm10-staff-configuracion-contacto', '/staff/configuracion?tab=contacto');
+
     // Checkout de un paquete Recovery (cliente sin paquete): checkout → simulador de pagos → resultado.
     // Va al final porque deja a Nicolás con un paquete comprado.
     await visit(nicolasPage, '22-checkout-plan', '/checkout/plan/recovery-paquete-8');
@@ -254,6 +372,20 @@ async function main() {
     await nicolasPage.getByRole('button', { name: 'Aprobar' }).click();
     await nicolasPage.waitForURL(/\/checkout\/resultado/);
     await shot(nicolasPage, '24-checkout-resultado');
+
+    // Débito automático de Recovery con el mismo cliente: checkout (modo débito) → simulador → autorizar → resultado.
+    await nicolasPage.goto(`${WEB_URL}/checkout/plan/recovery-paquete-4`, { waitUntil: 'domcontentloaded' });
+    await settle(nicolasPage);
+    await chooseDebit(nicolasPage);
+    await shot(nicolasPage, '44-checkout-plan-debito');
+    await nicolasPage.getByRole('button', { name: 'Activar débito automático' }).click();
+    await nicolasPage.waitForURL(/\/checkout\/simulado\?debito=/);
+    await nicolasPage.getByRole('button', { name: 'Autorizar' }).waitFor();
+    await shot(nicolasPage, '45-checkout-simulado-debito');
+    await nicolasPage.getByRole('button', { name: 'Autorizar' }).click();
+    await nicolasPage.waitForURL(/\/checkout\/resultado\?debito=/);
+    await nicolasPage.getByText('Débito automático activo').first().waitFor();
+    await shot(nicolasPage, '46-checkout-resultado-debito');
     publishImages();
     console.log(`\nListo: ${readdirSync(outputDir).length} capturas en ${IMG_DIR}`);
   } finally {
