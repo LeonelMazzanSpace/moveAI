@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { safeNextPath } from './safe-next';
+import { isProtectedPath, safeNextPath } from './safe-next';
 
 describe('safeNextPath', () => {
   it('accepts internal paths for the right role', () => {
@@ -47,5 +47,20 @@ describe('safeNextPath', () => {
     expect(safeNextPath('/reservar/fisioterapia', 'staff')).toBeNull();
     expect(safeNextPath('/checkout/plan/trimestral', 'staff')).toBeNull();
     expect(safeNextPath('/perfil#avisos', 'staff')).toBeNull();
+  });
+});
+
+describe('isProtectedPath', () => {
+  it('flags the staff area and the client area, nothing else', () => {
+    const protectedPaths = ['/staff', '/staff/turnos', '/perfil', '/historial', '/check-in', '/reservar/fisioterapia', '/checkout/plan/trimestral'];
+    for (const path of protectedPaths) expect(isProtectedPath(path), path).toBe(true);
+
+    const publicPaths = ['/', '/performance', '/reservar', '/ingresar', '/checkout/resultado', '/staffing', '/perfilx', '/checkout/plan-x'];
+    for (const path of publicPaths) expect(isProtectedPath(path), path).toBe(false);
+  });
+
+  it('resolves dot segments before deciding', () => {
+    expect(isProtectedPath('/performance/%2e%2e/staff')).toBe(true);
+    expect(isProtectedPath('/staff/../performance')).toBe(false);
   });
 });
