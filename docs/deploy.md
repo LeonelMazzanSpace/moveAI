@@ -36,6 +36,7 @@ Se definen y validan en `apps/api/src/config/env.validation.ts`; si falta una ob
 | `COOKIE_DOMAIN` | Obligatoria en la práctica (`.move.uy`) | Dominio raíz de la cookie de sesión, para que web y API compartan la sesión. Vacío deja la cookie atada al host de la API |
 | `GOOGLE_CLIENT_ID` | Opcional | Cliente OAuth de Google. Va junto con `GOOGLE_CLIENT_SECRET`: se definen las dos o ninguna |
 | `GOOGLE_CLIENT_SECRET` | Opcional | Secreto del cliente OAuth de Google |
+| `CALENDAR_TOKEN_KEY` | Opcional | Clave de la sincronización de Rehab con Google Calendar: 32 bytes aleatorios en base64 (`openssl rand -base64 32`). Cifra el refresh token del calendario conectado y firma el `state` de OAuth. Si está definida y no son exactamente 32 bytes en base64, la API no arranca. La sincronización solo se activa con esta variable más `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`. Cambiarla obliga a reconectar el calendario desde Configuración → Calendario |
 | `MP_ACCESS_TOKEN` | Obligatoria | Access token de Mercado Pago. Sin él (fuera de producción) se usa el simulador |
 | `MP_WEBHOOK_SECRET` | Obligatoria | Secreto de firma de los webhooks de Mercado Pago; sin firma válida el webhook responde 401 |
 | `BREVO_API_KEY` | Obligatoria | API key de Brevo. Sin ella (fuera de producción) los emails se registran en el log y no se envían |
@@ -149,7 +150,7 @@ Web y API van bajo el mismo dominio raíz para que la cookie de sesión sea firs
 ### Google OAuth (opcional)
 
 1. En Google Cloud Console crear un cliente OAuth tipo *Web application*.
-2. Orígenes autorizados: `https://move.uy`. URI de redirección autorizada: `https://<api>/api/auth/callback/google` (por ejemplo `https://api.move.uy/api/auth/callback/google`).
+2. Orígenes autorizados: `https://move.uy`. URI de redirección autorizada: `https://<api>/api/auth/callback/google` (por ejemplo `https://api.move.uy/api/auth/callback/google`). Si se usa la sincronización de Rehab con Google Calendar, agregar también `https://<api>/api/calendar/oauth/callback` (por ejemplo `https://api.move.uy/api/calendar/oauth/callback`).
 3. Cargar `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` en la API y `NEXT_PUBLIC_GOOGLE_ENABLED=true` en Vercel. Una cuenta por email: Google se vincula a la cuenta que ya exista con ese email.
 
 ### Mercado Pago

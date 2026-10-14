@@ -74,6 +74,9 @@ export interface StaffTimeSlotDto {
   noShow: number;
   cancelled: number;
   pendingAttendance: number;
+  // D94: busy in Google Calendar; `calendarConflict` = busy and with active bookings.
+  calendarBlocked: boolean;
+  calendarConflict: boolean;
 }
 
 export type ActivityType = 'attendance' | 'booking' | 'cancellation' | 'payment';

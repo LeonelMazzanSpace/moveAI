@@ -113,7 +113,7 @@ export class BookingsService {
     const windowDays = await this.settings.get('bookingWindowDays');
     const slot = await this.schedule.lockSlot(manager, input.timeSlotId);
     if (slot.service !== input.expectedService) throw new AppError('SERVICE_MISMATCH');
-    this.assertBookable(slot, windowDays);
+    await this.assertBookable(manager, slot, windowDays);
     await this.assertRoom(manager, input.userId, slot);
     await this.assertHoldAllowed(manager, input.userId);
     return this.insert(manager, {
@@ -245,18 +245,22 @@ export class BookingsService {
   // R6 steps 1–2.
   private async lockBookableSlot(manager: EntityManager, slotId: string, windowDays: number): Promise<TimeSlotModel> {
     const slot = await this.schedule.lockSlot(manager, slotId);
-    this.assertBookable(slot, windowDays);
+    await this.assertBookable(manager, slot, windowDays);
     return slot;
   }
 
-  private assertBookable(slot: TimeSlotModel, windowDays: number): void {
+  // The slot must already be locked, so a Google Calendar block (D94) committed by a pull is seen here.
+  private async assertBookable(manager: EntityManager, slot: TimeSlotModel, windowDays: number): Promise<void> {
     const now = new Date();
-    if (!isBookable(slot, now, businessToday(now), windowDays)) throw new AppError('SLOT_NOT_BOOKABLE');
+    const calendarBlockedAt = await this.slotStats.calendarBlockedAt(manager, slot.id);
+    if (!isBookable({ ...slot, calendarBlockedAt }, now, businessToday(now), windowDays)) throw new AppError('SLOT_NOT_BOOKABLE');
   }
 
   private async assertRoomForExpiredHold(manager: EntityManager, booking: BookingModel): Promise<void> {
     const slot = await this.schedule.lockSlot(manager, booking.timeSlotId);
     if (slot.cancelledAt || slot.startsAt.getTime() <= Date.now()) throw new AppError('SLOT_FULL');
+    // D111: a slot busy in Google Calendar (D94) has no room either, so the late payment is flagged instead.
+    if (await this.slotStats.calendarBlockedAt(manager, slot.id)) throw new AppError('SLOT_FULL');
     try {
       await this.assertRoom(manager, booking.userId, slot);
     } catch (error) {

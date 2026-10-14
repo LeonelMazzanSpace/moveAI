@@ -15,6 +15,7 @@ import { AgendaModule } from './modules/schedule/agenda.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { AutomationsModule } from './modules/automations/automations.module.js';
 import { BookingsModule } from './modules/bookings/bookings.module.js';
+import { CalendarModule } from './modules/calendar/calendar.module.js';
 import { CatalogModule } from './modules/catalog/catalog.module.js';
 import { ClientsModule } from './modules/clients/clients.module.js';
 import { FollowupModule } from './modules/followup/followup.module.js';
@@ -55,6 +56,7 @@ import { UsersModule } from './modules/users/users.module.js';
     FollowupModule,
     ClientsModule,
     AutomationsModule,
+    CalendarModule,
   ],
 })
 export class AppModule {}
