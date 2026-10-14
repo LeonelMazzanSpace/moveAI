@@ -92,12 +92,17 @@ describe('proxy', () => {
       expect(unstable_doesMiddlewareMatch({ config, url: '/api/staff/clients' })).toBe(false);
     });
 
-    it('normalizes a hostile path before using it as next', () => {
+    it('uses the resolved path as next when the requested one has encoded dot segments', () => {
       const location = loginRedirect('/perfil/%2e%2e/staff/clientes?q=a');
       expect(location.pathname).toBe('/ingresar');
       expect(location.searchParams.get('next')).toBe('/staff/clientes?q=a');
     });
 
+    it('logs in without next when the query has a raw backslash', () => {
+      const location = loginRedirect('/perfil?a=\\');
+      expect(location.pathname).toBe('/ingresar');
+      expect(location.search).toBe('');
+    });
   });
 
   it('skips the API, Next internals and real static files', () => {
