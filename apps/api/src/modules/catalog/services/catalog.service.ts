@@ -5,7 +5,7 @@ import { QueryFailedError, Repository, type FindOptionsWhere } from 'typeorm';
 import { AppError } from '../../../common/errors/app-error.js';
 import type { CreatePlanDto } from '../dto/create-plan.dto.js';
 import type { UpdatePlanDto } from '../dto/update-plan.dto.js';
-import { isPlanSlug, validatePlanShape } from '../domain/plan-rules.js';
+import { assertDurationClearable, isPlanSlug, validatePlanShape } from '../domain/plan-rules.js';
 import { Plan, type Service } from '../entities/plan.entity.js';
 import { toPlanDto, type PlanModel } from '../models/plan.model.js';
 
@@ -87,13 +87,14 @@ export class CatalogService {
         // The row lock makes the shape check run against the stored values of concurrent edits.
         const plan = await repository.findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
         if (!plan) throw new AppError('PLAN_NOT_FOUND');
+        if (changes.durationMinutes === null) assertDurationClearable(plan.kind);
         validatePlanShape({
           service: plan.service,
           kind: plan.kind,
           periodMonths: changes.periodMonths ?? plan.periodMonths,
           periodDays: changes.periodDays ?? plan.periodDays,
           sessionsIncluded: changes.sessionsIncluded ?? plan.sessionsIncluded,
-          durationMinutes: changes.durationMinutes ?? plan.durationMinutes,
+          durationMinutes: changes.durationMinutes === undefined ? plan.durationMinutes : changes.durationMinutes,
         });
         return toPlanDto(await repository.save(repository.merge(plan, changes)));
       });

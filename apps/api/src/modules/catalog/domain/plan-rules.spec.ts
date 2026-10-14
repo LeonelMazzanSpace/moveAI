@@ -1,4 +1,4 @@
-import { validatePlanShape } from './plan-rules.js';
+import { assertDurationClearable, validatePlanShape } from './plan-rules.js';
 
 const base = { periodMonths: null, periodDays: null, sessionsIncluded: null, durationMinutes: null };
 
@@ -29,5 +29,14 @@ describe('validatePlanShape', () => {
     expect(() => validatePlanShape({ ...base, service: 'performance', kind: 'period_plan' })).toThrowError(
       expect.objectContaining({ code: 'PLAN_KIND_INVALID' }),
     );
+  });
+});
+
+describe('assertDurationClearable', () => {
+  it('lets only a session pack clear its duration', () => {
+    expect(() => assertDurationClearable('session_pack')).not.toThrow();
+    for (const kind of ['period_plan', 'single_session', 'evaluation'] as const) {
+      expect(() => assertDurationClearable(kind)).toThrowError(expect.objectContaining({ code: 'PLAN_KIND_INVALID' }));
+    }
   });
 });
