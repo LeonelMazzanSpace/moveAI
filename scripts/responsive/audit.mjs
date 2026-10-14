@@ -17,23 +17,30 @@
 //   MANUAL_STAFF_PASSWORD   (obligatoria) contraseña del staff de demostración
 //   MANUAL_CLIENT_PASSWORD  (obligatoria) contraseña de los clientes de demostración
 //   MANUAL_STAFF_EMAIL      (opcional) default staff@example.com
-//   WEB_URL                 (opcional) default http://localhost:3000
-//   API_URL                 (opcional) default http://localhost:3001/api
+//   WEB_URL                 (obligatoria) URL de TU web local, por ejemplo http://localhost:3265
+//   API_URL                 (obligatoria) URL de TU API local, por ejemplo http://localhost:3165/api
 //   AUDIT_ONLY              (opcional) filtro por texto de la ruta (por ejemplo `/staff/turnos`) para repetir solo una parte
-//   (WEB_URL y API_URL tienen que ser locales: localhost, 127.0.0.1 o ::1; el script imprime el destino antes de empezar)
+//   (WEB_URL y API_URL no tienen default a propósito: los puertos 3000 y 3001 son los de la app de desarrollo y el script
+//   los rechaza. Tienen que ser locales: localhost, 127.0.0.1 o ::1. El script imprime el destino antes de empezar.)
+//
+// Cada ruta tiene que responder con un estado < 400 y quedarse en la URL pedida; si no, es un hallazgo `ruta-inesperada`
+// (salvo las rutas con `expectRedirect`, que redirigen por diseño). El overlay de errores de Next también es un hallazgo.
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
-const WEB_URL = (process.env.WEB_URL ?? 'http://localhost:3000').replace(/\/$/, '');
-const API_URL = (process.env.API_URL ?? 'http://localhost:3001/api').replace(/\/$/, '');
+let WEB_URL = '';
+let API_URL = '';
 const STAFF_EMAIL = process.env.MANUAL_STAFF_EMAIL ?? 'staff@example.com';
 const CLIENT_EMAIL = 'sofia.martinez@example.com';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT_DIR = resolve(ROOT, 'tmp/responsive');
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+const FORBIDDEN_PORTS = new Set(['3000', '3001']);
 const MIN_TARGET = 32;
+// Elementos del diálogo de error de Next 16 (next/dist/next-devtools/dev-overlay), dentro del shadow DOM de `nextjs-portal`.
+const OVERLAY_SELECTOR = '[data-nextjs-dialog], [data-nextjs-dialog-overlay], [data-nextjs-error-overlay-nav], .nextjs__container_errors_wrapper';
 
 const VIEWPORTS = [
   { width: 375, height: 812 },
@@ -44,11 +51,13 @@ const VIEWPORTS = [
 
 const CONFIG_TABS = ['planes', 'horarios', 'profesionales', 'reglas', 'contacto', 'calendario'];
 
-function requireEnv(name) {
+function requireEnv(name, hint = '') {
   const value = process.env[name];
-  if (!value) throw new Error(`Falta la variable de entorno ${name}.`);
+  if (!value) throw new Error(`Falta la variable de entorno ${name}.${hint ? ` ${hint}` : ''}`);
   return value;
 }
+
+const TARGET_HINT = 'Definila con tu API y tu web locales (ver docs/responsive-audit.md, sección "Cómo se corre").';
 
 function assertLocalTarget(name, value) {
   let host;
@@ -59,6 +68,10 @@ function assertLocalTarget(name, value) {
   }
   if (!LOCAL_HOSTS.has(host.toLowerCase())) {
     throw new Error(`${name} no es local: la auditoría solo corre contra una API y una web locales.`);
+  }
+  const port = new URL(value).port;
+  if (FORBIDDEN_PORTS.has(port)) {
+    throw new Error(`${name} usa el puerto ${port}, que es el de la app de desarrollo: usá los puertos de tu propia API y web (ver docs/responsive-audit.md).`);
   }
 }
 
@@ -80,7 +93,7 @@ async function apiGet(context, path) {
 
 // Rutas del Frontend route map (más las pestañas de Configuración). Las que llevan parámetros usan un valor de ejemplo.
 function buildRoutes({ planSlug, clientId }) {
-  const anon = (path) => ({ path, role: 'anon' });
+  const anon = (path, options = {}) => ({ path, role: 'anon', ...options });
   const client = (path) => ({ path, role: 'client' });
   const staff = (path) => ({ path, role: 'staff' });
   return [
@@ -122,7 +135,7 @@ function buildRoutes({ planSlug, clientId }) {
 }
 
 // Se ejecuta dentro de la página: devuelve los hallazgos del DOM actual.
-function collectFindings({ minTarget }) {
+function collectFindings({ minTarget, overlaySelector }) {
   const vw = document.documentElement.clientWidth;
   const findings = [];
   const describe = (el) => {
@@ -162,6 +175,16 @@ function collectFindings({ minTarget }) {
     return 'free';
   };
   const isOutsideViewport = (rect) => rect.right > vw + 1 || rect.left < -1;
+  // Un link está en una oración si su padre tiene texto propio además del link.
+  const isInSentence = (el) =>
+    [...(el.parentElement?.childNodes ?? [])].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '');
+
+  // Overlay de errores de Next: el botón de herramientas siempre está; el diálogo de error, solo si la página falló.
+  const overlay = document.querySelector('nextjs-portal')?.shadowRoot;
+  if (overlay?.querySelector(overlaySelector)) {
+    const message = overlay.querySelector('[data-nextjs-dialog-content], .nextjs__container_errors_desc')?.textContent ?? '';
+    findings.push({ kind: 'error-overlay', detail: message.replace(/\s+/g, ' ').trim().slice(0, 120) || 'overlay de errores de Next abierto' });
+  }
 
   const root = document.documentElement;
   if (root.scrollWidth > root.clientWidth) {
@@ -190,8 +213,8 @@ function collectFindings({ minTarget }) {
   for (const el of clickable) {
     if (!isVisible(el)) continue;
     const style = getComputedStyle(el);
-    // Los links en línea dentro de un texto no tienen un área propia (excepción de WCAG 2.5.8).
-    if (el.matches('a') && style.display === 'inline') continue;
+    // Los links en línea dentro de una oración no tienen un área propia (excepción de WCAG 2.5.8); un link suelto, sí.
+    if (el.matches('a') && style.display === 'inline' && isInSentence(el)) continue;
     // Un link "estirado" (su ::after absoluto cubre la fila o la tarjeta) se toca en toda esa área.
     if (el.matches('a')) {
       const after = getComputedStyle(el, '::after');
@@ -235,13 +258,28 @@ async function settle(page) {
 const slug = (route, width, suffix) =>
   `${route.role}${route.path.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '') || 'inicio'}__${width}${suffix}`.slice(0, 150);
 
+// Una página que falla (estado >= 400) o que termina en otra URL que la pedida (sesión vencida → /ingresar, 404 que
+// redirige) no es la que se quería auditar. Las rutas con `expectRedirect` redirigen por diseño, pero igual deben ser < 400.
+function unexpectedRoute(route, status, finalPath) {
+  const findings = [];
+  if (status >= 400 || status === 0) findings.push({ kind: 'ruta-inesperada', detail: `respondió ${status || 'sin respuesta'}` });
+  const requestedPath = new URL(route.path, 'http://audit.local').pathname;
+  if (!route.expectRedirect && finalPath !== requestedPath) {
+    findings.push({ kind: 'ruta-inesperada', detail: `pidió ${requestedPath} y terminó en ${finalPath}` });
+  }
+  return findings;
+}
+
 async function auditPage(page, route, viewport, results) {
   const label = `${route.role} ${route.path}`;
   await page.setViewportSize(viewport);
-  await page.goto(`${WEB_URL}${route.path}`, { waitUntil: 'domcontentloaded' });
+  const response = await page.goto(`${WEB_URL}${route.path}`, { waitUntil: 'domcontentloaded' });
   await settle(page);
   await page.screenshot({ path: resolve(OUT_DIR, `${slug(route, viewport.width, '')}.png`), fullPage: true });
-  const findings = await page.evaluate(collectFindings, { minTarget: MIN_TARGET });
+  const findings = [
+    ...unexpectedRoute(route, response?.status() ?? 0, new URL(page.url()).pathname),
+    ...(await page.evaluate(collectFindings, { minTarget: MIN_TARGET, overlaySelector: OVERLAY_SELECTOR })),
+  ];
   results.push({ route: label, width: viewport.width, state: 'página', findings, finalUrl: new URL(page.url()).pathname });
 
   const menuButton = page.getByRole('button', { name: /^Abrir men/i }).first();
@@ -249,7 +287,7 @@ async function auditPage(page, route, viewport, results) {
   await menuButton.click();
   await page.waitForTimeout(400);
   await page.screenshot({ path: resolve(OUT_DIR, `${slug(route, viewport.width, '__menu')}.png`) });
-  const menuFindings = await page.evaluate(collectFindings, { minTarget: MIN_TARGET });
+  const menuFindings = await page.evaluate(collectFindings, { minTarget: MIN_TARGET, overlaySelector: OVERLAY_SELECTOR });
   results.push({ route: label, width: viewport.width, state: 'menú abierto', findings: menuFindings, finalUrl: new URL(page.url()).pathname });
 }
 
@@ -265,6 +303,8 @@ function printReport(results) {
 }
 
 async function main() {
+  API_URL = requireEnv('API_URL', TARGET_HINT).replace(/\/$/, '');
+  WEB_URL = requireEnv('WEB_URL', TARGET_HINT).replace(/\/$/, '');
   assertLocalTarget('API_URL', API_URL);
   assertLocalTarget('WEB_URL', WEB_URL);
   console.log(`• Destino: API ${API_URL}; web ${WEB_URL}`);

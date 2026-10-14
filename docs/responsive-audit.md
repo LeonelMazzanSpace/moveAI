@@ -13,17 +13,26 @@ export API_URL=http://localhost:<puerto API>/api WEB_URL=http://localhost:<puert
 pnpm responsive:audit            # AUDIT_ONLY=/staff/turnos para repetir solo una ruta
 ```
 
+`API_URL` y `WEB_URL` son obligatorias y no tienen valor por defecto: sin ellas el script termina con un error que apunta a esta sección. Rechaza los puertos **3000 y 3001** (la app de desarrollo) y cualquier host que no sea local; usá los puertos de tu propia API y web.
+
 Ingresa como cliente (Sofía Martínez) y como staff, recorre las rutas del route map más las seis pestañas de Configuración
 (`planes`, `horarios`, `profesionales`, `reglas`, `contacto`, `calendario`) y, por cada combinación, revisa:
 
 - **scroll** — scroll horizontal de la página (`scrollWidth > clientWidth`);
 - **fuera** — elementos visibles fuera del viewport, o cortados por un contenedor `overflow: hidden` (los que tienen su propio scroll horizontal están bien);
-- **tap** — botones, links (no en línea dentro de un texto), selects y campos con área menor a 32×32 px (un checkbox o radio se mide por su etiqueta; un link "estirado" sobre toda la fila se mide completo);
-- **txt** — texto cortado por `overflow` (recorte o puntos suspensivos).
+- **tap** — botones, links (solo se exceptúan los que están en línea dentro de una oración, con texto propio alrededor; un link suelto en su propio párrafo se mide), selects y campos con área menor a 32×32 px (un checkbox o radio se mide por su etiqueta; un link "estirado" sobre toda la fila se mide completo);
+- **txt** — texto cortado por `overflow` (recorte o puntos suspensivos);
+- **ruta-inesperada** — la ruta respondió con un estado ≥ 400 o terminó en otra URL que la pedida (por ejemplo una sesión vencida que redirige a `/ingresar`): la página auditada no es la que se quería ver. Las rutas marcadas `expectRedirect` en `buildRoutes` quedan exentas del cambio de URL (no del estado); hoy **ninguna ruta** redirige por diseño, así que no hay ninguna marcada;
+- **error-overlay** — el overlay de errores de Next está abierto con contenido (por ejemplo "URL data outside of Suspense").
 
 Guarda una captura de página completa por combinación en `tmp/responsive/` (ignorado por git) y `resultado.json`. Donde el botón "Abrir menú" está visible también abre el menú y revisa el panel.
 
-No cubre: diálogos y formularios que se abren con un clic (alta de plan, pago manual, etc.), estados de error de la API ni datos vacíos.
+No cubre:
+
+- diálogos y formularios que se abren con un clic (alta de plan, pago manual, etc.), estados de error de la API y datos vacíos;
+- los estados de las pantallas nuevas que `manual:demo-data` no genera (no crea débitos automáticos): la tarjeta de débito en `/perfil`, los débitos en la ficha del cliente, el badge y el filtro de origen en `/staff/pagos`, y `/checkout/resultado?debito=` y `/checkout/simulado?debito=` (con un UUID inventado muestran el estado de error, igual que las variantes `?ref=`);
+- los badges de Google Calendar en `/staff/turnos` y en la tabla del turno: aparecen solo si el día elegido tiene un turno bloqueado o en conflicto, y los datos de demostración no tienen conexión con Google;
+- el enlace a un `?ref=`/`?debito=` real: las rutas `/checkout/resultado` y `/checkout/simulado` se auditan siempre en su estado "no encontrado".
 
 ## Primera corrida
 
@@ -85,6 +94,8 @@ Menú móvil abierto: se revisa en cada ancho donde el botón "Abrir menú" est�
 | 4 | **Check-in del staff a 1024 px**: scroll horizontal de 8 px (`lg:grid-cols-[400px_1fr]` con la sidebar). | `xl:grid-cols-[400px_minmax(0,1fr)]`. Mismo cuidado (`minmax(0,1fr)`) en `rehab-booking-flow.tsx`, que también usa una columna fija a partir de `lg`. |
 | 5 | **Pestañas de Configuración** (ahora 6) en varias filas. | Una sola fila con `overflow-x-auto` propio y pestañas `shrink-0`. |
 | 6 | Etiquetas de checkbox/radio de 20 px de alto (radio de forma de pago del checkout, reglas, formulario de planes) y switch de seguimiento fisioterapéutico de 36×20 px; selector de día de `/performance` de 17 px. | `min-h-8` en las etiquetas; el switch queda dentro de un botón de 44×32 px con la pista visual igual; el select del día `min-h-8`. |
+| 7 | **Links sueltos de 15–17 px** que la excepción de "link en línea" dejaba pasar (la revisión pidió aplicarla solo dentro de una oración): contacto (WhatsApp, Instagram, email) en el pie y en "Dónde estamos", "Ver turno" del dashboard de staff, links de turnos con asistencia pendiente, "Ver Rehab", "Volver a ingresar" (`/recuperar`) e "Ingresar" (`/continuar`). | `inline-flex min-h-8 items-center` en cada uno (mismo patrón que el hallazgo 1). |
+| 8 | **Error de Next en desarrollo en `/checkout/plan/<slug>`** (overlay "URL data outside of Suspense"; lo detecta el chequeo `error-overlay`; el build de producción no lo señalaba): la página hacía `await params` fuera de `<Suspense>`. | El `await params` pasa a un componente hijo dentro de `<Suspense fallback={null}>` (`app/(cliente)/checkout/plan/[slug]/page.tsx`); mismo contenido y mismo comportamiento. No es un cambio de layout: se hizo a pedido, porque el hallazgo bloqueaba que la auditoría diera código 0. |
 
 Cambios de comportamiento: ninguno de lógica ni de copy. Cambios visibles: botones MOVE de 28–29 px a 32 px de alto; tablets (768–1023 px) usan el menú móvil en el sitio público y en el panel de staff, y las tablas de turnos y pagos son tarjetas hasta 1279 px.
 
