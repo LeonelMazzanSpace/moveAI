@@ -58,3 +58,9 @@ export function validatePlanShape(input: PlanShapeInput): void {
     throw new AppError('PLAN_KIND_INVALID');
   }
 }
+
+// A null `durationMinutes` is only allowed when the kind lists it as optional (session_pack).
+export function assertDurationClearable(kind: PlanKind): void {
+  const rule = RULES[kind] as KindRule | undefined;
+  if (!rule?.optional.includes('durationMinutes')) throw new AppError('PLAN_KIND_INVALID');
+}

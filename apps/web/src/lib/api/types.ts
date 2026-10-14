@@ -59,6 +59,13 @@ export interface PlanDto {
   featured: boolean; active: boolean; sortOrder: number;
 }
 
+// Body of `PATCH /staff/plans/:id`: every field is optional; `durationMinutes: null` clears the duration of a session pack (D89).
+export interface PlanUpdateBody {
+  slug?: string; name?: string; description?: string; features?: string[]; price?: number;
+  periodMonths?: number; periodDays?: number; sessionsIncluded?: number; durationMinutes?: number | null;
+  featured?: boolean; active?: boolean; sortOrder?: number;
+}
+
 export interface PublicSettingsDto { cancelLimitHours: number; bookingWindowDays: number; }
 
 export interface SettingsDto {

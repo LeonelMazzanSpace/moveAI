@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { apiFetch } from '@/lib/api/client';
 import { errorMessage } from '@/lib/api/errors';
-import type { PlanDto, Service } from '@/lib/api/types';
+import type { PlanDto, PlanUpdateBody, Service } from '@/lib/api/types';
 import { formatUYU, SERVICE_LABEL } from '@/lib/format';
 import { PlanForm } from './plan-form';
 import { KIND_LABEL, SERVICES, type PlanFormPayload } from './plan-form.schema';
@@ -27,9 +27,13 @@ function periodSummary(plan: PlanDto): string {
   return `${plan.durationMinutes} min`;
 }
 
-type PlanUpdateBody = Omit<PlanFormPayload, 'service' | 'kind'>;
+// An emptied optional duration (only session packs have one) is sent as `null`; an untouched empty one is omitted.
+function clearedDuration(payload: PlanFormPayload, plan: PlanDto): Pick<PlanUpdateBody, 'durationMinutes'> {
+  if (plan.kind !== 'session_pack' || plan.durationMinutes === null || payload.durationMinutes !== undefined) return {};
+  return { durationMinutes: null };
+}
 
-function updateBody(payload: PlanFormPayload): PlanUpdateBody {
+function updateBody(payload: PlanFormPayload, plan: PlanDto): PlanUpdateBody {
   return {
     slug: payload.slug,
     name: payload.name,
@@ -40,6 +44,7 @@ function updateBody(payload: PlanFormPayload): PlanUpdateBody {
     ...(payload.periodDays === undefined ? {} : { periodDays: payload.periodDays }),
     ...(payload.sessionsIncluded === undefined ? {} : { sessionsIncluded: payload.sessionsIncluded }),
     ...(payload.durationMinutes === undefined ? {} : { durationMinutes: payload.durationMinutes }),
+    ...clearedDuration(payload, plan),
     featured: payload.featured,
     active: payload.active,
     sortOrder: payload.sortOrder,
@@ -130,7 +135,7 @@ export function PlansTab() {
     onError,
   });
   const update = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: Partial<PlanUpdateBody> }) =>
+    mutationFn: ({ id, body }: { id: string; body: PlanUpdateBody }) =>
       apiFetch<PlanDto>(`/staff/plans/${id}`, { method: 'PATCH', body }),
     onSuccess: () => {
       toast.success('Plan actualizado.');
@@ -187,7 +192,7 @@ export function PlansTab() {
               mode="edit"
               plan={dialog.plan}
               submitting={update.isPending}
-              onSubmit={(payload) => update.mutateAsync({ id: dialog.plan.id, body: updateBody(payload) })}
+              onSubmit={(payload) => update.mutateAsync({ id: dialog.plan.id, body: updateBody(payload, dialog.plan) })}
               onCancel={closeDialog}
             />
           ) : null}
