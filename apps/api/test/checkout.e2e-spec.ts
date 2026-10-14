@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { addDays, businessDateTime, businessToday } from '../src/common/time/business-time.js';
 import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
+import { ExpireHoldsJob } from '../src/modules/bookings/jobs/expire-holds.job.js';
 import { createTestApp, type TestApp } from './utils/app.js';
 import { signUpClient, signUpStaff } from './utils/auth.js';
 import { resetDb } from './utils/db.js';
@@ -225,6 +226,53 @@ describe('checkout (e2e)', () => {
       const [booking] = await ctx.dataSource.query(`SELECT status FROM bookings WHERE id = $1`, [res.body.bookingId]);
       expect(booking.status).toBe('cancelled');
       await second.agent.post('/api/checkout/booking').send({ planId, timeSlotId: slotId }).expect(201);
+    });
+
+    it('emails the client once when the payment is rejected, and a repeated rejection does not email again (D93)', async () => {
+      const slotId = await rehabSlot();
+      const planId = await planIdBySlug(ctx.dataSource, 'rehab-evaluacion');
+      const { agent, userId } = await signUpClient(ctx.app);
+      const res = await agent.post('/api/checkout/booking').send({ planId, timeSlotId: slotId }).expect(201);
+      const notConfirmed = () => ctx.dataSource.query(
+        `SELECT template, user_id AS "userId", idempotency_key AS key FROM email_logs WHERE template = 'booking-not-confirmed'`);
+      expect(await notConfirmed()).toEqual([]);
+
+      await simulate(res.body.externalReference, 'rejected');
+      expect(await notConfirmed()).toEqual([
+        { template: 'booking-not-confirmed', userId, key: `booking-not-confirmed:${res.body.bookingId}` },
+      ]);
+      await simulate(res.body.externalReference, 'rejected');
+      expect(await notConfirmed()).toHaveLength(1);
+    });
+
+    it('does not email about a plan purchase that was declined (only bookings are released)', async () => {
+      const { agent } = await signUpClient(ctx.app);
+      const planId = await planIdBySlug(ctx.dataSource, 'performance-trimestral');
+      const res = await agent.post('/api/checkout/plan').send({ planId }).expect(201);
+      await simulate(res.body.externalReference, 'rejected');
+      expect(await ctx.dataSource.query(`SELECT 1 FROM email_logs WHERE template = 'booking-not-confirmed'`)).toEqual([]);
+    });
+
+    it('emails a client whose hold expired once, even if the job runs again (D93)', async () => {
+      const slotId = await rehabSlot();
+      const planId = await planIdBySlug(ctx.dataSource, 'rehab-evaluacion');
+      const { agent, userId } = await signUpClient(ctx.app);
+      const res = await agent.post('/api/checkout/booking').send({ planId, timeSlotId: slotId }).expect(201);
+      const other = await signUpClient(ctx.app);
+      const otherHold = await other.agent.post('/api/checkout/booking').send({ planId, timeSlotId: await rehabSlot('11:00') }).expect(201);
+      await ctx.dataSource.query(`UPDATE bookings SET hold_expires_at = now() - interval '1 minute' WHERE id = $1`, [res.body.bookingId]);
+      const notConfirmed = () => ctx.dataSource.query(
+        `SELECT template, user_id AS "userId", idempotency_key AS key FROM email_logs WHERE template = 'booking-not-confirmed'`);
+
+      const job = ctx.app.get(ExpireHoldsJob);
+      expect((await job.execute({ force: true })).result).toEqual({ expired: 1 });
+      expect(await notConfirmed()).toEqual([
+        { template: 'booking-not-confirmed', userId, key: `booking-not-confirmed:${res.body.bookingId}` },
+      ]);
+      expect((await job.execute({ force: true })).result).toEqual({ expired: 0 });
+      expect(await notConfirmed()).toHaveLength(1);
+      const [still] = await ctx.dataSource.query(`SELECT status FROM bookings WHERE id = $1`, [otherHold.body.bookingId]);
+      expect(still.status).toBe('pending_payment');
     });
 
     it('validates guest data', async () => {

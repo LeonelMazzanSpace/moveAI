@@ -9,6 +9,7 @@ import { ReconcilePaymentsJob } from '../../payments/jobs/reconcile-payments.job
 import { GenerateSlotsJob } from '../../schedule/jobs/generate-slots.job.js';
 import { SettingsService } from '../../settings/services/settings.service.js';
 import { isJobName, type JobName, type JobRunResultDto } from '../models/job.model.js';
+import { BookingRemindersService } from './booking-reminders.service.js';
 import { ExpiryRemindersService } from './expiry-reminders.service.js';
 
 type JobStarter = (force: boolean) => Promise<JobRunResult>;
@@ -23,6 +24,7 @@ export class AutomationsService {
     'generate-slots': (force) => this.generateSlots.execute({ force }),
     'expire-holds': (force) => this.expireHolds.execute({ force }),
     'reconcile-payments': (force) => this.reconcilePayments.execute({ force }),
+    'booking-reminders': this.locked('booking-reminders', () => this.bookingReminders.run()),
   };
 
   constructor(
@@ -34,6 +36,7 @@ export class AutomationsService {
     private readonly expireHolds: ExpireHoldsJob,
     private readonly reconcilePayments: ReconcilePaymentsJob,
     private readonly settings: SettingsService,
+    private readonly bookingReminders: BookingRemindersService,
   ) {}
 
   async run(job: string, options: { force: boolean }): Promise<JobRunResultDto> {
