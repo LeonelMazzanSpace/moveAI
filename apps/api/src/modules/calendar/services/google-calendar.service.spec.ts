@@ -175,11 +175,36 @@ describe('GoogleCalendarService', () => {
     [503, {}, 'transient'],
     [400, { error: 'invalid_request' }, 'other'],
     [403, {}, 'other'],
-  ])('maps HTTP %i to %s', async (status, body, kind) => {
+    [403, { error: { code: 403, errors: [{ reason: 'forbidden' }] } }, 'other'],
+    [403, { error: { code: 403, errors: [{ reason: 'rateLimitExceeded' }] } }, 'transient'],
+    [403, { error: { code: 403, errors: [{ reason: 'userRateLimitExceeded' }] } }, 'transient'],
+  ])('maps HTTP %i %j to %s', async (status, body, kind) => {
     fetchMock.mockResolvedValue(jsonResponse(status, body));
     const error = await service.refreshAccessToken('refresh').catch((e: unknown) => e);
     expect(error).toBeInstanceOf(GoogleCalendarError);
     expect(error).toMatchObject({ kind, status });
+  });
+
+  it('returns an empty list when Google sends no items', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, { items: [] }));
+    await expect(service.listEvents('access', 'rehab@group', new Date(), new Date())).resolves.toEqual([]);
+  });
+
+  it.each([
+    ['without items', () => jsonResponse(200, { kind: 'calendar#events' })],
+    ['with a body that is not JSON', () => new Response('<html>', { status: 200 })],
+    ['with a cut body', () => new Response('{"items":[{"id":"e1"', { status: 200 })],
+  ])('treats an OK event list %s as transient, never as an empty calendar', async (_case, response) => {
+    fetchMock.mockResolvedValue(response());
+    await expect(service.listEvents('access', 'rehab@group', new Date(), new Date())).rejects.toMatchObject({
+      kind: 'transient',
+      status: 200,
+    });
+  });
+
+  it('treats an OK calendar list without items as transient', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, {}));
+    await expect(service.listCalendars('access')).rejects.toMatchObject({ kind: 'transient', status: 200 });
   });
 
   it('maps network errors and timeouts to transient', async () => {

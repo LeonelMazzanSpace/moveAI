@@ -16,6 +16,11 @@ const BATCH = 200;
 
 type SyncResult = Record<string, number>;
 
+// `stale`: the connection changed while Google answered, so nothing was written and the pass is not recorded.
+interface PassOutcome { result: SyncResult; errorCode: string | null; stale?: boolean }
+
+type SyncableConnection = CalendarConnection & { calendarId: string };
+
 interface PushRow {
   id: string;
   source: BookingSource;
@@ -27,7 +32,15 @@ interface PushRow {
 
 interface StaleLink { id: string; googleEventId: string }
 
-interface ConflictRow { slotId: string; startsAt: Date; clientName: string; professionalName: string | null }
+interface ConflictRow { slotId: string; bookingId: string; startsAt: Date; clientName: string; professionalName: string | null }
+
+// D113: the chosen calendar was deleted or MOVE lost access to it; handled like a revoked grant.
+class CalendarLostError extends Error {
+  constructor(public readonly code: 'calendar_not_found' | 'calendar_forbidden') {
+    super(code);
+    this.name = 'CalendarLostError';
+  }
+}
 
 // Google event ids only take base32hex characters (0-9, a-v); `move` plus the uuid without dashes is one of them.
 const eventIdOf = (bookingId: string): string => `move${bookingId.replaceAll('-', '')}`;
@@ -66,7 +79,7 @@ export class CalendarSyncService {
 
       for (const row of await this.bookingsToPush()) {
         try {
-          await this.createEvent(accessToken, connection.calendarId, row);
+          if (!(await this.createEvent(accessToken, connection, row))) return { result, errorCode: lastError, stale: true };
           result.created += 1;
         } catch (error) {
           track(error);
@@ -86,31 +99,33 @@ export class CalendarSyncService {
 
   // Google → MOVE: Rehab slots of the window that overlap a busy event are blocked, the others released.
   async pull(): Promise<SyncResult> {
-    return this.withConnection('pull', async (connection, accessToken) => {
+    return this.withConnection('pull', async (connection, accessToken): Promise<PassOutcome> => {
       const windowDays = await this.settings.get('bookingWindowDays');
       const from = new Date();
       const to = new Date(from.getTime() + (windowDays + 1) * DAY_MS);
-      const events = await this.google.listEvents(accessToken, connection.calendarId, from, to);
-      const { blocked, released, conflicts } = await this.applyBlocks(from, to, busyIntervals(events, connection.calendarId, BUSINESS_TZ));
-      for (const conflict of conflicts) await this.notifyConflict(conflict);
-      return { result: { blocked, released, conflicts: conflicts.length }, errorCode: null };
+      const events = await this.listEvents(accessToken, connection.calendarId, from, to);
+      const applied = await this.applyBlocks(connection, from, to, busyIntervals(events, connection.calendarId, BUSINESS_TZ));
+      if (!applied) return { result: { stale: 1 }, errorCode: null, stale: true };
+      for (const conflict of applied.conflicts) await this.notifyConflict(conflict);
+      return { result: { blocked: applied.blocked, released: applied.released, conflicts: applied.conflicts.length }, errorCode: null };
     });
   }
 
   private async withConnection(
     stamp: SyncStamp,
-    run: (
-      connection: CalendarConnection & { calendarId: string },
-      accessToken: string,
-    ) => Promise<{ result: SyncResult; errorCode: string | null }>,
+    run: (connection: SyncableConnection, accessToken: string) => Promise<PassOutcome>,
   ): Promise<SyncResult> {
     const connection = await this.connections.findSyncable();
     if (!connection) return {};
     try {
-      const { result, errorCode } = await run(connection, await this.connections.accessToken(connection));
-      await this.connections.recordRun(connection.id, stamp, errorCode);
+      const { result, errorCode, stale } = await run(connection, await this.connections.accessToken(connection));
+      if (!stale) await this.connections.recordRun(connection.id, stamp, errorCode);
       return result;
     } catch (error) {
+      if (error instanceof CalendarLostError) {
+        await this.connections.markNeedsReconnect(connection.id, error.code);
+        return { reconnect: 1 };
+      }
       if (!(error instanceof GoogleCalendarError)) throw error;
       if (error.kind === 'invalid_grant') {
         await this.connections.markNeedsReconnect(connection.id);
@@ -119,6 +134,19 @@ export class CalendarSyncService {
       // Transient errors keep the last blocks; the next pass retries.
       await this.connections.recordError(connection.id, error.kind);
       return { failed: 1 };
+    }
+  }
+
+  // D113: 404/410 or a 403 that is not a rate limit (already mapped to transient) on the chosen calendar.
+  private async listEvents(accessToken: string, calendarId: string, from: Date, to: Date) {
+    try {
+      return await this.google.listEvents(accessToken, calendarId, from, to);
+    } catch (error) {
+      if (error instanceof GoogleCalendarError && error.kind === 'not_found') throw new CalendarLostError('calendar_not_found');
+      if (error instanceof GoogleCalendarError && error.kind === 'other' && error.status === 403) {
+        throw new CalendarLostError('calendar_forbidden');
+      }
+      throw error;
     }
   }
 
@@ -149,10 +177,11 @@ export class CalendarSyncService {
   }
 
   // The id is deterministic, so a 409 means the event of a previous pass already exists: only the link was missing.
-  private async createEvent(accessToken: string, calendarId: string, row: PushRow): Promise<void> {
+  // The link is only written while the connection still points to the same calendar (m-3); false stops the pass.
+  private async createEvent(accessToken: string, connection: SyncableConnection, row: PushRow): Promise<boolean> {
     const eventId = eventIdOf(row.id);
     try {
-      await this.google.insertEvent(accessToken, calendarId, {
+      await this.google.insertEvent(accessToken, connection.calendarId, {
         id: eventId,
         summary: summaryOf(row),
         description: descriptionOf(row),
@@ -163,10 +192,14 @@ export class CalendarSyncService {
     } catch (error) {
       if (!(error instanceof GoogleCalendarError && error.kind === 'conflict')) throw error;
     }
-    await this.dataSource.query(
-      `INSERT INTO calendar_event_links (booking_id, google_event_id) VALUES ($1, $2) ON CONFLICT (booking_id) DO NOTHING`,
-      [row.id, eventId],
-    );
+    return this.dataSource.transaction(async (manager) => {
+      if (!(await this.connections.holdForSync(manager, connection.id, connection.calendarId))) return false;
+      await manager.query(
+        `INSERT INTO calendar_event_links (booking_id, google_event_id) VALUES ($1, $2) ON CONFLICT (booking_id) DO NOTHING`,
+        [row.id, eventId],
+      );
+      return true;
+    });
   }
 
   // An event already gone in Google (404/410) counts as deleted.
@@ -182,12 +215,16 @@ export class CalendarSyncService {
   // One UPDATE per pass. It waits on the lock of any slot a booking holds, and the conflict query runs as a later
   // statement, so it sees every booking committed before the block: a booking either lands before the block (and is
   // reported here) or after it (and is rejected with SLOT_NOT_BOOKABLE).
+  // The connection is re-checked FOR SHARE first: a disconnect, lost access or calendar change that happened while
+  // Google answered skips the pass (null), and one that comes later waits for this commit and clears what it wrote.
   private async applyBlocks(
+    connection: SyncableConnection,
     from: Date,
     to: Date,
     intervals: BusyInterval[],
-  ): Promise<{ blocked: number; released: number; conflicts: ConflictRow[] }> {
+  ): Promise<{ blocked: number; released: number; conflicts: ConflictRow[] } | null> {
     return this.dataSource.transaction(async (manager) => {
+      if (!(await this.connections.holdForSync(manager, connection.id, connection.calendarId))) return null;
       const slots: { id: string; startsAt: Date; endsAt: Date }[] = await manager.query(
         `SELECT id, starts_at AS "startsAt", ends_at AS "endsAt" FROM time_slots
          WHERE service = 'rehab' AND cancelled_at IS NULL AND starts_at >= $1 AND starts_at < $2`,
@@ -209,26 +246,26 @@ export class CalendarSyncService {
         newlyBlocked.length === 0
           ? []
           : await manager.query(
-              `SELECT DISTINCT ON (s.id) s.id AS "slotId", s.starts_at AS "startsAt", u.name AS "clientName",
+              `SELECT s.id AS "slotId", b.id AS "bookingId", s.starts_at AS "startsAt", u.name AS "clientName",
                  p.name AS "professionalName"
                FROM bookings b
                JOIN time_slots s ON s.id = b.time_slot_id
                JOIN users u ON u.id = b.user_id
                LEFT JOIN professionals p ON p.id = s.professional_id
                WHERE b.time_slot_id = ANY($1::uuid[]) AND b.status IN ('pending_payment','confirmed') AND b.deleted_at IS NULL
-               ORDER BY s.id, b.created_at`,
+               ORDER BY s.starts_at, b.created_at`,
               [newlyBlocked],
             );
       return { blocked: newlyBlocked.length, released: changed.length - newlyBlocked.length, conflicts };
     });
   }
 
-  // D95: the booking stays; staff is told once per slot.
+  // D95: the booking stays; staff is told once per conflicting booking (D113).
   private async notifyConflict(conflict: ConflictRow): Promise<void> {
-    this.logger.warn(`calendar conflict slot=${conflict.slotId}`);
+    this.logger.warn(`calendar conflict slot=${conflict.slotId} booking=${conflict.bookingId}`);
     await this.notifications.sendToStaff({
       template: 'staff-calendar-conflict',
-      idempotencyKey: `staff-calendar-conflict:${conflict.slotId}`,
+      idempotencyKey: `staff-calendar-conflict:${conflict.slotId}:${conflict.bookingId}`,
       params: {
         clientName: conflict.clientName,
         professionalName: conflict.professionalName,

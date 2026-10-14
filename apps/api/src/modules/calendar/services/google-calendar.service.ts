@@ -51,10 +51,19 @@ interface Call {
   json?: object;
 }
 
+// Google answers some rate limits with 403 instead of 429.
+const RATE_LIMIT_REASONS = ['rateLimitExceeded', 'userRateLimitExceeded', 'quotaExceeded', 'dailyLimitExceeded'];
+
+const isRateLimited = (error: unknown): boolean => {
+  const errors = typeof error === 'object' && error !== null ? (error as { errors?: unknown }).errors : undefined;
+  return Array.isArray(errors) && errors.some((item: { reason?: unknown }) => RATE_LIMIT_REASONS.includes(String(item?.reason)));
+};
+
 // A 401 comes right after refreshing the access token, so the grant itself no longer works.
 const errorKind = (status: number, body: unknown): GoogleCalendarErrorKind => {
   const code = typeof body === 'object' && body !== null ? (body as { error?: unknown }).error : undefined;
   if ((status === 400 && code === 'invalid_grant') || status === 401) return 'invalid_grant';
+  if (status === 403 && isRateLimited(code)) return 'transient';
   if (status === 404 || status === 410) return 'not_found';
   if (status === 409) return 'conflict';
   if (status === 429 || status >= 500) return 'transient';
@@ -181,14 +190,24 @@ export class GoogleCalendarService {
     let pageToken: string | null = null;
     do {
       const query = new URLSearchParams({ ...params, ...(pageToken ? { pageToken } : {}) });
-      const body = await this.request({ op, url: `${url}?${query.toString()}`, accessToken });
-      if (Array.isArray(body.items)) items.push(...(body.items as Record<string, unknown>[]));
+      const { status, body } = await this.send({ op, url: `${url}?${query.toString()}`, accessToken });
+      // Google always sends `items` (empty when there is nothing). Without it the body was not read (cut or not JSON):
+      // taking it as an empty list would release every block, so it is retried like any transient error.
+      if (!Array.isArray(body.items)) {
+        this.logger.warn(`google ${op} failed: ${status} unreadable body`);
+        throw new GoogleCalendarError('transient', status);
+      }
+      items.push(...(body.items as Record<string, unknown>[]));
       pageToken = str(body.nextPageToken);
     } while (pageToken);
     return items;
   }
 
   private async request(call: Call): Promise<Record<string, unknown>> {
+    return (await this.send(call)).body;
+  }
+
+  private async send(call: Call): Promise<{ status: number; body: Record<string, unknown> }> {
     const method = call.method ?? (call.form || call.json ? 'POST' : 'GET');
     const headers: Record<string, string> = { accept: 'application/json' };
     if (call.accessToken) headers.authorization = `Bearer ${call.accessToken}`;
@@ -214,6 +233,6 @@ export class GoogleCalendarService {
       this.logger.warn(`google ${call.op} failed: ${response.status} ${kind}`);
       throw new GoogleCalendarError(kind, response.status);
     }
-    return typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
+    return { status: response.status, body: typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {} };
   }
 }

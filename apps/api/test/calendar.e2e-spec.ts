@@ -12,6 +12,7 @@ import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
 import { OAUTH_STATE_TTL_MS, signState } from '../src/modules/calendar/domain/oauth-state.js';
 import { decryptToken } from '../src/modules/calendar/domain/token-cipher.js';
 import { CalendarPushJob } from '../src/modules/calendar/jobs/calendar-push.job.js';
+import { CalendarConnectionService } from '../src/modules/calendar/services/calendar-connection.service.js';
 import { GoogleCalendarService } from '../src/modules/calendar/services/google-calendar.service.js';
 import { createTestApp, raisedCheckoutLimit } from './utils/app.js';
 import { signUp, signUpClient, signUpStaff, type TestAgent } from './utils/auth.js';
@@ -431,9 +432,34 @@ describe('Google Calendar ↔ Rehab (e2e)', () => {
       const [stored] = await ds.query(`SELECT status FROM bookings WHERE id = $1`, [booking.body.id]);
       expect(stored.status).toBe('confirmed');
       expect(await blockedAt(slotId)).not.toBeNull();
-      expect(await emails(`staff-calendar-conflict:${slotId}`)).toBe(1);
+      expect(await emails(`staff-calendar-conflict:${slotId}:${booking.body.id}`)).toBe(1);
+      expect(await count(`email_logs WHERE template = 'staff-calendar-conflict'`)).toBe(1);
       const slots = await staff.agent.get(`/api/staff/time-slots?date=${tomorrow()}&service=rehab`).expect(200);
       expect(slots.body.find((s: { id: string }) => s.id === slotId)).toMatchObject({ calendarBlocked: true, calendarConflict: true, booked: 1 });
+    });
+
+    it('tells staff again about a new conflict on the same slot with another booking (D113)', async () => {
+      const staff = await signUpStaff(app, ds);
+      await connectAndChoose(staff.agent);
+      const slotId = await rehabSlot('10:00');
+      const first = await followupClient();
+      const a = await first.agent.post('/api/bookings').send({ timeSlotId: slotId }).expect(201);
+      const eventId = busyOver('10:00');
+      await sync(staff.agent);
+      await staff.agent.post(`/api/staff/bookings/${a.body.id}/cancel`).expect(200);
+      google.removeEvent(CALENDAR, eventId);
+      await sync(staff.agent);
+      expect(await blockedAt(slotId)).toBeNull();
+
+      const second = await followupClient();
+      const b = await second.agent.post('/api/bookings').send({ timeSlotId: slotId }).expect(201);
+      busyOver('10:00');
+      await sync(staff.agent);
+      await sync(staff.agent);
+
+      expect(await emails(`staff-calendar-conflict:${slotId}:${a.body.id}`)).toBe(1);
+      expect(await emails(`staff-calendar-conflict:${slotId}:${b.body.id}`)).toBe(1);
+      expect(await count(`email_logs WHERE template = 'staff-calendar-conflict'`)).toBe(2);
     });
 
     it('keeps the last blocks when Google fails transiently', async () => {
@@ -486,6 +512,26 @@ describe('Google Calendar ↔ Rehab (e2e)', () => {
       expect(await count('calendar_connections')).toBe(1);
     });
 
+    it.each([
+      ['not_found', 'calendar_not_found'],
+      ['other', 'calendar_forbidden'],
+    ] as const)('treats a %s (404/403) on the chosen calendar as lost access (D113)', async (kind, code) => {
+      const staff = await signUpStaff(app, ds);
+      await connectAndChoose(staff.agent);
+      const slotId = await rehabSlot('10:00');
+      busyOver('10:00');
+      await sync(staff.agent);
+      expect(await blockedAt(slotId)).not.toBeNull();
+
+      google.failWith(kind, 'listEvents');
+      const status = await sync(staff.agent);
+      expect(status.body.status).toBe('needs_reconnect');
+      expect(await blockedAt(slotId)).toBeNull();
+      const [{ id, last_error_code }] = await ds.query(`SELECT id, last_error_code FROM calendar_connections`);
+      expect(last_error_code).toBe(code);
+      expect(await emails(`staff-calendar-disconnected:${id}:${businessToday()}`)).toBe(1);
+    });
+
     it('treats a 401 from Google while listing calendars as lost access', async () => {
       const staff = await signUpStaff(app, ds);
       await connect(staff.agent);
@@ -531,6 +577,93 @@ describe('Google Calendar ↔ Rehab (e2e)', () => {
     });
   });
 
+  describe('connection changes while a sync talks to Google (I-1, m-3)', () => {
+    const live = () => count('calendar_connections WHERE deleted_at IS NULL');
+
+    // Pull has read the connection and is waiting on events.list when `change` runs.
+    const duringPull = async (change: (agent: TestAgent) => Promise<unknown>) => {
+      const staff = await signUpStaff(app, ds);
+      await connectAndChoose(staff.agent);
+      const slotId = await rehabSlot('10:00');
+      busyOver('10:00');
+      const held = google.hold('listEvents');
+      const pull = staff.agent.post('/api/staff/calendar/sync').then((r) => r);
+      await held.reached;
+      await change(staff.agent);
+      held.release();
+      expect((await pull).status).toBe(200);
+      return slotId;
+    };
+
+    it('a disconnect during a pull leaves no block behind', async () => {
+      const slotId = await duringPull((agent) => agent.delete('/api/staff/calendar').expect(200));
+      expect(await live()).toBe(0);
+      expect(await blockedAt(slotId)).toBeNull();
+    });
+
+    it('losing access during a pull leaves no block behind', async () => {
+      const slotId = await duringPull(async () => {
+        const [{ id }] = await ds.query(`SELECT id FROM calendar_connections`);
+        await app.get(CalendarConnectionService).markNeedsReconnect(id as string);
+      });
+      const [row] = await ds.query(`SELECT status FROM calendar_connections`);
+      expect(row.status).toBe('needs_reconnect');
+      expect(await blockedAt(slotId)).toBeNull();
+    });
+
+    it('a calendar change during a pull does not apply the old calendar busy times', async () => {
+      const slotId = await duringPull((agent) => agent.patch('/api/staff/calendar').send({ calendarId: 'agenda@move.test' }).expect(200));
+      expect(await blockedAt(slotId)).toBeNull();
+    });
+
+    it('a disconnect waits for a pull that is already writing its blocks, then clears them', async () => {
+      const staff = await signUpStaff(app, ds);
+      await connectAndChoose(staff.agent);
+      const slotId = await rehabSlot('10:00');
+      busyOver('10:00');
+
+      const gate = ds.createQueryRunner();
+      await gate.connect();
+      await gate.startTransaction();
+      let pull: Promise<request.Response> | undefined;
+      let disconnect: Promise<request.Response> | undefined;
+      try {
+        await gate.query(`SELECT id FROM time_slots WHERE id = $1 FOR UPDATE`, [slotId]);
+        pull = staff.agent.post('/api/staff/calendar/sync').then((r) => r);
+        await waitForLockWaiters(ds, 1);
+        disconnect = staff.agent.delete('/api/staff/calendar').then((r) => r);
+        await waitForLockWaiters(ds, 2);
+      } finally {
+        await gate.commitTransaction();
+        await gate.release();
+      }
+      const [pullRes, disconnectRes] = await Promise.all([pull!, disconnect!]);
+      expect(pullRes.status).toBe(200);
+      expect(disconnectRes.status).toBe(200);
+      expect(await live()).toBe(0);
+      expect(await blockedAt(slotId)).toBeNull();
+    });
+
+    it('a calendar change while push creates an event leaves no stale link, so the booking reaches the new calendar', async () => {
+      const staff = await signUpStaff(app, ds);
+      await connectAndChoose(staff.agent);
+      const client = await followupClient();
+      const booking = await client.agent.post('/api/bookings').send({ timeSlotId: await rehabSlot('10:00') }).expect(201);
+      const held = google.hold('insertEvent');
+      const push = staff.agent.post('/api/staff/calendar/sync').then((r) => r);
+      await held.reached;
+      await staff.agent.patch('/api/staff/calendar').send({ calendarId: 'agenda@move.test' }).expect(200);
+      held.release();
+      expect((await push).status).toBe(200);
+      expect(await count('calendar_event_links')).toBe(0);
+
+      await sync(staff.agent);
+      const eventId = `move${(booking.body.id as string).replaceAll('-', '')}`;
+      expect(google.calendarEvents('agenda@move.test').has(eventId)).toBe(true);
+      expect(await count('calendar_event_links')).toBe(1);
+    });
+  });
+
   describe('concurrency: a pull blocks the slot a client is booking', () => {
     // A separate transaction holds the slot lock so the booking and the pull both queue on it; `first` decides which
     // one reaches the lock first.
@@ -567,7 +700,7 @@ describe('Google Calendar ↔ Rehab (e2e)', () => {
       const [bookingRes, pullRes] = await Promise.all([booking!, pull!]);
       expect(pullRes.status).toBe(200);
       expect(await blockedAt(slotId)).not.toBeNull();
-      const conflictMails = await emails(`staff-calendar-conflict:${slotId}`);
+      const conflictMails = await count(`email_logs WHERE idempotency_key LIKE $1`, [`staff-calendar-conflict:${slotId}:%`]);
       // Never a confirmed booking without the conflict notice.
       if (bookingRes.status === 201) expect(conflictMails).toBe(1);
       return { bookingRes, conflictMails, slotId };

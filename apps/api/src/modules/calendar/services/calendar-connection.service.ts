@@ -10,7 +10,7 @@ import { calendarConfig, type CalendarConfig } from '../../../config/calendar.co
 import { NotificationsService } from '../../notifications/services/notifications.service.js';
 import { OAUTH_STATE_TTL_MS, signState, verifyState } from '../domain/oauth-state.js';
 import { decryptToken, encryptToken } from '../domain/token-cipher.js';
-import { CalendarConnection } from '../entities/calendar-connection.entity.js';
+import { CalendarConnection, type StoredConnectionStatus } from '../entities/calendar-connection.entity.js';
 import type { CalendarStatusDto, GoogleCalendarOptionDto } from '../models/calendar-status.model.js';
 import { GoogleCalendarError, GoogleCalendarService } from './google-calendar.service.js';
 
@@ -36,6 +36,20 @@ async function resetSync(manager: EntityManager): Promise<void> {
 
 async function clearBlocks(manager: EntityManager): Promise<void> {
   await manager.query(`UPDATE time_slots SET calendar_blocked_at = NULL WHERE calendar_blocked_at IS NOT NULL`);
+}
+
+// Every write that changes the connection locks its row before touching links or blocks. A sync holds the same row
+// FOR SHARE while it writes (`holdForSync`), so it either commits first (and its writes are cleared here) or runs
+// after and sees the change.
+async function lockConnection(
+  manager: EntityManager,
+  connectionId: string,
+): Promise<{ status: StoredConnectionStatus; calendarId: string | null } | null> {
+  const [row]: { status: StoredConnectionStatus; calendarId: string | null }[] = await manager.query(
+    `SELECT status, calendar_id AS "calendarId" FROM calendar_connections WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+    [connectionId],
+  );
+  return row ?? null;
 }
 
 // D94: the single Google account of MOVE. The refresh token only exists encrypted at rest and is never logged.
@@ -78,7 +92,9 @@ export class CalendarConnectionService {
     const calendar = (await this.calendarsOf(connection)).find((option) => option.id === calendarId);
     if (!calendar) throw new AppError('CALENDAR_INVALID_CALENDAR');
     await this.dataSource.transaction(async (manager) => {
-      if (connection.calendarId !== calendar.id) await resetSync(manager);
+      const locked = await lockConnection(manager, connection.id);
+      if (locked?.status !== 'connected') throw new AppError('CALENDAR_NOT_CONNECTED');
+      if (locked.calendarId !== calendar.id) await resetSync(manager);
       await manager.update(CalendarConnection, connection.id, { calendarId: calendar.id, calendarName: calendar.name });
     });
     return this.getStatus();
@@ -90,6 +106,7 @@ export class CalendarConnectionService {
     if (connection) {
       await this.revoke(connection);
       await this.dataSource.transaction(async (manager) => {
+        if (!(await lockConnection(manager, connection.id))) return;
         await resetSync(manager);
         await manager.update(CalendarConnection, connection.id, { refreshTokenEnc: '' });
         await manager.softDelete(CalendarConnection, connection.id);
@@ -103,6 +120,18 @@ export class CalendarConnectionService {
     const connection = await this.findActive();
     if (!connection || connection.status !== 'connected' || !connection.calendarId) return null;
     return connection as CalendarConnection & { calendarId: string };
+  }
+
+  // Called first in the transaction of any sync write that depends on the connection read before calling Google:
+  // false (skip the write) when the connection was deleted, lost access or moved to another calendar meanwhile.
+  async holdForSync(manager: EntityManager, connectionId: string, calendarId: string): Promise<boolean> {
+    const rows: unknown[] = await manager.query(
+      `SELECT 1 FROM calendar_connections
+       WHERE id = $1 AND status = 'connected' AND calendar_id = $2 AND deleted_at IS NULL
+       FOR SHARE`,
+      [connectionId, calendarId],
+    );
+    return rows.length > 0;
   }
 
   // A token that no longer decrypts (key rotated) can only be fixed by reconnecting, like a revoked grant.
@@ -133,16 +162,17 @@ export class CalendarConnectionService {
     ]);
   }
 
-  // The grant no longer works: sync pauses, every slot is freed and staff is told to reconnect (once per connection and day).
-  async markNeedsReconnect(connectionId: string): Promise<void> {
+  // The grant no longer works (or the chosen calendar is gone, D113): sync pauses, every slot is freed and staff is told
+  // to reconnect (once per connection and day). The UPDATE locks the connection row before the blocks are cleared.
+  async markNeedsReconnect(connectionId: string, errorCode = 'invalid_grant'): Promise<void> {
     const changed = await this.dataSource.transaction(async (manager) => {
       const rows: { id: string }[] = await manager.query(
         `WITH changed AS (
-           UPDATE calendar_connections SET status = 'needs_reconnect', last_error_code = 'invalid_grant', updated_at = now()
+           UPDATE calendar_connections SET status = 'needs_reconnect', last_error_code = $2, updated_at = now()
            WHERE id = $1 AND status = 'connected' AND deleted_at IS NULL
            RETURNING id
          ) SELECT id FROM changed`,
-        [connectionId],
+        [connectionId, errorCode],
       );
       if (rows.length > 0) await clearBlocks(manager);
       return rows.length > 0;
@@ -177,7 +207,7 @@ export class CalendarConnectionService {
     await this.dataSource.transaction(async (manager) => {
       await manager.query(`SELECT pg_advisory_xact_lock(hashtext('calendar-connection'))`);
       const repository = manager.getRepository(CalendarConnection);
-      const current = await repository.findOne({ where: {}, order: { createdAt: 'DESC' } });
+      const current = await repository.findOne({ where: {}, order: { createdAt: 'DESC' }, lock: { mode: 'pessimistic_write' } });
       const fields = { googleAccountEmail: email, refreshTokenEnc, status: 'connected' as const, lastErrorCode: null, connectedBy: staffId };
       if (!current) {
         await repository.insert({ ...fields, calendarId: null, calendarName: null });

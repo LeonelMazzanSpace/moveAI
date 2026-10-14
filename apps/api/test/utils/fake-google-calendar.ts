@@ -4,7 +4,7 @@ import {
   GoogleCalendarError, type GoogleCalendarErrorKind, type GoogleCalendarService, type GoogleTokens, type NewCalendarEvent,
 } from '../../src/modules/calendar/services/google-calendar.service.js';
 
-type Method = Exclude<keyof GoogleCalendarService, 'buildAuthUrl'>;
+export type Method = Exclude<keyof GoogleCalendarService, 'buildAuthUrl'>;
 
 export type FakeEvent = GoogleEvent & { summary?: string; description?: string };
 
@@ -25,6 +25,17 @@ export class FakeGoogleCalendar implements Pick<GoogleCalendarService, keyof Goo
   readonly inserted: string[] = [];
   readonly refreshedWith: string[] = [];
   private readonly failures = new Map<Method | '*', GoogleCalendarErrorKind>();
+  private readonly holds = new Map<Method, { arrived: () => void; released: Promise<void> }>();
+
+  // The next call of `method` stops until `release`; `reached` resolves once a call is waiting there.
+  hold(method: Method): { reached: Promise<void>; release: () => void } {
+    let arrived = (): void => undefined;
+    let release = (): void => undefined;
+    const reached = new Promise<void>((resolve) => { arrived = resolve; });
+    const released = new Promise<void>((resolve) => { release = resolve; });
+    this.holds.set(method, { arrived, released });
+    return { reached, release };
+  }
 
   failWith(kind: GoogleCalendarErrorKind, method: Method | '*' = '*'): void {
     this.failures.set(method, kind);
@@ -35,6 +46,7 @@ export class FakeGoogleCalendar implements Pick<GoogleCalendarService, keyof Goo
   }
 
   reset(): void {
+    this.holds.clear();
     this.events.clear();
     this.revoked.length = 0;
     this.inserted.length = 0;
@@ -95,6 +107,7 @@ export class FakeGoogleCalendar implements Pick<GoogleCalendarService, keyof Goo
   }
 
   async listEvents(_accessToken: string, calendarId: string, timeMin: Date, timeMax: Date): Promise<GoogleEvent[]> {
+    await this.wait('listEvents');
     this.fail('listEvents');
     return [...this.calendarEvents(calendarId).values()].filter((event) => {
       const start = new Date(event.start?.dateTime ?? `${event.start?.date}T00:00:00-03:00`);
@@ -104,6 +117,7 @@ export class FakeGoogleCalendar implements Pick<GoogleCalendarService, keyof Goo
   }
 
   async insertEvent(_accessToken: string, calendarId: string, event: NewCalendarEvent): Promise<void> {
+    await this.wait('insertEvent');
     this.fail('insertEvent');
     const events = this.calendarEvents(calendarId);
     if (events.has(event.id)) throw new GoogleCalendarError('conflict', 409);
@@ -122,6 +136,14 @@ export class FakeGoogleCalendar implements Pick<GoogleCalendarService, keyof Goo
   async deleteEvent(_accessToken: string, calendarId: string, eventId: string): Promise<void> {
     this.fail('deleteEvent');
     if (!this.calendarEvents(calendarId).delete(eventId)) throw new GoogleCalendarError('not_found', 404);
+  }
+
+  private async wait(method: Method): Promise<void> {
+    const hold = this.holds.get(method);
+    if (!hold) return;
+    this.holds.delete(method);
+    hold.arrived();
+    await hold.released;
   }
 
   private fail(method: Method): void {
