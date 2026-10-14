@@ -175,16 +175,16 @@ export function PlanForm({ mode, plan, submitting = false, onSubmit, onCancel }:
         </FormField>
       </div>
       <div className="flex flex-wrap gap-x-6 gap-y-3">
-        <Label htmlFor={id('featured')} className="text-sm">
+        <Label htmlFor={id('featured')} className="min-h-8 text-sm">
           <input id={id('featured')} type="checkbox" className={CHECKBOX_CLASS} {...register('featured')} />
           Destacado
         </Label>
-        <Label htmlFor={id('active')} className="text-sm">
+        <Label htmlFor={id('active')} className="min-h-8 text-sm">
           <input id={id('active')} type="checkbox" className={CHECKBOX_CLASS} {...register('active')} />
           Activo
         </Label>
         {AUTO_DEBIT_KINDS.includes(kind) ? (
-          <Label htmlFor={id('autoDebitEnabled')} className="text-sm">
+          <Label htmlFor={id('autoDebitEnabled')} className="min-h-8 text-sm">
             <input id={id('autoDebitEnabled')} type="checkbox" className={CHECKBOX_CLASS} {...register('autoDebitEnabled')} />
             Permite débito automático
           </Label>

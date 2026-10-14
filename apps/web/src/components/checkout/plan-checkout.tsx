@@ -104,7 +104,7 @@ function PaymentModeOption({
     <div className="flex items-start gap-3 rounded border border-border bg-card p-4">
       <input id={id} type="radio" name={name} value={value} checked={checked} onChange={() => onSelect(value)} className={RADIO_CLASS} />
       <div className="space-y-1.5">
-        <label htmlFor={id} className="block text-sm font-medium">
+        <label htmlFor={id} className="flex min-h-8 items-center text-sm font-medium">
           {label}
         </label>
         {children}

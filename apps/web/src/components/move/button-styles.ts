@@ -14,7 +14,7 @@ interface MoveButtonOptions extends MoveButtonSizeOptions {
 }
 
 /** MOVE lettering (small, uppercase, tracked) on top of the shared button variants; the only place that spells it out. */
-const MOVE_LETTERING = 'h-auto text-[10px] font-semibold uppercase tracking-[0.2em]';
+const MOVE_LETTERING = 'h-auto min-h-8 text-[10px] font-semibold uppercase tracking-[0.2em]';
 
 const SIZE_CLASS: Record<MoveButtonSize, string> = {
   compact: 'px-3.5 py-1.5',

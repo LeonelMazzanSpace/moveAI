@@ -24,7 +24,7 @@ export async function FooterContact() {
             href={contact.mapsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-6 inline-block text-[11px] uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground"
+            className="mt-4 inline-flex min-h-8 items-center text-[11px] uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground"
           >
             Abrir en Google Maps
           </a>
@@ -44,9 +44,9 @@ export function PublicFooter() {
         <span className="font-display text-base font-black normal-case tracking-tight text-foreground">
           MOVE<span className="align-super text-[9px]">®</span>
         </span>
-        <div className="flex gap-7">
+        <div className="flex gap-x-7">
           {FOOTER_LINKS.map((link) => (
-            <Link key={link.href} href={link.href} className="hover:text-foreground">
+            <Link key={link.href} href={link.href} className="inline-flex min-h-8 items-center hover:text-foreground">
               {link.label}
             </Link>
           ))}

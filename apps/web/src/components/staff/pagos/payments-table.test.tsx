@@ -50,9 +50,9 @@ describe('PaymentsTable', () => {
   it('stacks every payment as a card on mobile so nothing needs a horizontal swipe', () => {
     render(<PaymentsTable payments={[base]} />);
     const row = screen.getByText('Martina Suárez').closest('tr');
-    expect(row).toHaveClass('max-md:grid');
-    expect(row?.closest('table')).toHaveClass('max-md:block');
-    expect(screen.getByRole('columnheader', { name: 'Estado' }).closest('thead')).toHaveClass('max-md:sr-only');
+    expect(row).toHaveClass('max-xl:grid');
+    expect(row?.closest('table')).toHaveClass('max-xl:block');
+    expect(screen.getByRole('columnheader', { name: 'Estado' }).closest('thead')).toHaveClass('max-xl:sr-only');
     const labels = Array.from(row?.querySelectorAll('td') ?? []).map((cell) => cell.getAttribute('data-label'));
     expect(labels).toEqual(['Fecha', null, 'Ítem', 'Servicio', 'Monto', 'Método', 'Estado']);
   });
@@ -200,6 +200,6 @@ describe('PaymentsTable semantics below md', () => {
   it('shows the cells in the same order on mobile as in the DOM', () => {
     render(<PaymentsTable payments={[base]} />);
     const cells = Array.from(screen.getAllByRole('row')[1].querySelectorAll('td'));
-    for (const cell of cells) expect(cell.className).not.toMatch(/max-md:order-/);
+    for (const cell of cells) expect(cell.className).not.toMatch(/max-xl:order-/);
   });
 });

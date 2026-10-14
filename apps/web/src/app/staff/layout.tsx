@@ -12,7 +12,7 @@ async function StaffShell({ children }: { children: ReactNode }) {
       <StaffSidebar />
       <div className="min-w-0 flex-1">
         <StaffTopbar name={user.name} />
-        <main className="p-8">{children}</main>
+        <main className="p-4 md:p-8">{children}</main>
       </div>
     </div>
   );

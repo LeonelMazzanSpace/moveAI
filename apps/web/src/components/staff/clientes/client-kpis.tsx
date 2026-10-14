@@ -51,7 +51,7 @@ function inactiveDetail(days: number | undefined): string {
 export function ClientKpis({ kpis }: { kpis: ClientKpisDto }) {
   const { expiringSoonDays, noAttendanceDays } = useThresholds();
   return (
-    <div className="grid gap-4 sm:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Kpi label="Clientes activos" value={kpis.active} detail={`+${kpis.activeDeltaMonth} este mes`} detailTone="success" />
       <Kpi label="Planes por vencer" value={kpis.expiringSoon} tone="warning" detail={expiringDetail(expiringSoonDays)} />
       <Kpi label="Inactivos" value={kpis.inactive} tone="danger" detail={inactiveDetail(noAttendanceDays)} />

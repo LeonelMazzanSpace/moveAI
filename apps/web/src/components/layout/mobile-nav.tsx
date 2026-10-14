@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { LogoutButton } from './logout-button';
-import { isNavItemActive, type NavItem } from './nav-items';
+import { BREAKPOINT_CLASSES, isNavItemActive, type NavBreakpoint, type NavItem } from './nav-items';
 
 interface MobileNavProps {
   items: NavItem[];
@@ -22,9 +22,10 @@ interface MobileNavProps {
   actions?: (NavItem & { primary?: boolean })[];
   footer?: ReactNode;
   className?: string;
+  breakpoint?: NavBreakpoint;
 }
 
-export function MobileNav({ items, alertsTotal = 0, actions = [], footer, className }: MobileNavProps) {
+export function MobileNav({ items, alertsTotal = 0, actions = [], footer, className, breakpoint = 'md' }: MobileNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [openedOn, setOpenedOn] = useState(pathname);
@@ -39,7 +40,7 @@ export function MobileNav({ items, alertsTotal = 0, actions = [], footer, classN
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
-        render={<Button variant="outline" size="icon-lg" aria-label="Abrir menú" className={cn('md:hidden', className)} />}
+        render={<Button variant="outline" size="icon-lg" aria-label="Abrir menú" className={cn(BREAKPOINT_CLASSES[breakpoint].hide, className)} />}
       >
         <Menu aria-hidden="true" />
       </DialogTrigger>

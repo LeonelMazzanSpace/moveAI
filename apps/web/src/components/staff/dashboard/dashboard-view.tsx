@@ -33,7 +33,7 @@ function PendingAttendanceNotice({ count }: { count: number }) {
   return (
     <div role="status" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded border border-border bg-warning-muted px-6 py-4">
       <p className="text-sm font-semibold text-warning">{title}</p>
-      <Link href="/staff/turnos" className="text-xs underline underline-offset-4 hover:text-foreground">
+      <Link href="/staff/turnos" className="inline-flex min-h-8 items-center text-xs underline underline-offset-4 hover:text-foreground">
         Ir a turnos y asistencia
       </Link>
     </div>

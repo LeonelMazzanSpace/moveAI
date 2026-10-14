@@ -48,15 +48,15 @@ export function PaymentsTable({ payments }: { payments: StaffPaymentDto[] }) {
             const badge = STATUS_BADGE[payment.status];
             return (
               <TableRow role="row" key={payment.purchaseId} className={cn(MOBILE_ROW, payment.needsAttention && 'bg-warning-muted/40')}>
-                <TableCell role="cell" data-label="Fecha" className={cn('whitespace-nowrap', MOBILE_LABELLED_CELL, 'max-md:col-span-2')}>
+                <TableCell role="cell" data-label="Fecha" className={cn('whitespace-nowrap', MOBILE_LABELLED_CELL, 'max-xl:col-span-2')}>
                   {formatDate(payment.createdAt)} <span className="text-muted-foreground">{formatTime(payment.createdAt)}</span>
                 </TableCell>
-                <TableCell role="cell" className={cn(MOBILE_CELL, 'max-md:col-span-2')}>
+                <TableCell role="cell" className={cn(MOBILE_CELL, 'max-xl:col-span-2')}>
                   <span className="sr-only">Cliente: </span>
                   <div className="font-medium">{payment.client.name}</div>
                   <div className="text-xs text-muted-foreground">{payment.client.email}</div>
                 </TableCell>
-                <TableCell role="cell" data-label="Ítem" className={cn(MOBILE_LABELLED_CELL, 'max-md:col-span-2')}>
+                <TableCell role="cell" data-label="Ítem" className={cn(MOBILE_LABELLED_CELL, 'max-xl:col-span-2')}>
                   <div>{payment.itemName}</div>
                   {payment.note ? <div className="text-xs text-muted-foreground">{payment.note}</div> : null}
                 </TableCell>

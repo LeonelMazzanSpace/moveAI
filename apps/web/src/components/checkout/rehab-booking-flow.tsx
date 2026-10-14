@@ -60,7 +60,7 @@ export function PaidBookingFlow({ plan, nextPath, steps }: PaidBookingFlowProps)
   return (
     <div className="space-y-8">
       <Stepper steps={steps} current={paying ? PAY_STEP : PICK_STEP} />
-      <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-8">
           <SlotPicker picker={picker} />
           {needsGuest ? (

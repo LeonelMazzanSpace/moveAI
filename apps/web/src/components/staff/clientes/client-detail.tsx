@@ -285,17 +285,21 @@ function RehabToggle({ client }: { client: ClientDetailDto['client'] }) {
         aria-labelledby={labelId}
         disabled={toggle.isPending}
         onClick={() => toggle.mutate(!client.rehabFollowupEnabled)}
-        className={cn(
-          'relative h-5 w-9 shrink-0 rounded-full border border-border transition-colors disabled:opacity-50',
-          client.rehabFollowupEnabled ? 'bg-success' : 'bg-soft',
-        )}
+        className="flex h-8 w-11 shrink-0 items-center justify-center disabled:opacity-50"
       >
         <span
           className={cn(
-            'absolute top-0.5 size-3.5 rounded-full bg-foreground transition-all',
-            client.rehabFollowupEnabled ? 'left-[1.125rem]' : 'left-0.5',
+            'relative h-5 w-9 rounded-full border border-border transition-colors',
+            client.rehabFollowupEnabled ? 'bg-success' : 'bg-soft',
           )}
-        />
+        >
+          <span
+            className={cn(
+              'absolute top-0.5 size-3.5 rounded-full bg-foreground transition-all',
+              client.rehabFollowupEnabled ? 'left-[1.125rem]' : 'left-0.5',
+            )}
+          />
+        </span>
       </button>
       <span id={labelId} className="text-sm">
         Seguimiento fisioterapéutico habilitado
