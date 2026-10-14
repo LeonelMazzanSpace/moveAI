@@ -5,7 +5,7 @@ Plataforma de **Performance, Rehab y Recovery** de MOVE (Uruguay): registro, pla
 Este manual es la guía única para clientes, staff de MOVE y equipo técnico. Tiene una captura de cada pantalla y se ordena así:
 
 1. [Probar MOVE en local](#probar-move-en-local): los pasos, en orden, para tener la plataforma funcionando en tu computadora con datos de demostración, y qué muestra cada usuario de demo.
-2. [Estado actual frente a MOVE.pdf](#estado-actual-frente-a-movepdf): qué está hecho, qué está simulado en local y qué falta, sección por sección del documento de alcance.
+2. [Estado actual frente a MOVE.pdf](#estado-actual-frente-a-movepdf): qué está hecho, qué está simulado en local y qué falta, sección por sección del documento de alcance. Termina con la [deuda conocida](#deuda-conocida-y-comportamientos-a-tener-presentes) y con [qué queda abierto al cerrar la tanda de deuda](#qué-queda-abierto-al-cerrar-la-tanda-de-deuda): decisiones pendientes, falta de deploy y deuda menor de tests y herramientas.
 3. [Parte 1: Clientes](#parte-1-clientes): cómo usar el sitio, contratar un plan y reservar.
 4. [Parte 2: Staff de MOVE](#parte-2-staff-de-move): el panel de gestión (clientes, turnos, pagos, seguimiento y configuración).
 5. [Parte 3: Cómo levantar todo](#parte-3-cómo-levantar-todo): el sistema completo en una computadora, paso a paso, y el orden para publicarlo en producción.
@@ -267,7 +267,7 @@ Las cuentas de los invitados (`paula.rivero` y `mateo.lemos`) **no pueden ingres
 | Ambientes separados de desarrollo y producción | Pendiente | Diseño en [Ambientes separados](#ambientes-separados-de-desarrollo-y-producción) |
 | Vercel con previews y producción desde el repositorio | Pendiente | [Vercel](#vercel-web) |
 | Elastic Beanstalk con configuración y variables separadas del código | Pendiente | Las variables se validan al arrancar; ninguna va en el repositorio |
-| Validación automática en cada cambio | Pendiente (configurado, nunca ejecutado) | `bitbucket-pipelines.yml` define lint, tests, e2e de la API y build (sin deploy), y esos mismos pasos pasan en local. Pero el repositorio no está conectado a Bitbucket y, con D67, el código se publica en GitHub, donde ese archivo no corre (ver [Dónde vive el repositorio](#dónde-vive-el-repositorio)). La primera corrida real puede pedir ajustes: el paso usa `size: 2x`, que cuenta el doble de minutos de build |
+| Validación automática en cada cambio | Pendiente (configurado, nunca ejecutado) | `bitbucket-pipelines.yml` define lint, tests, e2e de la API y build (sin deploy), y esos mismos pasos pasan en local. Pero el repositorio no está conectado a Bitbucket y, con D67, el código se publica en GitHub, donde ese archivo no corre (ver [Dónde vive el repositorio](#dónde-vive-el-repositorio)). La primera corrida real puede pedir ajustes: el paso usa `size: 2x`, que cuenta el doble de minutos de build. La suite end to end de la web (Playwright, escritorio y celular) corre solo en local, no en el pipeline (ver [Local, paso a paso](#local-paso-a-paso)) |
 
 ### Fuera del MVP y cambios de alcance
 
@@ -278,6 +278,7 @@ Las cuentas de los invitados (`paula.rivero` y `mateo.lemos`) **no pueden ingres
 - **Sin penalidades** por ausencia o no show en el MVP: los tres estados se registran, pero no tienen consecuencias.
 - **El staff no reserva en nombre de clientes:** sí cancela reservas y marca asistencia.
 - **Valores provisorios:** planes, precios, horarios y umbrales son los del mockup hasta que MOVE los confirme (Configuración → Reglas).
+- **Uso desde el celular (agregado):** menú ☰ en el sitio público, el perfil del cliente y el panel de staff; las tablas de Turnos y asistencia y de Pagos se muestran como tarjetas (ver [Sitio público](#sitio-público), [Turnos y asistencia](#turnos-y-asistencia) y [Pagos](#pagos)); la suite de pruebas end to end recorre las pantallas en escritorio y en celular.
 - **Dominio:** el sitio actual de MOVE está en `moveperformance.uy`. El dominio de la plataforma nueva **no está decidido**; este manual usa `<dominio>` (y `api.<dominio>` para la API) como marcador. El código no tiene ningún dominio fijo: todo sale de variables de entorno.
 
 ### Deuda conocida y comportamientos a tener presentes
@@ -293,6 +294,33 @@ Las cuentas de los invitados (`paula.rivero` y `mateo.lemos`) **no pueden ingres
 | Compras vencidas | La conciliación vuelve a consultar en Mercado Pago las compras de **reserva** vencidas durante **72 horas** y las de **plan** durante **7 días**, por si llega un pago tardío. No vuelve a consultar las rechazadas | Nada: es intencional; si aparece una compra "Requiere atención", resolverla a mano |
 | Identificador (slug) de un plan eliminado | Se puede reutilizar en un plan nuevo. El seed no vuelve a crear los planes que el staff eliminó. Revertir la migración que lo permite falla si un plan eliminado y uno vigente comparten identificador | Antes de revertirla, renombrar los duplicados eliminados (ver [`docs/deploy.md`](../deploy.md#revertir-la-migración-de-slugs-de-planes)) |
 | Botón de Google | Oculto hasta configurar las credenciales | [Google OAuth](#google-oauth-inicio-de-sesión-con-google) |
+
+### Qué queda abierto al cerrar la tanda de deuda
+
+Al cerrar la tanda de deuda técnica, la plataforma funciona completa en local. Esto es lo que quedó sin resolver y quién tiene que moverlo.
+
+**Decisiones pendientes** (del usuario o de MOVE; ninguna se tomó en el código):
+
+| Tema | Qué falta decidir | Dónde está el detalle |
+|---|---|---|
+| Avisos de Mercado Pago (D68) | Elegir entre (a) responder 200 a los avisos IPN antes de verificar la firma o (b) quitar la `notification_url` de cada preferencia y usar una aplicación de Mercado Pago por ambiente (recomendada). Se confirma con un pago real. No hay cambio de código | [Decisión D68](#decisión-d68-avisos-de-mercado-pago) |
+| Dominio final y dominio de desarrollo | Hoy `moveperformance.uy` es el sitio anterior; el de la plataforma nueva y el registrable de desarrollo (`<dominio-dev>`) no están decididos | [Valores provisorios y decisiones abiertas](#valores-provisorios-y-decisiones-abiertas) |
+| Política de IPs de Brevo | Desactivar el bloqueo de IPs desconocidas para las API keys o darle a la API una IP de salida fija, antes de salir a producción | [Brevo](#brevo-emails), paso 4 |
+| Dónde vive el repositorio y qué CI lo valida (D67) | Bitbucket o GitHub. `bitbucket-pipelines.yml` nunca corrió y no se modificó en esta tanda | [Dónde vive el repositorio](#dónde-vive-el-repositorio) |
+| Reintento de invitaciones de check-in fallidas | Qué errores de Brevo se reintentan y con qué tope de intentos. Hoy una invitación `failed` no se reintenta sola | Fila "Invitaciones de check-in que fallaron" de la [deuda conocida](#deuda-conocida-y-comportamientos-a-tener-presentes) |
+
+También siguen abiertos los valores provisorios de Configuración y la cuenta de AWS, en [Valores provisorios y decisiones abiertas](#valores-provisorios-y-decisiones-abiertas).
+
+**Comportamientos conocidos.** Los que ya están en la tabla de [deuda conocida](#deuda-conocida-y-comportamientos-a-tener-presentes) no se repiten acá.
+
+**Sin deploy (D51).** No hay ambientes de desarrollo ni de producción en la nube: todo corre en local. Los pasos para publicar están en [`docs/deploy.md`](../deploy.md) y en las partes [3](#parte-3-cómo-levantar-todo) y [4](#parte-4-proveedores-uno-por-uno) de este manual.
+
+**Deuda menor de tests y herramientas** (no cambia lo que ve un cliente ni el staff):
+
+- `apps/api/test/webhook.e2e-spec.ts` espera los bloqueos de Postgres con un bucle propio, en lugar del helper compartido `waitForLockWaiters` (`apps/api/test/utils/db.ts`) que usan los demás specs.
+- Dos detalles cosméticos en tests de la web: falta una línea en blanco entre dos tests de `turnos-view.test.tsx`, y el test de `clients-view.test.tsx` sobre una búsqueda igual a la de la URL también pasa sin el guard `latestQ` que cubre (ese comportamiento no se puede observar desde afuera).
+- La guarda de la base de las pruebas end to end (`scripts/e2e/env.mjs`) solo compara `DB_PORT` cuando está definido. Si no lo está y el contenedor `move-postgres` publica otro puerto que el 5432, `pnpm e2e:reset` borra y recrea la base en el contenedor, pero las migraciones y la API se conectan al Postgres del 5432 (el daño queda limitado a una base con nombre `move_e2e…`). Mientras tanto: exportar `DB_PORT` con el puerto que publica el contenedor.
+- `API_URL` y `WEB_URL` no son obligatorias en `manual:demo-data` y `manual:screenshots`: si faltan usan `http://localhost:3001/api` y `http://localhost:3000`. Los scripts rechazan destinos que no sean locales, pero si ahí corre otra aplicación con datos propios, escriben contra ella. Exportarlas siempre (ver [Regenerar este manual](#regenerar-este-manual)).
 
 ---
 
