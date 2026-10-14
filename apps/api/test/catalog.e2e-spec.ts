@@ -221,6 +221,61 @@ describe('catalog (e2e)', () => {
     expect(unchanged).toEqual(plan);
   });
 
+  describe('clearing the optional duration on PATCH (D89)', () => {
+    const findPlan = async (slug: string) =>
+      (await staff.get('/api/staff/plans').expect(200)).body.find((plan: { slug: string }) => plan.slug === slug);
+    const expectRejected = (res: { body: { code: string } }) =>
+      expect(['VALIDATION_FAILED', 'PLAN_KIND_INVALID']).toContain(res.body.code);
+
+    it('clears the duration of a session pack and leaves the other fields intact', async () => {
+      const pack = await findPlan('recovery-paquete-4');
+      expect(pack.durationMinutes).not.toBeNull();
+      const res = await staff.patch(`/api/staff/plans/${pack.id}`).send({ durationMinutes: null }).expect(200);
+      expect(res.body).toEqual({ ...pack, durationMinutes: null });
+      expect(await findPlan('recovery-paquete-4')).toEqual({ ...pack, durationMinutes: null });
+    });
+
+    it('keeps the duration when the PATCH omits it', async () => {
+      const pack = await findPlan('recovery-paquete-4');
+      const res = await staff.patch(`/api/staff/plans/${pack.id}`).send({ price: 3300 }).expect(200);
+      expect(res.body).toEqual({ ...pack, price: 3300 });
+    });
+
+    it('sets the duration again after clearing it', async () => {
+      const pack = await findPlan('recovery-paquete-4');
+      await staff.patch(`/api/staff/plans/${pack.id}`).send({ durationMinutes: null }).expect(200);
+      const res = await staff.patch(`/api/staff/plans/${pack.id}`).send({ durationMinutes: 50 }).expect(200);
+      expect(res.body.durationMinutes).toBe(50);
+    });
+
+    it('rejects null in the required fields of a session pack', async () => {
+      const pack = await findPlan('recovery-paquete-4');
+      await staff.patch(`/api/staff/plans/${pack.id}`).send({ sessionsIncluded: null }).expect(400).expect(expectCode('VALIDATION_FAILED'));
+      await staff.patch(`/api/staff/plans/${pack.id}`).send({ periodDays: null }).expect(400).expect(expectCode('VALIDATION_FAILED'));
+      expect(await findPlan('recovery-paquete-4')).toEqual(pack);
+    });
+
+    it('rejects clearing the duration of the kinds that require it', async () => {
+      const single = await findPlan('recovery-sesion');
+      const evaluation = await findPlan('rehab-evaluacion');
+      expectRejected(await staff.patch(`/api/staff/plans/${single.id}`).send({ durationMinutes: null }).expect(400));
+      expectRejected(await staff.patch(`/api/staff/plans/${evaluation.id}`).send({ durationMinutes: null }).expect(400));
+      expect(await findPlan('recovery-sesion')).toEqual(single);
+      expect(await findPlan('rehab-evaluacion')).toEqual(evaluation);
+    });
+
+    it('rejects a null duration on a period plan', async () => {
+      const plan = await findPlan('performance-mensual');
+      expectRejected(await staff.patch(`/api/staff/plans/${plan.id}`).send({ durationMinutes: null }).expect(400));
+      expect(await findPlan('performance-mensual')).toEqual(plan);
+    });
+
+    it('still rejects an out-of-range duration', async () => {
+      const pack = await findPlan('recovery-paquete-4');
+      await staff.patch(`/api/staff/plans/${pack.id}`).send({ durationMinutes: 14 }).expect(400).expect(expectCode('VALIDATION_FAILED'));
+    });
+  });
+
   it('answers 404 for unknown or malformed plan ids', async () => {
     await staff.patch('/api/staff/plans/00000000-0000-4000-8000-000000000000').send({ price: 1 }).expect(404).expect(expectCode('PLAN_NOT_FOUND'));
     await staff.delete('/api/staff/plans/00000000-0000-4000-8000-000000000000').expect(404).expect(expectCode('PLAN_NOT_FOUND'));

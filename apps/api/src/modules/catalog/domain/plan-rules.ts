@@ -58,3 +58,9 @@ export function validatePlanShape(input: PlanShapeInput): void {
     throw new AppError('PLAN_KIND_INVALID');
   }
 }
+
+// Only the optional shape fields of a kind can be cleared (PATCH with `null`).
+export function assertDurationClearable(kind: PlanKind): void {
+  const rule = RULES[kind] as KindRule | undefined;
+  if (!rule?.optional.includes('durationMinutes')) throw new AppError('PLAN_KIND_INVALID');
+}

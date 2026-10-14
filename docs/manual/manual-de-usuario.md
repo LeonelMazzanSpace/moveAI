@@ -285,7 +285,6 @@ Las cuentas de los invitados (`paula.rivero` y `mateo.lemos`) **no pueden ingres
 
 | Tema | Efecto | Qué hacer por ahora |
 |---|---|---|
-| Vaciar un campo numérico opcional al editar un plan | No tiene efecto: el valor anterior queda | Desactivar el plan y crear uno nuevo con los valores correctos |
 | Links de invitación y de restablecer contraseña | La **invitación** (el staff crea un cliente, o un invitado reserva sin cuenta) dura **72 horas**; el **restablecimiento** de contraseña dura **1 hora**. Si por un error no se pudo extender la invitación a 72 horas, el email sale igual, con un link de 1 hora | Si un link venció, pedir uno nuevo desde **¿Olvidaste tu contraseña?** |
 | Cuentas sin contraseña (invitados y cuentas que solo ingresaron con Google) que piden **¿Olvidaste tu contraseña?** | Reciben el email de invitación (`account-invitation`, link de 72 horas) y no el de restablecimiento | Es intencional: el link les permite definir su primera contraseña |
 | Invitaciones de check-in que fallaron | Si Brevo rechaza una invitación de check-in (o falla el envío), no se reintenta sola; repetir **Enviar check-in** solo reenvía las invitaciones que nunca llegaron a intentarse (no a los clientes pausados ni dados de baja) | **Pendiente de decisión:** reintentar solo los errores de Brevo que aseguran que el email no salió, con un tope de intentos. Mientras tanto, revisar `email_logs` (estado `failed`) y avisar al cliente |

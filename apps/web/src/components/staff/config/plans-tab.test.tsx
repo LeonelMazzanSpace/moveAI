@@ -270,6 +270,51 @@ describe('PlansTab', () => {
       expect(hasNullValue(writeCalls('PATCH')[0][1].body)).toBe(false);
     });
 
+    it('sends durationMinutes: null when the duration of a pack is emptied', async () => {
+      const dialog = await editPack({ ...PACK, durationMinutes: 45 });
+      await userEvent.clear(dialog.getByLabelText('Duración (min)'));
+      await userEvent.click(dialog.getByRole('button', { name: 'Guardar' }));
+
+      await vi.waitFor(() => expect(writeCalls('PATCH')).toHaveLength(1));
+      const [path, init] = writeCalls('PATCH')[0];
+      expect(path).toBe('/staff/plans/plan-pack');
+      expect(init.body).toEqual({
+        slug: 'recovery-paquete-6',
+        name: 'Paquete 6 sesiones',
+        description: 'Entrená todo el mes.',
+        features: ['Clases ilimitadas'],
+        price: 4500,
+        periodDays: 30,
+        sessionsIncluded: 6,
+        durationMinutes: null,
+        featured: false,
+        active: true,
+        sortOrder: 1,
+      });
+      expect(Object.keys(init.body)).not.toContain('service');
+      expect(Object.keys(init.body)).not.toContain('kind');
+    });
+
+    it('sends null only for the emptied duration, never for another field', async () => {
+      const dialog = await editPack({ ...PACK, durationMinutes: 45 });
+      await userEvent.clear(dialog.getByLabelText('Duración (min)'));
+      await userEvent.click(dialog.getByRole('button', { name: 'Guardar' }));
+
+      await vi.waitFor(() => expect(writeCalls('PATCH')).toHaveLength(1));
+      const nulls = Object.entries(writeCalls('PATCH')[0][1].body as Record<string, unknown>).filter(([, value]) => value === null);
+      expect(nulls).toEqual([['durationMinutes', null]]);
+    });
+
+    it('does not let the required fields of a pack be emptied', async () => {
+      const dialog = await editPack({ ...PACK, durationMinutes: 45 });
+      await userEvent.clear(dialog.getByLabelText('Sesiones incluidas'));
+      await userEvent.clear(dialog.getByLabelText('Días de vigencia'));
+      await userEvent.click(dialog.getByRole('button', { name: 'Guardar' }));
+
+      expect(await dialog.findAllByText('Ingresá un valor.')).toHaveLength(2);
+      expect(writeCalls('PATCH')).toHaveLength(0);
+    });
+
     it('sends a duration typed into a pack that had none', async () => {
       const dialog = await editPack(PACK);
       await userEvent.type(dialog.getByLabelText('Duración (min)'), '50');
@@ -278,6 +323,28 @@ describe('PlansTab', () => {
       await vi.waitFor(() => expect(writeCalls('PATCH')).toHaveLength(1));
       expect(writeCalls('PATCH')[0][1].body).toEqual(expect.objectContaining({ durationMinutes: 50 }));
     });
+  });
+
+  it('does not let the required duration of a single session be emptied', async () => {
+    const single: PlanDto = {
+      ...EXISTING_PLAN,
+      id: 'plan-single',
+      service: 'recovery',
+      kind: 'single_session',
+      slug: 'recovery-sesion',
+      name: 'Sesión individual',
+      periodMonths: null,
+      durationMinutes: 45,
+    };
+    apiFetch.mockImplementation(async (_path: string, init?: { method?: string }) => (init?.method ? single : [single]));
+    renderTab();
+    await userEvent.click(await screen.findByRole('button', { name: 'Editar' }));
+    const dialog = within(await screen.findByRole('dialog'));
+    await userEvent.clear(dialog.getByLabelText('Duración (min)'));
+    await userEvent.click(dialog.getByRole('button', { name: 'Guardar' }));
+
+    expect(await dialog.findByText('Ingresá un valor.')).toBeInTheDocument();
+    expect(writeCalls('PATCH')).toHaveLength(0);
   });
 
   it('names the rehab service "Fisioterapia" in the tables and the form', async () => {

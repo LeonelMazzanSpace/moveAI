@@ -1,9 +1,9 @@
-import { IsBoolean } from 'class-validator';
+import { IsBoolean, ValidateIf } from 'class-validator';
 import {
   IntInRange, OptionalField, PLAN_LIMITS, PlanDescription, PlanFeatures, PlanName, PlanSlug,
 } from './create-plan.dto.js';
 
-// Every field is optional but never null; `service` and `kind` cannot change after creation.
+// Every field is optional and never null, except `durationMinutes`; `service` and `kind` cannot change after creation.
 export class UpdatePlanDto {
   @OptionalField()
   @PlanSlug()
@@ -37,9 +37,10 @@ export class UpdatePlanDto {
   @IntInRange(PLAN_LIMITS.sessionsIncluded)
   sessionsIncluded?: number;
 
-  @OptionalField()
+  // `null` clears the optional duration of a session pack; plan-rules rejects it for the kinds that require one.
+  @ValidateIf((_, value) => value !== undefined && value !== null)
   @IntInRange(PLAN_LIMITS.durationMinutes)
-  durationMinutes?: number;
+  durationMinutes?: number | null;
 
   @OptionalField()
   @IsBoolean()
