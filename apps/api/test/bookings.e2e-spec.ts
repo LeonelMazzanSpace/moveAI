@@ -301,6 +301,123 @@ describe('bookings (e2e)', () => {
     });
   });
 
+  describe('emails (D93)', () => {
+    const emailLogs = (): Promise<{ template: string; userId: string | null; key: string }[]> =>
+      ctx.dataSource.query(
+        `SELECT template, user_id AS "userId", idempotency_key AS key FROM email_logs
+         WHERE template IN ('booking-confirmed','booking-cancelled','booking-cancelled-by-client','booking-not-confirmed','staff-rehab-booking')
+         ORDER BY idempotency_key`,
+      );
+    const keysOf = async () => (await emailLogs()).map((log) => log.key).sort();
+    const configureStaffEmail = () =>
+      ctx.dataSource.query(`UPDATE settings SET value = to_jsonb('avisos@move.test'::text) WHERE key = 'staff_notifications_email'`);
+    const rehabFollowup = async () => {
+      const client = await signUpClient(ctx.app);
+      await ctx.dataSource.query(`UPDATE users SET rehab_followup_enabled = true WHERE id = $1`, [client.userId]);
+      const slotId = await createSlot(ctx.dataSource, {
+        service: 'rehab', startsAt: businessDateTime(addDays(businessToday(), 3), '11:00'), capacity: 1, professionalId: await createProfessional(ctx.dataSource),
+      });
+      const booking = await client.agent.post('/api/bookings').send({ timeSlotId: slotId }).expect(201);
+      return { client, bookingId: booking.body.id as string };
+    };
+
+    it('emails the client when they cancel, keyed by booking', async () => {
+      const { agent, userId } = await signUpClient(ctx.app);
+      await givePerformancePlan(ctx.dataSource, userId, { startsOn: businessToday(), endsOn: addDays(businessToday(), 5) });
+      const slotId = await createSlot(ctx.dataSource, { service: 'performance', startsAt: businessDateTime(addDays(businessToday(), 3), '19:00'), capacity: 14 });
+      const booking = await agent.post('/api/bookings').send({ timeSlotId: slotId }).expect(201);
+      await agent.post(`/api/bookings/${booking.body.id}/cancel`).expect(200);
+
+      expect(await emailLogs()).toEqual([
+        { template: 'booking-cancelled-by-client', userId, key: `booking-cancelled-by-client:${booking.body.id}` },
+        { template: 'booking-confirmed', userId, key: `booking-confirmed:${booking.body.id}` },
+      ]);
+    });
+
+    it('does not email on a rejected cancellation', async () => {
+      const { agent, userId } = await signUpClient(ctx.app);
+      await givePerformancePlan(ctx.dataSource, userId, { startsOn: businessToday(), endsOn: tomorrow() });
+      const soon = await createSlot(ctx.dataSource, { service: 'performance', startsAt: new Date(Date.now() + 60 * 60 * 1000), capacity: 14 });
+      const booking = await agent.post('/api/bookings').send({ timeSlotId: soon }).expect(201);
+      await agent.post(`/api/bookings/${booking.body.id}/cancel`).expect(409);
+      expect(await keysOf()).toEqual([`booking-confirmed:${booking.body.id}`]);
+    });
+
+    it('tells the staff address about a confirmed and a cancelled Rehab booking', async () => {
+      await configureStaffEmail();
+      const { client, bookingId } = await rehabFollowup();
+      expect(await emailLogs()).toEqual([
+        { template: 'booking-confirmed', userId: client.userId, key: `booking-confirmed:${bookingId}` },
+        { template: 'staff-rehab-booking', userId: null, key: `staff-rehab-booking:${bookingId}:confirmed` },
+      ]);
+
+      await client.agent.post(`/api/bookings/${bookingId}/cancel`).expect(200);
+      expect(await keysOf()).toEqual([
+        `booking-cancelled-by-client:${bookingId}`,
+        `booking-confirmed:${bookingId}`,
+        `staff-rehab-booking:${bookingId}:cancelled`,
+        `staff-rehab-booking:${bookingId}:confirmed`,
+      ]);
+    });
+
+    it('writes no staff email without a configured address, and never fails the booking', async () => {
+      const { client, bookingId } = await rehabFollowup();
+      await client.agent.post(`/api/bookings/${bookingId}/cancel`).expect(200);
+      expect(await keysOf()).toEqual([`booking-cancelled-by-client:${bookingId}`, `booking-confirmed:${bookingId}`]);
+    });
+
+    it('keeps the staff cancellation email for the client and also tells the staff address for Rehab', async () => {
+      await configureStaffEmail();
+      const staff = await signUpStaff(ctx.app, ctx.dataSource);
+      const { client, bookingId } = await rehabFollowup();
+      await staff.agent.post(`/api/staff/bookings/${bookingId}/cancel`).expect(200);
+      expect(await emailLogs()).toEqual([
+        { template: 'booking-cancelled', userId: client.userId, key: `booking-cancelled:${bookingId}` },
+        { template: 'booking-confirmed', userId: client.userId, key: `booking-confirmed:${bookingId}` },
+        { template: 'staff-rehab-booking', userId: null, key: `staff-rehab-booking:${bookingId}:cancelled` },
+        { template: 'staff-rehab-booking', userId: null, key: `staff-rehab-booking:${bookingId}:confirmed` },
+      ]);
+    });
+
+    it('sends no staff email for Performance or Recovery bookings', async () => {
+      await configureStaffEmail();
+      const staff = await signUpStaff(ctx.app, ctx.dataSource);
+      const { agent, userId } = await signUpClient(ctx.app);
+      await givePack(ctx.dataSource, userId, { startsOn: businessToday(), endsOn: addDays(businessToday(), 29), total: 4 });
+      const slotId = await createSlot(ctx.dataSource, { service: 'recovery', startsAt: businessDateTime(addDays(businessToday(), 3), '19:30'), capacity: 2 });
+      const booking = await agent.post('/api/bookings').send({ timeSlotId: slotId }).expect(201);
+      await staff.agent.post(`/api/staff/bookings/${booking.body.id}/cancel`).expect(200);
+      expect(await keysOf()).toEqual([`booking-cancelled:${booking.body.id}`, `booking-confirmed:${booking.body.id}`]);
+    });
+
+    it('does not tell the staff address about a Rehab hold that staff cancels before it was ever confirmed', async () => {
+      await configureStaffEmail();
+      const staff = await signUpStaff(ctx.app, ctx.dataSource);
+      const service = ctx.app.get(BookingsService);
+      const { userId } = await signUpClient(ctx.app);
+      const slotId = await createSlot(ctx.dataSource, {
+        service: 'rehab', startsAt: businessDateTime(tomorrow(), '12:00'), capacity: 1, professionalId: await createProfessional(ctx.dataSource),
+      });
+      const hold = await ctx.dataSource.transaction((m) =>
+        service.holdForPayment(m, { userId, timeSlotId: slotId, expectedService: 'rehab', holdMinutes: 15 }));
+      await staff.agent.post(`/api/staff/bookings/${hold.id}/cancel`).expect(200);
+      expect(await keysOf()).toEqual([`booking-cancelled:${hold.id}`]);
+    });
+
+    it('lists the holds it expires, and expireHolds keeps answering the count', async () => {
+      const service = ctx.app.get(BookingsService);
+      const { userId } = await signUpClient(ctx.app);
+      const slotId = await createSlot(ctx.dataSource, { service: 'recovery', startsAt: businessDateTime(tomorrow(), '18:30'), capacity: 2 });
+      const hold = await ctx.dataSource.transaction((m) =>
+        service.holdForPayment(m, { userId, timeSlotId: slotId, expectedService: 'recovery', holdMinutes: 15 }));
+      const later = new Date(Date.now() + 16 * 60_000);
+      expect(await service.expireHoldsWithIds(later)).toEqual([hold.id]);
+      expect(await service.expireHoldsWithIds(later)).toEqual([]);
+      expect(await service.expireHolds(later)).toBe(0);
+      expect(await keysOf()).toEqual([]);
+    });
+  });
+
   describe('listings', () => {
     it('lists my upcoming and past bookings', async () => {
       const { agent, userId } = await signUpClient(ctx.app);

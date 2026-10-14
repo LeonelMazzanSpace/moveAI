@@ -11,13 +11,14 @@ import { StaffTimeSlotsController } from './controllers/staff-time-slots.control
 import { ExpireHoldsJob } from './jobs/expire-holds.job.js';
 import { ActivityMetricsService } from './services/activity-metrics.service.js';
 import { AttendanceService } from './services/attendance.service.js';
+import { BookingEmailsService } from './services/booking-emails.service.js';
 import { BookingsService } from './services/bookings.service.js';
 import { SlotStatsService } from './services/slot-stats.service.js';
 
 @Module({
   imports: [SettingsModule, NotificationsModule, UsersModule, AgendaModule, SubscriptionsModule],
   controllers: [AvailabilityController, BookingsController, StaffTimeSlotsController, StaffBookingsController],
-  providers: [BookingsService, AttendanceService, SlotStatsService, ActivityMetricsService, ExpireHoldsJob],
-  exports: [BookingsService, AttendanceService, SlotStatsService, ActivityMetricsService, ExpireHoldsJob],
+  providers: [BookingsService, BookingEmailsService, AttendanceService, SlotStatsService, ActivityMetricsService, ExpireHoldsJob],
+  exports: [BookingsService, BookingEmailsService, AttendanceService, SlotStatsService, ActivityMetricsService, ExpireHoldsJob],
 })
 export class BookingsModule {}
