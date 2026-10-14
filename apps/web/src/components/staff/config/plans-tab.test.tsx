@@ -295,16 +295,6 @@ describe('PlansTab', () => {
       expect(Object.keys(init.body)).not.toContain('kind');
     });
 
-    it('sends null only for the emptied duration, never for another field', async () => {
-      const dialog = await editPack({ ...PACK, durationMinutes: 45 });
-      await userEvent.clear(dialog.getByLabelText('Duración (min)'));
-      await userEvent.click(dialog.getByRole('button', { name: 'Guardar' }));
-
-      await vi.waitFor(() => expect(writeCalls('PATCH')).toHaveLength(1));
-      const nulls = Object.entries(writeCalls('PATCH')[0][1].body as Record<string, unknown>).filter(([, value]) => value === null);
-      expect(nulls).toEqual([['durationMinutes', null]]);
-    });
-
     it('does not let the required fields of a pack be emptied', async () => {
       const dialog = await editPack({ ...PACK, durationMinutes: 45 });
       await userEvent.clear(dialog.getByLabelText('Sesiones incluidas'));

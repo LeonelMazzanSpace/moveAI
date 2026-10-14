@@ -224,8 +224,6 @@ describe('catalog (e2e)', () => {
   describe('clearing the optional duration on PATCH (D89)', () => {
     const findPlan = async (slug: string) =>
       (await staff.get('/api/staff/plans').expect(200)).body.find((plan: { slug: string }) => plan.slug === slug);
-    const expectRejected = (res: { body: { code: string } }) =>
-      expect(['VALIDATION_FAILED', 'PLAN_KIND_INVALID']).toContain(res.body.code);
 
     it('clears the duration of a session pack and leaves the other fields intact', async () => {
       const pack = await findPlan('recovery-paquete-4');
@@ -258,16 +256,28 @@ describe('catalog (e2e)', () => {
     it('rejects clearing the duration of the kinds that require it', async () => {
       const single = await findPlan('recovery-sesion');
       const evaluation = await findPlan('rehab-evaluacion');
-      expectRejected(await staff.patch(`/api/staff/plans/${single.id}`).send({ durationMinutes: null }).expect(400));
-      expectRejected(await staff.patch(`/api/staff/plans/${evaluation.id}`).send({ durationMinutes: null }).expect(400));
+      await staff.patch(`/api/staff/plans/${single.id}`).send({ durationMinutes: null }).expect(400).then((res) => expect(res.body.code).toBe('PLAN_KIND_INVALID'));
+      await staff.patch(`/api/staff/plans/${evaluation.id}`).send({ durationMinutes: null }).expect(400).then((res) => expect(res.body.code).toBe('PLAN_KIND_INVALID'));
       expect(await findPlan('recovery-sesion')).toEqual(single);
       expect(await findPlan('rehab-evaluacion')).toEqual(evaluation);
     });
 
     it('rejects a null duration on a period plan', async () => {
       const plan = await findPlan('performance-mensual');
-      expectRejected(await staff.patch(`/api/staff/plans/${plan.id}`).send({ durationMinutes: null }).expect(400));
+      await staff.patch(`/api/staff/plans/${plan.id}`).send({ durationMinutes: null }).expect(400).then((res) => expect(res.body.code).toBe('PLAN_KIND_INVALID'));
       expect(await findPlan('performance-mensual')).toEqual(plan);
+    });
+
+    it.each([
+      ['extreme durationMinutes', { durationMinutes: 1e20 }],
+      ['string durationMinutes', { durationMinutes: '45' }],
+      ['fractional durationMinutes', { durationMinutes: 45.5 }],
+      ['durationMinutes 0', { durationMinutes: 0 }],
+    ])('rejects %s on a pack patch', async (_label, body) => {
+      const pack = await findPlan('recovery-paquete-4');
+      const res = await staff.patch(`/api/staff/plans/${pack.id}`).send(body).expect(400);
+      expect(res.body.code).toBe('VALIDATION_FAILED');
+      expect(await findPlan('recovery-paquete-4')).toEqual(pack);
     });
 
     it('still rejects an out-of-range duration', async () => {
