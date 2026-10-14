@@ -123,8 +123,8 @@ export class CalendarSyncService {
       return result;
     } catch (error) {
       if (error instanceof CalendarLostError) {
-        await this.connections.markNeedsReconnect(connection.id, error.code);
-        return { reconnect: 1 };
+        const changed = await this.connections.markNeedsReconnect(connection.id, { kind: error.code, calendarId: connection.calendarId });
+        return changed ? { reconnect: 1 } : { stale: 1 };
       }
       if (!(error instanceof GoogleCalendarError)) throw error;
       if (error.kind === 'invalid_grant') {

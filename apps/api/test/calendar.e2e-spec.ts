@@ -492,7 +492,7 @@ describe('Google Calendar ↔ Rehab (e2e)', () => {
       expect(status.body).toMatchObject({ status: 'needs_reconnect', calendarId: CALENDAR });
       expect(await blockedAt(slotId)).toBeNull();
       const [{ id }] = await ds.query(`SELECT id FROM calendar_connections`);
-      const mailKey = `staff-calendar-disconnected:${id}:${businessToday()}`;
+      const mailKey = `staff-calendar-disconnected:${id}:${businessToday()}:invalid_grant`;
       expect(await emails(mailKey)).toBe(1);
 
       await sync(staff.agent);
@@ -523,13 +523,45 @@ describe('Google Calendar ↔ Rehab (e2e)', () => {
       await sync(staff.agent);
       expect(await blockedAt(slotId)).not.toBeNull();
 
+      const client = await followupClient();
+      await client.agent.post('/api/bookings').send({ timeSlotId: await rehabSlot('14:00') }).expect(201);
+      await sync(staff.agent);
+      expect(await count('calendar_event_links')).toBe(1);
+
       google.failWith(kind, 'listEvents');
       const status = await sync(staff.agent);
-      expect(status.body.status).toBe('needs_reconnect');
+      expect(status.body).toMatchObject({ status: 'needs_reconnect', calendarId: null, calendarName: null });
       expect(await blockedAt(slotId)).toBeNull();
+      expect(await count('calendar_event_links')).toBe(0);
       const [{ id, last_error_code }] = await ds.query(`SELECT id, last_error_code FROM calendar_connections`);
       expect(last_error_code).toBe(code);
-      expect(await emails(`staff-calendar-disconnected:${id}:${businessToday()}`)).toBe(1);
+      expect(await emails(`staff-calendar-disconnected:${id}:${businessToday()}:${code}`)).toBe(1);
+
+      // I-1 (review a2): reconnecting the same account lands without a calendar, so staff picks one and sync resumes.
+      google.clearFailures();
+      await connect(staff.agent, 'again');
+      const reconnected = await staff.agent.get('/api/staff/calendar').expect(200);
+      expect(reconnected.body).toMatchObject({ status: 'connected', calendarId: null, calendarName: null });
+      await staff.agent.patch('/api/staff/calendar').send({ calendarId: 'agenda@move.test' }).expect(200);
+      const resumed = await sync(staff.agent);
+      expect(resumed.body).toMatchObject({ status: 'connected', calendarId: 'agenda@move.test', calendarName: 'Agenda' });
+      expect(await count('calendar_event_links')).toBe(1);
+    });
+
+    it('emails staff again the same day when the connection is lost for a different reason (D115)', async () => {
+      const staff = await signUpStaff(app, ds);
+      await connectAndChoose(staff.agent);
+      google.failWith('invalid_grant', 'refreshAccessToken');
+      await sync(staff.agent);
+      google.clearFailures();
+      await connect(staff.agent, 'again');
+      google.failWith('not_found', 'listEvents');
+      const status = await sync(staff.agent);
+      expect(status.body.status).toBe('needs_reconnect');
+
+      const [{ id }] = await ds.query(`SELECT id FROM calendar_connections`);
+      expect(await emails(`staff-calendar-disconnected:${id}:${businessToday()}:invalid_grant`)).toBe(1);
+      expect(await emails(`staff-calendar-disconnected:${id}:${businessToday()}:calendar_not_found`)).toBe(1);
     });
 
     it('treats a 401 from Google while listing calendars as lost access', async () => {
@@ -614,6 +646,17 @@ describe('Google Calendar ↔ Rehab (e2e)', () => {
     it('a calendar change during a pull does not apply the old calendar busy times', async () => {
       const slotId = await duringPull((agent) => agent.patch('/api/staff/calendar').send({ calendarId: 'agenda@move.test' }).expect(200));
       expect(await blockedAt(slotId)).toBeNull();
+    });
+
+    it('a 404 for the old calendar after a calendar change does not mark the new one as lost (m-1, review a2)', async () => {
+      await duringPull(async (agent) => {
+        await agent.patch('/api/staff/calendar').send({ calendarId: 'agenda@move.test' }).expect(200);
+        google.failWith('not_found', 'listEvents');
+      });
+      const [row] = await ds.query(`SELECT status, calendar_id, last_error_code FROM calendar_connections`);
+      expect(row).toMatchObject({ status: 'connected', calendar_id: 'agenda@move.test' });
+      expect(row.last_error_code).not.toBe('calendar_not_found');
+      expect(await count(`email_logs WHERE template = 'staff-calendar-disconnected'`)).toBe(0);
     });
 
     it('a disconnect waits for a pull that is already writing its blocks, then clears them', async () => {

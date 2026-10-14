@@ -18,6 +18,11 @@ export interface OAuthCallbackQuery { code: unknown; state: unknown; error: unkn
 
 export type SyncStamp = 'push' | 'pull';
 
+// Why sync stopped. A lost calendar (D113) names the calendar that failed, so only that calendar is dropped.
+export type ReconnectReason =
+  | { kind: 'invalid_grant' }
+  | { kind: 'calendar_not_found' | 'calendar_forbidden'; calendarId: string };
+
 const toStatus = (configured: boolean, connection: CalendarConnection | null): CalendarStatusDto => ({
   configured,
   status: connection?.status ?? 'disconnected',
@@ -162,28 +167,39 @@ export class CalendarConnectionService {
     ]);
   }
 
-  // The grant no longer works (or the chosen calendar is gone, D113): sync pauses, every slot is freed and staff is told
-  // to reconnect (once per connection and day). The UPDATE locks the connection row before the blocks are cleared.
-  async markNeedsReconnect(connectionId: string, errorCode = 'invalid_grant'): Promise<void> {
+  // Sync pauses, every slot is freed and staff is told to reconnect (once per connection, day and reason, D115). The UPDATE
+  // locks the connection row before anything is cleared.
+  // - invalid_grant: the calendar and the links are kept, so reconnecting the same account resumes where it stopped.
+  // - lost calendar (D113): only if the connection still points to the calendar that failed (a 404 for a calendar staff
+  //   already replaced changes nothing). The calendar and its links are dropped, so a reconnect lands in "connected
+  //   without a calendar" and staff picks one.
+  // Returns whether the connection changed.
+  async markNeedsReconnect(connectionId: string, reason: ReconnectReason = { kind: 'invalid_grant' }): Promise<boolean> {
+    const lostCalendar = reason.kind !== 'invalid_grant';
     const changed = await this.dataSource.transaction(async (manager) => {
       const rows: { id: string }[] = await manager.query(
         `WITH changed AS (
-           UPDATE calendar_connections SET status = 'needs_reconnect', last_error_code = $2, updated_at = now()
-           WHERE id = $1 AND status = 'connected' AND deleted_at IS NULL
+           UPDATE calendar_connections
+           SET status = 'needs_reconnect', last_error_code = $2, updated_at = now(),
+             calendar_id = CASE WHEN $3::text IS NULL THEN calendar_id END,
+             calendar_name = CASE WHEN $3::text IS NULL THEN calendar_name END
+           WHERE id = $1 AND status = 'connected' AND deleted_at IS NULL AND ($3::text IS NULL OR calendar_id = $3)
            RETURNING id
          ) SELECT id FROM changed`,
-        [connectionId, errorCode],
+        [connectionId, reason.kind, lostCalendar ? reason.calendarId : null],
       );
-      if (rows.length > 0) await clearBlocks(manager);
-      return rows.length > 0;
+      if (rows.length === 0) return false;
+      await (lostCalendar ? resetSync(manager) : clearBlocks(manager));
+      return true;
     });
-    if (!changed) return;
-    this.logger.warn(`calendar connection ${connectionId} needs reconnect`);
+    if (!changed) return false;
+    this.logger.warn(`calendar connection ${connectionId} needs reconnect: ${reason.kind}`);
     await this.notifications.sendToStaff({
       template: 'staff-calendar-disconnected',
-      idempotencyKey: `staff-calendar-disconnected:${connectionId}:${businessToday()}`,
+      idempotencyKey: `staff-calendar-disconnected:${connectionId}:${businessToday()}:${reason.kind}`,
       params: { configUrl: `${this.app.webUrl}/staff/configuracion?tab=calendario` },
     });
+    return true;
   }
 
   private async tryConnect(staffId: string, query: OAuthCallbackQuery): Promise<boolean> {
