@@ -104,7 +104,8 @@ export class CheckoutService {
   private async assertSlotOpen(slot: TimeSlotModel): Promise<void> {
     const now = new Date();
     const windowDays = await this.settings.get('bookingWindowDays');
-    if (!isBookable(slot, now, businessToday(now), windowDays)) throw new AppError('SLOT_NOT_BOOKABLE');
+    const calendarBlockedAt = await this.slotStats.calendarBlockedAt(this.dataSource.manager, slot.id);
+    if (!isBookable({ ...slot, calendarBlockedAt }, now, businessToday(now), windowDays)) throw new AppError('SLOT_NOT_BOOKABLE');
     if ((await this.slotStats.countActive(this.dataSource.manager, slot.id)) >= slot.capacity) throw new AppError('SLOT_FULL');
   }
 

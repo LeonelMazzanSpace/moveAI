@@ -18,10 +18,17 @@ describe('booking rules', () => {
   });
 
   it('checks the booking window in business dates', () => {
-    const slot = { startsAt: new Date('2026-10-27T00:00:00.000Z'), cancelledAt: null }; // 26/10 21:00 local
+    const slot = { startsAt: new Date('2026-10-27T00:00:00.000Z'), cancelledAt: null, calendarBlockedAt: null }; // 26/10 21:00 local
     expect(isBookable(slot, new Date('2026-10-12T15:00:00.000Z'), '2026-10-12', 14)).toBe(true);
     expect(isBookable(slot, new Date('2026-10-12T15:00:00.000Z'), '2026-10-11', 14)).toBe(false);
     expect(isBookable({ ...slot, cancelledAt: new Date() }, new Date('2026-10-12T15:00:00.000Z'), '2026-10-12', 14)).toBe(false);
+  });
+
+  it('never lets a slot busy in Google Calendar be booked (D94)', () => {
+    const slot = { startsAt: new Date('2026-10-14T13:00:00.000Z'), cancelledAt: null, calendarBlockedAt: null };
+    const now = new Date('2026-10-12T15:00:00.000Z');
+    expect(isBookable(slot, now, '2026-10-12', 14)).toBe(true);
+    expect(isBookable({ ...slot, calendarBlockedAt: now }, now, '2026-10-12', 14)).toBe(false);
   });
 });
 
@@ -29,8 +36,9 @@ describe('booking rules edge cases', () => {
   const now = new Date('2026-10-12T15:00:00.000Z');
 
   it('never lets a started slot be booked', () => {
-    expect(isBookable({ startsAt: now, cancelledAt: null }, now, '2026-10-12', 14)).toBe(false);
-    expect(isBookable({ startsAt: new Date(now.getTime() + 1), cancelledAt: null }, now, '2026-10-12', 14)).toBe(true);
+    expect(isBookable({ startsAt: now, cancelledAt: null, calendarBlockedAt: null }, now, '2026-10-12', 14)).toBe(false);
+    expect(isBookable({ startsAt: new Date(now.getTime() + 1), cancelledAt: null, calendarBlockedAt: null }, now, '2026-10-12', 14))
+      .toBe(true);
   });
 
   it('only lets clients cancel confirmed bookings', () => {

@@ -49,6 +49,10 @@ export const ERROR_CODES = {
   CHECKIN_NOT_FOUND: { status: 404, message: 'El check-in no existe.' },
   CHECKIN_ALREADY_ANSWERED: { status: 409, message: 'Este check-in ya fue respondido.' },
   JOB_UNKNOWN: { status: 404, message: 'La automatización no existe.' },
+  CALENDAR_NOT_CONFIGURED: { status: 409, message: 'La conexión con Google Calendar no está configurada.' },
+  CALENDAR_NOT_CONNECTED: { status: 409, message: 'Primero conectá una cuenta de Google Calendar.' },
+  CALENDAR_INVALID_CALENDAR: { status: 400, message: 'Elegí un calendario de la lista.' },
+  CALENDAR_PROVIDER_ERROR: { status: 502, message: 'Google Calendar no respondió. Probá de nuevo en un rato.' },
 } as const satisfies Record<string, { status: number; message: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

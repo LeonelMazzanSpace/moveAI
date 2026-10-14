@@ -27,6 +27,9 @@ export class TimeSlot {
   @Column({ type: 'uuid', nullable: true }) templateId: string | null;
   @ManyToOne(() => ScheduleTemplate, { nullable: true }) @JoinColumn({ name: 'template_id' }) template: ScheduleTemplate | null;
   @Column({ type: 'timestamptz', nullable: true }) cancelledAt: Date | null;
+  // D94: busy in the connected Google Calendar (written by the calendar module); not bookable while set.
+  @Index({ where: `"calendar_blocked_at" IS NOT NULL` })
+  @Column({ type: 'timestamptz', nullable: true }) calendarBlockedAt: Date | null;
   @CreateDateColumn({ type: 'timestamptz' }) createdAt: Date;
   @UpdateDateColumn({ type: 'timestamptz' }) updatedAt: Date;
 }
