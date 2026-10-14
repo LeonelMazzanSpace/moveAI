@@ -68,6 +68,11 @@ export interface PlanUpdateBody {
 
 export interface PublicSettingsDto { cancelLimitHours: number; bookingWindowDays: number; }
 
+export interface ContactInfoDto {
+  address: string; hours: string; whatsapp: string; instagram: string; email: string; mapsUrl: string;
+}
+export interface StaffContactInfoDto extends ContactInfoDto { staffNotificationsEmail: string; }
+
 export interface SettingsDto {
   cancelLimitHours: number; bookingWindowDays: number; pendingPaymentMinutes: number; reconcileAfterMinutes: number;
   expiringSoonDays: number; noAttendanceDays: number; prolongedInactivityDays: number; frequencyDropRatio: number;
