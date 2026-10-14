@@ -10,6 +10,7 @@ export interface NavItem {
 
 export const PUBLIC_NAV_ITEMS: NavItem[] = [
   { label: 'Inicio', href: '/', exact: true },
+  { label: 'Equipo', href: '/#equipo', exact: true },
   { label: 'Performance', href: '/performance' },
   { label: 'Rehab', href: '/rehab' },
   { label: 'Recovery', href: '/recovery' },

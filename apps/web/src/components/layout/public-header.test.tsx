@@ -27,6 +27,7 @@ describe('PublicHeader', () => {
     expect(screen.getByRole('link', { name: 'Reservar' })).toHaveAttribute('href', '/reservar');
     const links: [string, string][] = [
       ['Inicio', '/'],
+      ['Equipo', '/#equipo'],
       ['Performance', '/performance'],
       ['Rehab', '/rehab'],
       ['Recovery', '/recovery'],

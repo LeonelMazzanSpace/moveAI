@@ -72,8 +72,8 @@ export default function PerformancePage() {
       <section>
         <PageContainer className="pb-16 pt-6">
           <div className="rounded border border-border bg-soft px-5 py-4 text-xs leading-relaxed text-muted-foreground">
-            <span className="font-semibold text-foreground">Plan vencido:</span> la plataforma bloquea nuevas reservas y te
-            orienta hacia el proceso de renovación.
+            <span className="font-semibold text-foreground">Plan vigente:</span> para reservar necesitás un plan activo en la
+            fecha del turno. Si tu plan vence, renovalo desde tu perfil para seguir reservando.
           </div>
         </PageContainer>
       </section>
