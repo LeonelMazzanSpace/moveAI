@@ -27,6 +27,11 @@ function normalize(next: string): string {
   return `${normalizePathname(rawPathname)}${next.slice(rawPathname.length)}`;
 }
 
+export function isProtectedPath(path: string): boolean {
+  const pathname = normalizePathname(path.split(/[?#]/)[0]);
+  return matchesRoute(pathname, '/staff') || CLIENT_ONLY_ROUTES.some((route) => matchesRoute(pathname, route));
+}
+
 export function safeNextPath(rawNext: string | null | undefined, role: Role): string | null {
   if (!rawNext || !isInternal(rawNext)) return null;
 
