@@ -11,9 +11,8 @@
 //   MANUAL_STAFF_EMAIL      (opcional) default staff@example.com
 //   WEB_URL                 (obligatoria) origen de TU web, por ejemplo http://localhost:3268
 //   API_URL                 (obligatoria) URL de TU API con /api, por ejemplo http://localhost:3168/api
-//   (sin valor por defecto: se rechazan los puertos 3000 y 3001, los de la app de desarrollo, salvo con
-//   MANUAL_ALLOW_DEV_PORTS=1. WEB_URL y API_URL tienen que ser locales: localhost, 127.0.0.1 o ::1; el script imprime el
-//   destino antes de empezar)
+//   (sin valor por defecto: se rechazan siempre los puertos 3000 y 3001, los de la app de desarrollo, sin excepción.
+//   WEB_URL y API_URL tienen que ser locales: localhost, 127.0.0.1 o ::1; el script imprime el destino antes de empezar)
 //
 // Las capturas se toman primero en un directorio temporal. Solo si salieron todas (EXPECTED_IMAGE_COUNT) se arma una
 // carpeta nueva junto a docs/manual/img/ y se la renombra en su lugar (nombres estables; arquitectura.png y cualquier
@@ -67,8 +66,8 @@ function assertLocalTarget(name, value, example) {
   if (!LOCAL_HOSTS.has(url.hostname.toLowerCase())) {
     throw new Error(`${name} no es local: las capturas solo se toman contra una API y una web locales.`);
   }
-  if (PROTECTED_PORTS.has(url.port) && process.env.MANUAL_ALLOW_DEV_PORTS !== '1') {
-    throw new Error(`${name} apunta al puerto ${url.port}, el de la app de desarrollo: usá los puertos de tu propia API y web (o MANUAL_ALLOW_DEV_PORTS=1 si la app de esos puertos es la tuya y es de demostración).`);
+  if (PROTECTED_PORTS.has(url.port)) {
+    throw new Error(`${name} apunta al puerto ${url.port}, el de la app de desarrollo: usá los puertos de tu propia API y web.`);
   }
 }
 

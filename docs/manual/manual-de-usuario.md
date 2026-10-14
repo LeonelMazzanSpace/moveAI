@@ -88,11 +88,13 @@ Esta sección es el camino más corto para ver la plataforma funcionando en tu c
    ```bash
    printf 'Contraseña del staff: '; read -rs MANUAL_STAFF_PASSWORD && export MANUAL_STAFF_PASSWORD; echo
    printf 'Contraseña de los clientes: '; read -rs MANUAL_CLIENT_PASSWORD && export MANUAL_CLIENT_PASSWORD; echo
-   export API_URL=http://localhost:3001/api WEB_URL=http://localhost:3000 MANUAL_ALLOW_DEV_PORTS=1
+   export API_URL=http://localhost:3001/api WEB_URL=http://localhost:3000
    pnpm manual:demo-data
    ```
 
-   `API_URL` y `WEB_URL` son **obligatorias**: los scripts del manual no tienen valor por defecto y **rechazan los puertos 3000 y 3001** (los de la app de desarrollo de quien programa en el repositorio) para no escribir sobre datos reales por error. `MANUAL_ALLOW_DEV_PORTS=1` confirma que en esos puertos corre **tu** copia de demostración, como en esta guía; con otros puertos (por ejemplo, API en 3168 y web en 3268) no hace falta.
+   `API_URL` y `WEB_URL` son **obligatorias**: los scripts del manual no tienen valor por defecto y **rechazan los puertos 3000 y 3001** (los de la app de desarrollo de quien programa en el repositorio) para no escribir sobre datos reales por error. Con otros puertos (por ejemplo, API en 3168 y web en 3268) no hace falta nada más.
+
+   Solo para `manual:demo-data`, y solo si en 3000 y 3001 corre **tu** copia de esta guía, se puede agregar `MANUAL_ALLOW_DEV_PORTS=1` a ese comando: solo en tu copia local de desarrollo, nunca contra una base con datos reales. `manual:screenshots` y `responsive:audit` no tienen esta excepción y rechazan 3000 y 3001 siempre.
 
    El script comprueba que Docker y la base responden, imprime la **base destino** antes de escribir (`Base destino: move …`) y se **niega a cargar** datos si `DB_HOST`, `API_URL` o `WEB_URL` no son locales (localhost, 127.0.0.1 o ::1). Además de clientes, reservas, pagos y alertas, carga un email de avisos del staff de ejemplo, dos débitos automáticos simulados y la marca "ocupado en Google Calendar" en un turno de Rehab (ver la tabla de abajo). Tarda unos segundos. Solo se puede cargar **una vez por base**: si ya hay datos de demostración, avisa y no hace nada (para repetirlo, usá una base nueva: ver [Regenerar este manual](#regenerar-este-manual)). Las fechas son relativas al día de la carga (planes que vencen en unos días, asistencias de las últimas semanas, turnos de hoy).
 
@@ -131,7 +133,7 @@ Las cuentas de los invitados (`paula.rivero` y `mateo.lemos`) **no pueden ingres
 - **La API no arranca y el log dice qué variable falta o es inválida:** el paso 2 no se hizo en esa consola, o se editó un valor. `PORT` y `DB_PORT` aceptan solo dígitos (1 a 65535) y `DB_SSL` solo `true` o `false`.
 - **`manual:demo-data` dice que no puede conectar a la base:** Docker no está abierto o el contenedor `move-postgres` no está levantado (paso 3).
 - **`manual:demo-data` dice "Ya hay datos de demostración":** la base ya se cargó; usá una base nueva (ver arriba).
-- **`manual:demo-data` o `manual:screenshots` dicen que falta `API_URL` o `WEB_URL`, o que apuntan al puerto de la app de desarrollo:** exportalas con los puertos de tu API y tu web (paso 8). En los puertos 3000 y 3001 hace falta además `MANUAL_ALLOW_DEV_PORTS=1`.
+- **`manual:demo-data` o `manual:screenshots` dicen que falta `API_URL` o `WEB_URL`, o que apuntan al puerto de la app de desarrollo:** exportalas con los puertos de tu API y tu web (paso 8). En 3000 y 3001 solo `manual:demo-data` admite la excepción descrita en ese paso.
 - **El puerto 3000 o 3001 está ocupado:** cerrá la otra aplicación o cambiá `PORT` (API) y el puerto de la web, y mantené `WEB_URL`, `API_PUBLIC_URL` y `NEXT_PUBLIC_API_URL` apuntando a esos puertos.
 
 ## Estado actual frente a MOVE.pdf
@@ -628,7 +630,7 @@ Elegí el día (con las flechas o el calendario) y el servicio (**Performance**,
 
 En el celular cada alumno se muestra como una **tarjeta** (nombre, plan, última asistencia y estado) con **P**, **A**, **NS** y **Cancelar** a la vista, sin deslizar la tabla hacia los costados.
 
-**Google Calendar.** Un turno de Rehab que la agenda de Google marca como ocupado muestra **Ocupado en Google Calendar** y no se puede reservar. Si ese turno ya tenía una reserva, la marca es **Conflicto con Google Calendar**: la reserva **no se cancela sola**, el staff recibe un email para resolverlo con el cliente . En la captura, el turno de Federico está marcado a mano en los datos de demostración, sin Google conectado (ver [Calendario](#calendario)).
+**Google Calendar.** Un turno de Rehab que la agenda de Google marca como ocupado muestra **Ocupado en Google Calendar** y no se puede reservar. Si ese turno ya tenía una reserva, la marca es **Conflicto con Google Calendar**: la reserva **no se cancela sola**, el staff recibe un email para resolverlo con el cliente. En la captura, el turno de Federico está marcado a mano en los datos de demostración, sin Google conectado (ver [Calendario](#calendario)).
 
 ![Turno de Rehab en conflicto con Google Calendar](img/50-staff-turnos-conflicto.png)
 
@@ -1219,7 +1221,7 @@ Cuando haya credenciales (hoy el pago y el débito solo se probaron con el simul
 
 **Acceso:** el proyecto de Google Cloud de MOVE (el mismo de [Google OAuth](#google-oauth-inicio-de-sesión-con-google) o uno propio), con permiso para habilitar APIs, editar la pantalla de consentimiento y crear o editar clientes OAuth. Es opcional: sin estas variables, **Configuración → Calendario** avisa "Falta configurar Google en el servidor" y todo lo demás funciona.
 
-**Cómo funciona.** El staff conecta **una** cuenta de Google desde Configuración → Calendario, con un consentimiento propio (distinto del de iniciar sesión con Google, con los permisos `openid email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly`). La API guarda el token de acceso **cifrado** (AES-256-GCM) con `CALENDAR_TOKEN_KEY`; nunca aparece en claro en la base ni en los logs. El `state` de la conexión vence a los 10 minutos y solo vale para el mismo staff.
+**Cómo funciona.** El staff conecta **una** cuenta de Google desde Configuración → Calendario, con un consentimiento propio (distinto del de iniciar sesión con Google, con los permisos `openid email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly`). La API guarda el token de actualización (*refresh token*) **cifrado** (AES-256-GCM) con `CALENDAR_TOKEN_KEY`; nunca aparece en claro en la base ni en los logs. El `state` de la conexión vence a los 10 minutos y solo vale para el mismo staff.
 
 **Pasos:**
 
@@ -1270,7 +1272,7 @@ Cuando haya credenciales (hoy el pago y el débito solo se probaron con el simul
 
 #### Qué emails manda el sistema
 
-Todos salen después de que se guarda la operación, se registran en `email_logs` antes de enviarse y no se repiten (cada uno tiene una clave de idempotencia).
+Todos salen después de que se guarda la operación, se registran en `email_logs` antes de enviarse (salvo los del staff cuando el email de avisos está vacío) y no se repiten (cada uno tiene una clave de idempotencia).
 
 | Email | Asunto | Cuándo |
 |---|---|---|
@@ -1292,7 +1294,7 @@ Todos salen después de que se guarda la operación, se registran en `email_logs
 | `auto-debit-charge-failed` | No pudimos cobrar tu plan de MOVE | Mercado Pago rechazó un cobro del débito automático |
 | `auto-debit-cancelled` | Tu débito automático en MOVE fue cancelado | Se cancela el débito (desde MOVE o desde Mercado Pago); indica hasta cuándo sigue vigente lo pagado |
 
-Los clientes en pausa no reciben emails automáticos de seguimiento; el **recordatorio de turno** sí les llega, porque es un aviso del servicio. Los cuatro emails del staff van a la dirección fija de **Email para avisos del staff** (Configuración → Contacto): si está vacía no se envía nada y tampoco hay error.
+Los clientes en pausa no reciben emails automáticos de seguimiento; el **recordatorio de turno** sí les llega, porque es un aviso del servicio. Los tres emails del staff van a la dirección fija de **Email para avisos del staff** (Configuración → Contacto): si está vacía no se envía nada y tampoco hay error.
 
 #### Pie de contacto y vista previa
 
@@ -1406,7 +1408,7 @@ node scripts/manual/render-diagram.mjs    # solo si cambió docs/manual/arquitec
 pnpm manual:pdf             # genera docs/manual/manual-de-usuario.pdf (A4, imágenes embebidas)
 ```
 
-- **`API_URL` y `WEB_URL` son obligatorias** en los dos scripts: no tienen valor por defecto y los dos rechazan una URL que no sea local (localhost, 127.0.0.1 o ::1) y los puertos 3000 y 3001 (la app de desarrollo), para no escribir ni comprar sobre datos reales. Si en esos puertos corre tu propia copia de demostración (como en [Probar MOVE en local](#probar-move-en-local)), agregá `MANUAL_ALLOW_DEV_PORTS=1`. `manual:screenshots` imprime su destino (`Destino: API …; web …`) antes de empezar.
+- **`API_URL` y `WEB_URL` son obligatorias** en los dos scripts: no tienen valor por defecto y los dos rechazan una URL que no sea local (localhost, 127.0.0.1 o ::1) y los puertos 3000 y 3001 (la app de desarrollo), para no escribir ni comprar sobre datos reales; la única excepción, solo de `manual:demo-data`, está explicada en [Probar MOVE en local](#probar-move-en-local). `manual:screenshots` imprime su destino (`Destino: API …; web …`) antes de empezar.
 - Para cambiar solo el texto o el diagrama no hace falta la base ni la API: alcanza con editar el Markdown (o `arquitectura.html` y correr `render-diagram.mjs`) y correr `pnpm manual:pdf`.
 - `manual:demo-data` hace estas comprobaciones **antes de escribir** nada: `API_URL`, `WEB_URL` y `DB_HOST` (si está definido) son locales, Docker y la base responden (`SELECT 1`), y la base no tiene ya datos de demostración. Imprime la base destino (`Base destino: …`) y, si algo no se cumple, termina con un mensaje claro. La historia (asistencias pasadas y planes que vencen o vencieron) no se puede crear por la API porque no admite reservar ni marcar asistencia en el pasado: esos datos se insertan con SQL en la base de desarrollo mediante `docker exec <contenedor> psql` (contenedor `move-postgres`, o `MANUAL_DB_CONTAINER`), solo para los clientes de demostración.
 - `manual:screenshots` captura primero en un directorio temporal y **reemplaza las imágenes de `docs/manual/img/` solo si salieron todas las capturas esperadas (64: 54 de escritorio y 10 de celular)**: arma una carpeta nueva al lado y la renombra en el lugar de la actual, así que si algo falla las imágenes actuales quedan intactas y nunca queda un juego a medias. No toca `arquitectura.png`. Al agregar o quitar una pantalla hay que actualizar `EXPECTED_IMAGE_COUNT` en `scripts/manual/capture.mjs`.
@@ -1419,7 +1421,7 @@ pnpm manual:pdf             # genera docs/manual/manual-de-usuario.pdf (A4, imá
 
 `pnpm responsive:audit` recorre todas las rutas de la web (públicas, de cliente y de staff, más las seis pestañas de Configuración) a **375×812, 768×1024, 1024×768 y 1440×900** y marca, en cada combinación: scroll horizontal de la página, elementos fuera de la pantalla o cortados, botones, links y campos con área táctil menor a 32×32 px, texto cortado, una ruta que responde con error o termina en otra URL, y el overlay de errores de Next. Donde existe el botón **Abrir menú**, también abre el menú y revisa el panel.
 
-Necesita la API y la web levantadas con los datos de `pnpm manual:demo-data` y las mismas variables que los otros scripts (`MANUAL_STAFF_PASSWORD`, `MANUAL_CLIENT_PASSWORD`, `API_URL` y `WEB_URL`, obligatorias y sin valor por defecto; rechaza los puertos 3000 y 3001):
+Necesita la API y la web levantadas con los datos de `pnpm manual:demo-data` y las mismas variables que los otros scripts (`MANUAL_STAFF_PASSWORD`, `MANUAL_CLIENT_PASSWORD`, `API_URL` y `WEB_URL`, obligatorias y sin valor por defecto; rechaza los puertos 3000 y 3001 sin excepción: `scripts/responsive/audit.mjs` no tiene la opt-in de `manual:demo-data` que explica [Probar MOVE en local](#probar-move-en-local)):
 
 ```bash
 pnpm responsive:audit            # AUDIT_ONLY=/staff/turnos para repetir solo una ruta

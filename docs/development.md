@@ -138,7 +138,7 @@ Los crons corren dentro de la API (los desactiva `SCHEDULER_ENABLED=false`). Par
 curl -X POST http://localhost:3001/api/staff/automations/run/<job> --cookie "<cookie de sesión del staff>"
 ```
 
-Jobs disponibles: `followup-detect`, `checkins-monthly`, `expiry-reminders`, `generate-slots`, `expire-holds`, `reconcile-payments`. La respuesta es `{ job, ran, result }`. Corre aunque `SCHEDULER_ENABLED` sea `false`, usa el mismo lock de Postgres que el cron (no se pisan) y es idempotente: repetirlo el mismo día no duplica alertas ni emails. `checkins-monthly` manual envía los check-ins aunque no sea el primer lunes del mes, pero un cliente recibe como máximo uno por mes calendario.
+Jobs disponibles: `followup-detect`, `checkins-monthly`, `expiry-reminders`, `generate-slots`, `expire-holds`, `reconcile-payments`, `booking-reminders`. La respuesta es `{ job, ran, result }`. Corre aunque `SCHEDULER_ENABLED` sea `false`, usa el mismo lock de Postgres que el cron (no se pisan) y es idempotente: repetirlo el mismo día no duplica alertas ni emails. `checkins-monthly` manual envía los check-ins aunque no sea el primer lunes del mes, pero un cliente recibe como máximo uno por mes calendario.
 
 ## Migraciones
 
