@@ -16,9 +16,11 @@ const escapeText = (value: string): string => value.replace(/[&<>"]/g, (char) =>
 
 mkdirSync(OUTPUT_DIR, { recursive: true });
 
+const renderPreview = <K extends EmailTemplate>(template: K) => renderEmail(template, PREVIEW_FIXTURES[template], footer);
+
 const templates = Object.keys(PREVIEW_FIXTURES) as EmailTemplate[];
 const links = templates.map((template) => {
-  const { subject, html } = renderEmail(template, PREVIEW_FIXTURES[template] as never, footer);
+  const { subject, html } = renderPreview(template);
   writeFileSync(`${OUTPUT_DIR}${template}.html`, html);
   return `<li><a href="${template}.html">${template}</a> — ${escapeText(subject)}</li>`;
 });

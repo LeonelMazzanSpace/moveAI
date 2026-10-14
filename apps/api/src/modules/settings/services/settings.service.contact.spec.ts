@@ -10,7 +10,7 @@ async function failedFields(body: Record<string, unknown>): Promise<string[]> {
 }
 
 const VALID: Record<string, string[]> = {
-  address: ['Máximo Tajes 6397 esquina Beranger', 'x'.repeat(200)],
+  address: ['Máximo Tajes 6397 esquina Beranger', 'x'.repeat(200), 'Calle 😀 1'],
   hours: ['Lunes a viernes · 7:00 – 11:00', 'x'.repeat(200)],
   whatsapp: ['+598 99 140 299', '+59899140299', '+12345678', '+123456789012345', '+598 99 140 299 '],
   instagram: ['@move_strengthconditioning', '@a', '@a.b_c9', `@${'a'.repeat(30)}`],
@@ -20,13 +20,13 @@ const VALID: Record<string, string[]> = {
 };
 
 const INVALID: Record<string, unknown[]> = {
-  address: ['x'.repeat(201), 'a\u0000b', 5, null],
-  hours: ['x'.repeat(201), 'a\u0000b', true, null],
-  whatsapp: ['598 99 140 299', '+1234567', '+1234567890123456', '+598-99-140-299', '+598 99 14a 299', '+', 5, null],
-  instagram: ['move', '@', `@${'a'.repeat(31)}`, '@con espacio', '@con-guion', 5, null],
-  email: ['no-es-email', 'a@b', `${'a'.repeat(250)}@b.com`, 'a\u0000@b.com', 5, null],
-  mapsUrl: ['http://maps.google.com/x', 'maps.google.com/x', 'javascript:alert(1)', `https://x.com/${'a'.repeat(500)}`, 5, null],
-  staffNotificationsEmail: ['no-es-email', `${'a'.repeat(250)}@b.com`, null],
+  address: ['x'.repeat(201), 'a\u0000b', '\ud800', 'a\udc00', 5, null],
+  hours: ['x'.repeat(201), 'a\u0000b', '\ud800', 'a\udc00', true, null],
+  whatsapp: ['598 99 140 299', '+1234567', '+1234567890123456', '+598-99-140-299', '+598 99 14a 299', '+', '+598 99 14\ud800', 5, null],
+  instagram: ['move', '@', `@${'a'.repeat(31)}`, '@con espacio', '@con-guion', '@a\ud800', 5, null],
+  email: ['no-es-email', 'a@b', `${'a'.repeat(250)}@b.com`, 'a\u0000@b.com', 'a\ud800@b.com', 5, null],
+  mapsUrl: ['http://maps.google.com/x', 'maps.google.com/x', 'javascript:alert(1)', `https://x.com/${'a'.repeat(500)}`, 'https://x.com/\ud800', 5, null],
+  staffNotificationsEmail: ['no-es-email', `${'a'.repeat(250)}@b.com`, 'a\udc00@b.com', null],
 };
 
 const pairs = (table: Record<string, readonly unknown[]>) =>

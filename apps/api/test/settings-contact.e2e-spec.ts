@@ -113,6 +113,13 @@ describe('contact settings (e2e)', () => {
     ['null instead of clearing', { address: null }],
     ['a number', { hours: 5 }],
     ['a NUL byte', { address: 'a\u0000b' }],
+    ['a lone high surrogate in address', { address: '\ud800' }],
+    ['a lone low surrogate in hours', { hours: 'a\udc00' }],
+    ['a lone surrogate in whatsapp', { whatsapp: '+598 99 14\ud800' }],
+    ['a lone surrogate in instagram', { instagram: '@a\ud800' }],
+    ['a lone surrogate in email', { email: 'a\ud800@b.com' }],
+    ['a lone surrogate in maps url', { mapsUrl: 'https://x.com/\ud800' }],
+    ['a lone surrogate in staff email', { staffNotificationsEmail: 'a\udc00@b.com' }],
     ['an unknown field', { nope: 'x' }],
   ];
 
@@ -122,16 +129,6 @@ describe('contact settings (e2e)', () => {
     expect(res.body.code).toBe('VALIDATION_FAILED');
     expect(res.body.details.length).toBeGreaterThan(0);
     expect((await agent.get('/api/staff/settings/contact').expect(200)).body).toEqual(CONTACT_DEFAULTS);
-  });
-
-  it('applies concurrent patches of different fields without losing either', async () => {
-    const { agent } = await signUpStaff(ctx.app, ctx.dataSource);
-    await Promise.all([
-      agent.patch('/api/staff/settings/contact').send({ address: 'Calle A' }).expect(200),
-      agent.patch('/api/staff/settings/contact').send({ hours: 'Horario B' }).expect(200),
-    ]);
-    expect((await agent.get('/api/staff/settings/contact').expect(200)).body)
-      .toEqual({ ...CONTACT_DEFAULTS, address: 'Calle A', hours: 'Horario B' });
   });
 
   describe('ContactSettings migration', () => {

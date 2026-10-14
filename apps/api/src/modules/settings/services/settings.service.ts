@@ -91,12 +91,8 @@ export class SettingsService {
     const changes = definedEntries<StaffContactInfo>(patch);
     return this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(Setting);
-      // Locks the contact rows so concurrent patches apply one after another.
-      const rows = await repository.find({
-        select: { key: true, value: true },
-        where: { key: In(CONTACT_KEYS) },
-        lock: { mode: 'pessimistic_write' },
-      });
+      // No row lock: contact fields have no cross-field rule and each patch upserts only the keys it changes.
+      const rows = await repository.find({ select: { key: true, value: true }, where: { key: In(CONTACT_KEYS) } });
       const next = { ...toContact(rows), ...changes };
 
       const upserts = (Object.keys(changes) as ContactField[]).map((field) => ({

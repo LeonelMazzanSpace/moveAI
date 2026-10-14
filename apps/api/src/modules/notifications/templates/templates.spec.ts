@@ -191,8 +191,10 @@ describe('email footer', () => {
 });
 
 describe('preview fixtures', () => {
+  const renderFixture = <K extends EmailTemplate>(template: K) => renderEmail(template, PREVIEW_FIXTURES[template]);
+
   it.each(Object.keys(PREVIEW_FIXTURES) as EmailTemplate[])('%s renders with its fixture', (template) => {
-    const email = renderEmail(template, PREVIEW_FIXTURES[template] as never);
+    const email = renderFixture(template);
     expect(email.subject.length).toBeGreaterThan(0);
     expect(email.html).toContain('<!DOCTYPE html>');
   });
