@@ -98,6 +98,7 @@ describe('automatic debit (e2e, simulator)', () => {
 
     // Barrier: a separate transaction holds the per-client lock of the service, so both checkouts are in flight
     // before either reads the active debits. Without the lock the second insert hits the partial unique index.
+    // The lock guarantees that the latest checkout replaces the previous pending one instead of failing with 409.
     it('never leaves two active debits of the same service when two checkouts race', async () => {
       const { agent, userId } = await signUpClient(ctx.app);
       const gate = ctx.dataSource.createQueryRunner();

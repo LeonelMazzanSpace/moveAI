@@ -179,7 +179,7 @@ export class PaymentsService {
       for (const { externalReference } of pending) {
         if (await this.reconcileOne(externalReference)) applied += 1;
       }
-      applied += await this.reconcileAutoDebits();
+      applied += await this.reconcileAutoDebits(now);
     }
     const expired = (await this.expireStale(now)) + (await this.autoDebits.expirePending(now));
     return { applied, expired };
@@ -510,20 +510,28 @@ export class PaymentsService {
     return this.applyAutoDebitCharge(debit, payment);
   }
 
-  // A Mercado Pago failure for one debit must not stop the others. Payments already stored are not read again.
-  private async reconcileAutoDebits(): Promise<number> {
+  // Active debits and those cancelled in the last 40 days: their state is read again (a debit MOVE closed but Mercado
+  // Pago still holds is cancelled there again, I-1) and their approved charges are applied, also on a cancelled debit,
+  // without changing its status (I-2, D108). A Mercado Pago failure on one step or one debit must not stop the others.
+  // Payments already stored are not read again.
+  private async reconcileAutoDebits(now: Date): Promise<number> {
     let applied = 0;
-    for (const debit of await this.autoDebits.listToReconcile()) {
+    const cancelledSince = new Date(now.getTime() - AUTO_DEBIT_RECONCILE_LOOKBACK_DAYS * 24 * 60 * MINUTE_MS);
+    for (const debit of await this.autoDebits.listToReconcile(cancelledSince)) {
+      if (!debit.mpPreapprovalId) continue;
       try {
-        if (!debit.mpPreapprovalId) continue;
         await this.autoDebits.refresh(await this.mercadoPago.getPreapproval(debit.mpPreapprovalId));
+      } catch {
+        this.logger.warn(`reconcile refresh failed auto debit=${debit.id}`);
+      }
+      try {
         const charges = await this.mercadoPago.searchAuthorizedPayments(debit.mpPreapprovalId, AUTO_DEBIT_RECONCILE_LOOKBACK_DAYS);
         for (const charge of charges) {
           if (charge.paymentId && (await this.isPaymentStored(charge.paymentId))) continue;
           if (await this.applyCharge(charge)) applied += 1;
         }
       } catch {
-        this.logger.warn(`reconcile failed auto debit=${debit.id}`);
+        this.logger.warn(`reconcile charges failed auto debit=${debit.id}`);
       }
     }
     return applied;

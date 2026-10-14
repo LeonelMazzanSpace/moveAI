@@ -133,7 +133,9 @@ export class AutoDebitsService {
         throw error;
       });
 
-    for (const debit of replaced) await this.cancelReplacedAtProvider(debit);
+    for (const debit of replaced) {
+      if (debit.mpPreapprovalId) await this.cancelAtProviderBestEffort(debit.id, debit.mpPreapprovalId);
+    }
     const initPoint = await this.startPreapproval(created, plan, userId, frequency, startDate);
     return { externalReference: created.externalReference, initPoint };
   }
@@ -180,6 +182,12 @@ export class AutoDebitsService {
     if (!debit) {
       this.logger.warn(`preapproval ${preapproval.id} ignored: unknown auto debit`);
       return null;
+    }
+    // I-1: MOVE closed it but Mercado Pago still holds it (its cancellation there failed): cancel it there again so it
+    // stops charging. Charges it already collected are still applied (D108); the debit stays as MOVE closed it.
+    if (debit.status === 'cancelled') {
+      if (preapproval.status !== 'cancelled') await this.cancelAtProviderBestEffort(debit.id, preapproval.id);
+      return debit;
     }
     if (preapproval.status === 'paused') this.logger.warn(`auto debit ${debit.id} paused in Mercado Pago preapproval=${preapproval.id}`);
     if (preapproval.status === 'authorized' || preapproval.status === 'paused') {
@@ -236,28 +244,29 @@ export class AutoDebitsService {
     return new Set(rows.map((row) => row.userId));
   }
 
-  // Debits whose state and charges the reconciliation reads from Mercado Pago.
-  async listToReconcile(): Promise<AutoDebitModel[]> {
+  // Debits whose state and charges the reconciliation reads from Mercado Pago: the active ones, and those cancelled
+  // since `cancelledSince`, which Mercado Pago may still hold (I-1) or whose last charges may not be applied yet (I-2).
+  async listToReconcile(cancelledSince: Date): Promise<AutoDebitModel[]> {
     return this.dataSource.query(
       `SELECT ${MODEL_COLUMNS} ${FROM_AUTO_DEBITS}
-       WHERE ad.status IN ('pending','authorized') AND ad.mp_preapproval_id IS NOT NULL ORDER BY ad.created_at`,
+       WHERE ad.mp_preapproval_id IS NOT NULL
+         AND (ad.status IN ('pending','authorized') OR (ad.status = 'cancelled' AND ad.cancelled_at > $1))
+       ORDER BY ad.created_at`,
+      [cancelledSince],
     );
   }
 
-  // A debit left pending for more than 24 h is cancelled in Mercado Pago and closed as `expired`, without email. If
-  // Mercado Pago cannot cancel it, it is retried on the next run. Returns how many debits expired.
+  // A debit left pending for more than 24 h is cancelled in Mercado Pago and closed as `expired`, without email. Mercado
+  // Pago is read first: a debit it no longer reports pending takes that state instead (M-1). If Mercado Pago cannot be
+  // read or cannot cancel it, it is retried on the next run. Returns how many debits expired.
   async expirePending(now: Date): Promise<number> {
     const pending: AutoDebitModel[] = await this.dataSource.query(
       `SELECT ${MODEL_COLUMNS} ${FROM_AUTO_DEBITS} WHERE ad.status = 'pending' ORDER BY ad.created_at`,
     );
     let expired = 0;
     for (const debit of pending.filter((row) => isPendingExpired(row.createdAt, now))) {
-      try {
-        if (debit.mpPreapprovalId && !this.config.simulatorEnabled) await this.cancelAtProvider(debit.mpPreapprovalId);
-      } catch {
-        this.logger.warn(`auto debit ${debit.id} not expired: Mercado Pago did not cancel it`);
-        continue;
-      }
+      const preapprovalId = this.config.simulatorEnabled ? null : debit.mpPreapprovalId;
+      if (preapprovalId && !(await this.cancelStalePendingAtProvider(debit.id, preapprovalId))) continue;
       if (await this.markCancelled(this.dataSource.manager, debit.id, 'expired', 'pending')) expired += 1;
     }
     return expired;
@@ -363,13 +372,31 @@ export class AutoDebitsService {
     }
   }
 
-  // Best effort: a replaced pending subscription left open in Mercado Pago expires by itself on the next runs.
-  private async cancelReplacedAtProvider(debit: AutoDebitModel): Promise<void> {
-    if (!debit.mpPreapprovalId || this.config.simulatorEnabled) return;
+  // Best effort for a debit MOVE already closed: if Mercado Pago does not cancel it now, `refresh` and the
+  // reconciliation cancel it again while they still see it there (I-1).
+  private async cancelAtProviderBestEffort(debitId: string, preapprovalId: string): Promise<void> {
+    if (this.config.simulatorEnabled) return;
     try {
-      await this.cancelAtProvider(debit.mpPreapprovalId);
+      await this.cancelAtProvider(preapprovalId);
     } catch {
-      this.logger.warn(`auto debit ${debit.id} replaced but not cancelled in Mercado Pago`);
+      this.logger.warn(`auto debit ${debitId} closed in MOVE but not cancelled in Mercado Pago preapproval=${preapprovalId}`);
+    }
+  }
+
+  // Returns whether the stale pending debit may be closed as expired. A debit Mercado Pago no longer reports pending
+  // takes its real state through `refresh` instead.
+  private async cancelStalePendingAtProvider(debitId: string, preapprovalId: string): Promise<boolean> {
+    try {
+      const current = await this.mercadoPago.getPreapproval(preapprovalId);
+      if (current.status !== 'pending') {
+        await this.refresh(current);
+        return false;
+      }
+      await this.cancelAtProvider(preapprovalId);
+      return true;
+    } catch {
+      this.logger.warn(`auto debit ${debitId} not expired: Mercado Pago could not be read or did not cancel it`);
+      return false;
     }
   }
 

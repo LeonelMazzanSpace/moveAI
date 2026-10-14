@@ -418,5 +418,130 @@ describe('automatic debit with Mercado Pago (e2e, fake provider)', () => {
       await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 1, expired: 0 });
       expect(await debitRow(third.ref)).toMatchObject({ status: 'authorized' });
     });
+
+    it('checks Mercado Pago before expiring an old pending debit whose refresh failed (M-1)', async () => {
+      const { ref, preapprovalId } = await startDebit();
+      await ds.query(`UPDATE auto_debits SET created_at = now() - interval '25 hours' WHERE external_reference = $1`, [ref]);
+      authorizeInProvider(preapprovalId);
+      fake.getPreapproval.mockRejectedValueOnce(new Error('down'));
+      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 0 });
+      expect(fake.cancelPreapproval).not.toHaveBeenCalled();
+      expect(preapprovals.get(preapprovalId)!.status).toBe('authorized');
+      expect(await debitRow(ref)).toMatchObject({ status: 'authorized' });
+    });
+
+    it('leaves an old pending debit for the next run when Mercado Pago cannot be read', async () => {
+      const { ref } = await startDebit();
+      await ds.query(`UPDATE auto_debits SET created_at = now() - interval '25 hours' WHERE external_reference = $1`, [ref]);
+      fake.getPreapproval.mockRejectedValue(new Error('down'));
+      try {
+        await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 0 });
+      } finally {
+        fake.getPreapproval.mockImplementation(async (id: string) => preapprovals.get(id)!);
+      }
+      expect(fake.cancelPreapproval).not.toHaveBeenCalled();
+      expect(await debitRow(ref)).toMatchObject({ status: 'pending' });
+    });
+  });
+
+  describe('debits cancelled in MOVE that Mercado Pago still holds', () => {
+    // I-1: the replaced pending debit A could not be cancelled in Mercado Pago, and the client authorizes it later.
+    const replaceWithFailedCancel = async () => {
+      const first = await startDebit();
+      fake.cancelPreapproval.mockRejectedValueOnce(new Error('down'));
+      const second = await startDebit(first.agent);
+      expect(await debitRow(first.ref)).toMatchObject({ status: 'cancelled', cancelReason: 'client' });
+      expect(preapprovals.get(first.preapprovalId)!.status).toBe('pending');
+      return { first, second };
+    };
+
+    it('cancels it again in Mercado Pago when a notification reports it authorized', async () => {
+      const { first, second } = await replaceWithFailedCancel();
+      authorizeInProvider(first.preapprovalId);
+      await notify('subscription_preapproval', first.preapprovalId).expect(200);
+      expect(fake.cancelPreapproval).toHaveBeenLastCalledWith(first.preapprovalId);
+      expect(preapprovals.get(first.preapprovalId)!.status).toBe('cancelled');
+      expect(await debitRow(first.ref)).toMatchObject({ status: 'cancelled', cancelReason: 'client' });
+      expect(await debitRow(second.ref)).toMatchObject({ status: 'pending' });
+      expect(await count(`email_logs WHERE template = 'auto-debit-cancelled'`)).toBe(0);
+    });
+
+    it('cancels it in the reconciliation, applies what it already collected once, and nothing after that', async () => {
+      const { first } = await replaceWithFailedCancel();
+      authorizeInProvider(first.preapprovalId);
+      chargeInProvider({ chargeId: '9960', preapprovalId: first.preapprovalId, paymentId: '596' });
+
+      await app.get(PaymentsService).reconcilePending(new Date());
+      expect(fake.cancelPreapproval).toHaveBeenLastCalledWith(first.preapprovalId);
+      expect(preapprovals.get(first.preapprovalId)!.status).toBe('cancelled');
+      expect(await debitRow(first.ref)).toMatchObject({ status: 'cancelled', cancelReason: 'client' });
+      expect(await count(`purchases WHERE auto_debit_id = $1`, [(await debitRow(first.ref)).id])).toBe(1);
+
+      fake.cancelPreapproval.mockClear();
+      await app.get(PaymentsService).reconcilePending(new Date());
+      expect(fake.cancelPreapproval).not.toHaveBeenCalled();
+      expect(await count('purchases')).toBe(1);
+      expect(await count('subscriptions')).toBe(1);
+    });
+
+    it('keeps trying when Mercado Pago fails again, and stops looking after 40 days', async () => {
+      const { first } = await replaceWithFailedCancel();
+      authorizeInProvider(first.preapprovalId);
+      fake.cancelPreapproval.mockRejectedValueOnce(new Error('down'));
+      await app.get(PaymentsService).reconcilePending(new Date());
+      expect(preapprovals.get(first.preapprovalId)!.status).toBe('authorized');
+      await app.get(PaymentsService).reconcilePending(new Date());
+      expect(preapprovals.get(first.preapprovalId)!.status).toBe('cancelled');
+
+      authorizeInProvider(first.preapprovalId);
+      await ds.query(`UPDATE auto_debits SET cancelled_at = now() - interval '41 days' WHERE external_reference = $1`, [first.ref]);
+      fake.getPreapproval.mockClear();
+      await app.get(PaymentsService).reconcilePending(new Date());
+      expect(fake.getPreapproval).not.toHaveBeenCalledWith(first.preapprovalId);
+    });
+
+    // I-2: without webhooks, a charge approved before the client cancels is only seen by the reconciliation.
+    it('applies once a charge approved before the client cancelled, seen only by the reconciliation', async () => {
+      const { agent, ref, preapprovalId } = await startDebit();
+      authorizeInProvider(preapprovalId);
+      await notify('subscription_preapproval', preapprovalId).expect(200);
+      chargeInProvider({ chargeId: '9970', preapprovalId, paymentId: '597' });
+      const { id } = await debitRow(ref);
+      await agent.post(`/api/me/auto-debits/${id}/cancel`).expect(200);
+
+      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 1, expired: 0 });
+      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 0 });
+      expect(await count('purchases')).toBe(1);
+      expect(await count(`email_logs WHERE template = 'purchase-approved'`)).toBe(1);
+      expect(await debitRow(ref)).toMatchObject({ status: 'cancelled', cancelReason: 'client' });
+      const subs = await agent.get('/api/me/subscriptions').expect(200);
+      expect(subs.body.performance).toMatchObject({ startsOn: today(), endsOn: addMonths(today(), 1) });
+    });
+
+    it('applies a charge approved after the cancellation once its payment leaves in_process', async () => {
+      const { agent, ref, preapprovalId } = await startDebit();
+      authorizeInProvider(preapprovalId);
+      await notify('subscription_preapproval', preapprovalId).expect(200);
+      chargeInProvider({ chargeId: '9980', preapprovalId, paymentId: '598', status: 'in_process' });
+      const { id } = await debitRow(ref);
+      await agent.post(`/api/me/auto-debits/${id}/cancel`).expect(200);
+      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 0, expired: 0 });
+
+      chargeInProvider({ chargeId: '9980', preapprovalId, paymentId: '598', status: 'approved' });
+      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 1, expired: 0 });
+      expect(await count('purchases')).toBe(1);
+      expect(await debitRow(ref)).toMatchObject({ status: 'cancelled' });
+    });
+
+    it('applies the charges of a cancelled debit even when Mercado Pago cannot report its state', async () => {
+      const { agent, ref, preapprovalId } = await startDebit();
+      authorizeInProvider(preapprovalId);
+      await notify('subscription_preapproval', preapprovalId).expect(200);
+      chargeInProvider({ chargeId: '9990', preapprovalId, paymentId: '599' });
+      const { id } = await debitRow(ref);
+      await agent.post(`/api/me/auto-debits/${id}/cancel`).expect(200);
+      fake.getPreapproval.mockRejectedValueOnce(new Error('down'));
+      await expect(app.get(PaymentsService).reconcilePending(new Date())).resolves.toEqual({ applied: 1, expired: 0 });
+    });
   });
 });
