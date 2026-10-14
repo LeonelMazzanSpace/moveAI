@@ -289,6 +289,28 @@ describe('checkout (e2e)', () => {
       const [{ count }] = await ctx.dataSource.query(`SELECT count(*)::int AS count FROM users`);
       expect(count).toBe(0);
     });
+
+    it.each([['high surrogate', '\ud800'], ['low surrogate', 'a\udc00']])(
+      'rejects a lone %s in the guest name, email or phone with VALIDATION_FAILED', async (_label, bad) => {
+        const slotId = await rehabSlot();
+        const planId = await planIdBySlug(ctx.dataSource, 'rehab-evaluacion');
+        const overrides = [{ name: `Ana ${bad}` }, { name: bad }, { email: `${bad}@x.com` }, { email: bad }, { phone: `0991${bad}2345` }];
+        for (const override of overrides) {
+          const res = await http().post('/api/checkout/booking').send({ planId, timeSlotId: slotId, guest: { ...guest(), ...override } });
+          expect(res.status, JSON.stringify(override)).toBe(400);
+          expect(res.body.code, JSON.stringify(override)).toBe('VALIDATION_FAILED');
+        }
+        const [{ count }] = await ctx.dataSource.query(`SELECT count(*)::int AS count FROM users`);
+        expect(count).toBe(0);
+      });
+
+    it('still accepts a guest name with a valid surrogate pair (emoji)', async () => {
+      const slotId = await rehabSlot();
+      const planId = await planIdBySlug(ctx.dataSource, 'rehab-evaluacion');
+      await http().post('/api/checkout/booking').send({ planId, timeSlotId: slotId, guest: { ...guest(), name: 'Ana 😀' } }).expect(201);
+      const [row] = await ctx.dataSource.query(`SELECT name FROM users`);
+      expect(row.name).toBe('Ana 😀');
+    });
   });
 
   describe('purchase status', () => {
