@@ -6,7 +6,10 @@
 //   - elementos visibles fuera del viewport, o cortados por un contenedor con `overflow: hidden` (los contenedores con su
 //     propio scroll horizontal están bien);
 //   - botones, links (no en línea dentro de un texto) y controles de formulario con área menor a 32×32 px;
-//   - texto cortado por `overflow` (recorte o puntos suspensivos).
+//   - texto cortado por `overflow` (recorte o puntos suspensivos), esté el texto en el elemento o en alguno de sus hijos;
+//   - `ruta-inesperada`: la ruta respondió con estado >= 400, o terminó en otra URL que la pedida (salvo las que redirigen
+//     por diseño);
+//   - `error-overlay`: el diálogo de errores de Next quedó abierto en la página.
 // Además, donde el botón "Abrir menú" está visible, abre el menú y revisa el panel abierto.
 // Guarda una captura PNG de cada combinación en `tmp/responsive/` (ignorado por git) y sale con código 1 si hay hallazgos.
 //
@@ -175,6 +178,15 @@ function collectFindings({ minTarget, overlaySelector }) {
     return 'free';
   };
   const isOutsideViewport = (rect) => rect.right > vw + 1 || rect.left < -1;
+  // Texto propio del elemento o de cualquiera de sus hijos visibles (un recorte sobre un <span> hijo también es texto cortado).
+  const hasVisibleText = (el) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (node.textContent.trim() === '') continue;
+      if (node.parentElement === el || isVisible(node.parentElement)) return true;
+    }
+    return false;
+  };
   // Un link está en una oración si su padre tiene texto propio además del link.
   const isInSentence = (el) =>
     [...(el.parentElement?.childNodes ?? [])].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '');
@@ -215,10 +227,12 @@ function collectFindings({ minTarget, overlaySelector }) {
     const style = getComputedStyle(el);
     // Los links en línea dentro de una oración no tienen un área propia (excepción de WCAG 2.5.8); un link suelto, sí.
     if (el.matches('a') && style.display === 'inline' && isInSentence(el)) continue;
-    // Un link "estirado" (su ::after absoluto cubre la fila o la tarjeta) se toca en toda esa área.
+    // Un link "estirado" (su ::after absoluto cubre la fila o la tarjeta) se toca en toda esa área: el ::after tiene que medir
+    // al menos lo mínimo táctil; un subrayado o un ícono decorativo no cuenta.
     if (el.matches('a')) {
       const after = getComputedStyle(el, '::after');
-      if (after.position === 'absolute' && after.content !== 'none') continue;
+      const coversTarget = parseFloat(after.width) >= minTarget && parseFloat(after.height) >= minTarget;
+      if (after.position === 'absolute' && after.content !== 'none' && coversTarget) continue;
     }
     // Un checkbox o radio nativo se toca por su etiqueta.
     const isChoice = el.matches('input[type="checkbox"], input[type="radio"]');
@@ -238,8 +252,7 @@ function collectFindings({ minTarget, overlaySelector }) {
     if (!clipsX && !clipsY) continue;
     // El texto solo para lectores de pantalla (`sr-only`: 1×1 px con recorte) no se ve, no cuenta.
     if (el.clientWidth <= 1 && el.clientHeight <= 1) continue;
-    const hasText = [...el.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '');
-    if (!hasText) continue;
+    if (!hasVisibleText(el)) continue;
     if (clipsX && el.scrollWidth > el.clientWidth + 1) {
       findings.push({ kind: 'texto-cortado', detail: `${describe(el)} (ancho ${el.clientWidth}, contenido ${el.scrollWidth})` });
     } else if (clipsY && el.scrollHeight > el.clientHeight + 1) {

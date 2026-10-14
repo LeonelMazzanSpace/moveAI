@@ -75,8 +75,20 @@ describe('loadContact', () => {
   it('requests the public contact settings and returns them', async () => {
     serverApiFetch.mockResolvedValue(FULL);
 
-    await expect(loadContact()).resolves.toBe(FULL);
+    await expect(loadContact()).resolves.toEqual(FULL);
     expect(serverApiFetch).toHaveBeenCalledWith('/settings/contact');
+  });
+
+  it('fills a missing or null field with an empty string, so a partial answer cannot break the render', async () => {
+    serverApiFetch.mockResolvedValue({ address: 'Calle 1', hours: null, email: 42 });
+
+    await expect(loadContact()).resolves.toEqual({ ...EMPTY, address: 'Calle 1' });
+  });
+
+  it.each([null, undefined, 'texto', 7])('degrades to null for the non-object answer %j', async (payload) => {
+    serverApiFetch.mockResolvedValue(payload);
+
+    await expect(loadContact()).resolves.toBeNull();
   });
 
   it('degrades to null when the API fails', async () => {
@@ -89,5 +101,24 @@ describe('loadContact', () => {
     serverApiFetch.mockImplementation(() => notFound());
 
     await expect(loadContact()).rejects.toMatchObject({ digest: expect.stringContaining('404') });
+  });
+});
+
+describe('ContactSection with long values and incomplete data', () => {
+  const LONG_EMAIL = `${'a'.repeat(60)}@${'subdominio'.repeat(10)}.example.com`;
+  const LONG_ADDRESS = 'Avenida'.repeat(30);
+
+  it('breaks long values anywhere and lets every grid item shrink, so nothing pushes the page sideways', () => {
+    render(<ContactSection contact={{ ...FULL, email: LONG_EMAIL, address: LONG_ADDRESS }} />);
+    for (const value of [LONG_ADDRESS, LONG_EMAIL]) {
+      const dd = screen.getByText(value).closest('dd');
+      expect(dd).toHaveClass('[overflow-wrap:anywhere]');
+      expect(dd?.parentElement).toHaveClass('min-w-0');
+    }
+  });
+
+  it('links the long email to its own mailto', () => {
+    render(<ContactSection contact={{ ...FULL, email: LONG_EMAIL }} />);
+    expect(screen.getByRole('link', { name: LONG_EMAIL })).toHaveAttribute('href', `mailto:${LONG_EMAIL}`);
   });
 });

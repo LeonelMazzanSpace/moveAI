@@ -132,6 +132,13 @@ describe('PlanCheckout', () => {
     expect(screen.queryByRole('button', { name: 'Pagar con Mercado Pago' })).toBeNull();
   });
 
+  it('gives the standalone "Ver planes" link a 32 px tap area', async () => {
+    mockApi(new ApiError(404, 'PLAN_NOT_FOUND', 'El plan no existe.'));
+    renderCheckout('no-existe');
+
+    expect(await screen.findByRole('link', { name: 'Ver planes' })).toHaveClass('inline-flex', 'min-h-8', 'items-center');
+  });
+
   it('shows the unavailable state when the plan does not exist', async () => {
     mockApi(new ApiError(404, 'PLAN_NOT_FOUND', 'El plan no existe.'));
     renderCheckout('no-existe');
@@ -349,6 +356,92 @@ describe('PlanCheckout automatic debit', () => {
     expect(apiFetch).toHaveBeenCalledWith('/checkout/auto-debit', { method: 'POST', body: { planSlug: 'performance-trimestral' } });
     expect(apiFetch).not.toHaveBeenCalledWith('/checkout/plan', expect.anything());
     expect(screen.getByRole('button', { name: 'Activar débito automático' })).toBeDisabled();
+  });
+
+  it('names the group "Forma de pago" and links the debit explanation to its radio', async () => {
+    mockDebitApi(debitPlan);
+    renderCheckout();
+
+    expect(await screen.findByRole('group', { name: 'Forma de pago' })).toContainElement(debitRadio());
+    expect(debitRadio()).toHaveAccessibleDescription(
+      'Se cobra automáticamente cada 3 meses con Mercado Pago. Podés cancelarlo cuando quieras desde tu perfil.',
+    );
+    expect(onceRadio()).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('includes the date of the first charge in the description of the debit radio', async () => {
+    mockDebitApi(debitPlan, { subscriptions: { ...noSubscriptions, performance: subscription } });
+    renderCheckout();
+
+    await screen.findByText('El primer cobro es el 01/11/2026, cuando termina tu plan actual.');
+    expect(debitRadio()).toHaveAccessibleDescription(
+      'Se cobra automáticamente cada 3 meses con Mercado Pago. Podés cancelarlo cuando quieras desde tu perfil. El primer cobro es el 01/11/2026, cuando termina tu plan actual.',
+    );
+  });
+
+  it('does not let the client switch the payment mode while a one-time checkout is in flight, so a second one cannot start', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    mockDebitApi(debitPlan);
+    renderCheckout();
+    await payButtonEnabled();
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path === '/checkout/plan') return new Promise((resolve) => (release = resolve));
+      throw new Error(`unexpected request ${path}`);
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Pagar con Mercado Pago' }));
+
+    expect(debitRadio()).toBeDisabled();
+    expect(onceRadio()).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Pagar con Mercado Pago' })).toBeDisabled();
+    await userEvent.click(debitRadio());
+    expect(onceRadio()).toBeChecked();
+    expect(screen.queryByRole('button', { name: 'Activar débito automático' })).toBeNull();
+    expect(apiFetch).not.toHaveBeenCalledWith('/checkout/auto-debit', expect.anything());
+
+    release(checkoutResponse);
+    await vi.waitFor(() => expect(assign).toHaveBeenCalledWith('https://mp.test/pay'));
+    expect(debitRadio()).toBeDisabled();
+    expect(onceRadio()).toBeDisabled();
+    expect(assign).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not let the client switch back to a one-time payment while the debit is being created', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    mockDebitApi(debitPlan, { start: () => new Promise((resolve) => (release = resolve)) });
+    renderCheckout();
+
+    await userEvent.click(await screen.findByRole('radio', { name: 'Débito automático' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Activar débito automático' }));
+
+    expect(onceRadio()).toBeDisabled();
+    expect(debitRadio()).toBeDisabled();
+    await userEvent.click(onceRadio());
+    expect(debitRadio()).toBeChecked();
+    expect(screen.queryByRole('button', { name: 'Pagar con Mercado Pago' })).toBeNull();
+    expect(apiFetch).not.toHaveBeenCalledWith('/checkout/plan', expect.anything());
+
+    release(debitResponse);
+    await vi.waitFor(() => expect(assign).toHaveBeenCalledWith('https://mp.test/debit'));
+    expect(onceRadio()).toBeDisabled();
+    expect(assign).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets the client change the payment mode again after a failed attempt', async () => {
+    mockDebitApi(debitPlan, {
+      start: () => {
+        throw new ApiError(502, 'PAYMENT_PROVIDER_ERROR', 'x');
+      },
+    });
+    renderCheckout();
+
+    await userEvent.click(await screen.findByRole('radio', { name: 'Débito automático' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Activar débito automático' }));
+    await screen.findByRole('alert');
+
+    expect(onceRadio()).toBeEnabled();
+    await userEvent.click(onceRadio());
+    expect(onceRadio()).toBeChecked();
   });
 
   it('keeps charging a one-time payment through the regular checkout when "Pago único" is chosen', async () => {

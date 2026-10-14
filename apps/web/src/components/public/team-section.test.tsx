@@ -7,7 +7,7 @@ describe('TeamSection', () => {
   it('is the "equipo" section with its heading and intro', () => {
     const { container } = render(<TeamSection />);
     expect(container.querySelector('section#equipo')).not.toBeNull();
-    expect(screen.getByText(/Quiénes somos/)).toBeInTheDocument();
+    expect(screen.getByText('02 — Quiénes somos')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'El equipo detrás de MOVE' })).toBeInTheDocument();
     expect(screen.getByText(TEAM_INTRO)).toBeInTheDocument();
   });

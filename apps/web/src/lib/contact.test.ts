@@ -61,3 +61,16 @@ describe('hasContactData', () => {
     expect(hasContactData({ ...EMPTY, mapsUrl: 'https://maps.example/x' })).toBe(true);
   });
 });
+
+describe('hasContactData with an incomplete payload', () => {
+  it('ignores a missing or null field instead of throwing', () => {
+    const partial = { ...EMPTY, address: null, hours: undefined } as unknown as ContactInfoDto;
+    expect(() => hasContactData(partial)).not.toThrow();
+    expect(hasContactData(partial)).toBe(false);
+    expect(hasContactData({ ...partial, email: 'hola@move.uy' })).toBe(true);
+  });
+
+  it('is false for an empty object', () => {
+    expect(hasContactData({} as ContactInfoDto)).toBe(false);
+  });
+});

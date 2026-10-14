@@ -82,3 +82,24 @@ describe('PublicFooter', () => {
     expect(screen.getByText(/© 2026 MOVE/)).toBeInTheDocument();
   });
 });
+
+describe('PublicFooter contact block with long values and incomplete data', () => {
+  const LONG_EMAIL = `${'a'.repeat(60)}@${'subdominio'.repeat(10)}.example.com`;
+
+  beforeEach(() => {
+    loadContact.mockReset();
+  });
+
+  it('breaks long values anywhere and lets every grid item shrink, so the footer never scrolls sideways', async () => {
+    loadContact.mockResolvedValue({ ...FULL, email: LONG_EMAIL });
+    await renderContact();
+    const dd = screen.getByRole('link', { name: LONG_EMAIL }).closest('dd');
+    expect(dd).toHaveClass('[overflow-wrap:anywhere]');
+    expect(dd?.parentElement).toHaveClass('min-w-0');
+  });
+
+  it('keeps the footer without the contact block when the API leaves every field out', async () => {
+    loadContact.mockResolvedValue({});
+    await expect(FooterContact()).resolves.toBeNull();
+  });
+});

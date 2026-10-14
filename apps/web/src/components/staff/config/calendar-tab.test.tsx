@@ -130,13 +130,43 @@ describe('CalendarTab', () => {
       expect(screen.queryByRole('button', { name: 'Sincronizar ahora' })).toBeNull();
     });
 
-    it('shows a loading skeleton and then an error with retry when the status cannot be read', async () => {
-      apiFetch.mockRejectedValueOnce(new ApiError(502, 'CALENDAR_PROVIDER_ERROR', 'Bad gateway'));
-      renderTab();
+    it('shows a loading skeleton while the status loads, then an error with retry when it cannot be read', async () => {
+      let fail: (error: Error) => void = () => undefined;
+      apiFetch.mockImplementationOnce(() => new Promise((_resolve, reject) => { fail = reject; }));
+      const { container } = renderTab();
+      expect(container.querySelector('[data-slot="skeleton"]')).not.toBeNull();
+      expect(screen.queryByRole('alert')).toBeNull();
+      fail(new ApiError(502, 'CALENDAR_PROVIDER_ERROR', 'Bad gateway'));
       expect(await screen.findByText('Google Calendar no respondió. Probá de nuevo en un rato.')).toBeInTheDocument();
+      expect(container.querySelector('[data-slot="skeleton"]')).toBeNull();
       apiFetch.mockResolvedValueOnce(status({}));
       await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
       expect(await screen.findByRole('button', { name: 'Conectar Google Calendar' })).toBeInTheDocument();
+    });
+
+    it('explains that the account has no calendar MOVE can write to, and offers to reconnect with another account', async () => {
+      mockApi(CONNECTED_WITHOUT_CALENDAR, {
+        'GET /staff/calendar/calendars': () => Promise.resolve([]),
+        'POST /staff/calendar/connect': () => Promise.resolve({ authUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=abc' }),
+      });
+      renderTab();
+      expect(
+        await screen.findByText('Esta cuenta no tiene calendarios donde MOVE pueda escribir. Probá con otra cuenta.'),
+      ).toBeInTheDocument();
+      expect(screen.queryByLabelText('Calendario de MOVE')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Guardar' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Reconectar' }));
+      await waitFor(() => expect(assign).toHaveBeenCalledWith('https://accounts.google.com/o/oauth2/v2/auth?state=abc'));
+    });
+
+    it('does not show the empty state while the calendars load or when they fail to load', async () => {
+      mockApi(CONNECTED_WITHOUT_CALENDAR, {
+        'GET /staff/calendar/calendars': () => Promise.reject(new ApiError(502, 'CALENDAR_PROVIDER_ERROR', 'boom')),
+      });
+      renderTab();
+      await screen.findByText('Google Calendar no respondió. Probá de nuevo en un rato.');
+      expect(screen.queryByText(/no tiene calendarios/)).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Reconectar' })).toBeNull();
     });
 
     it('shows an error with retry when the calendar list cannot be loaded', async () => {
@@ -161,6 +191,42 @@ describe('CalendarTab', () => {
       await userEvent.click(await screen.findByRole('button', { name: label }));
       await waitFor(() => expect(assign).toHaveBeenCalledWith('https://accounts.google.com/o/oauth2/v2/auth?state=abc'));
       expect(callsTo('POST', '/staff/calendar/connect')).toHaveLength(1);
+    });
+
+    it('keeps the button disabled once the consent URL arrived, until the browser leaves the page', async () => {
+      mockApi(status({}), {
+        'POST /staff/calendar/connect': () => Promise.resolve({ authUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=abc' }),
+      });
+      renderTab();
+      await userEvent.click(await screen.findByRole('button', { name: 'Conectar Google Calendar' }));
+      await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
+      expect(screen.getByRole('button', { name: 'Conectar Google Calendar' })).toBeDisabled();
+      expect(callsTo('POST', '/staff/calendar/connect')).toHaveLength(1);
+    });
+
+    it('enables the button again when the consent URL cannot be requested', async () => {
+      mockApi(status({}), {
+        'POST /staff/calendar/connect': () => Promise.reject(new ApiError(502, 'CALENDAR_PROVIDER_ERROR', 'boom')),
+      });
+      renderTab();
+      await userEvent.click(await screen.findByRole('button', { name: 'Conectar Google Calendar' }));
+      await waitFor(() => expect(toastError).toHaveBeenCalled());
+      expect(screen.getByRole('button', { name: 'Conectar Google Calendar' })).toBeEnabled();
+    });
+
+    it.each([
+      ['javascript:', 'javascript:alert(1)'],
+      ['http:', 'http://accounts.google.com/o/oauth2/v2/auth'],
+      ['data:', 'data:text/html,hola'],
+      ['a relative path', '/staff/configuracion'],
+      ['not a URL', 'no es una url'],
+    ])('does not navigate to a consent URL that is %s', async (_label, authUrl) => {
+      mockApi(status({}), { 'POST /staff/calendar/connect': () => Promise.resolve({ authUrl }) });
+      renderTab();
+      await userEvent.click(await screen.findByRole('button', { name: 'Conectar Google Calendar' }));
+      await waitFor(() => expect(toastError).toHaveBeenCalledWith('No pudimos conectar Google Calendar. Probá de nuevo.'));
+      expect(assign).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Conectar Google Calendar' })).toBeEnabled();
     });
 
     it('shows the API message and does not navigate when Google is not configured', async () => {
@@ -232,6 +298,15 @@ describe('CalendarTab', () => {
       expect(callsTo('POST', '/staff/calendar/sync')).toHaveLength(1);
     });
 
+    it('swaps to the reconnect warning when the sync finds that Google access was lost', async () => {
+      mockApi(CONNECTED, { 'POST /staff/calendar/sync': () => Promise.resolve(NEEDS_RECONNECT) });
+      renderTab();
+      await userEvent.click(await screen.findByRole('button', { name: 'Sincronizar ahora' }));
+      expect(await screen.findByText(/Perdimos el acceso a Google Calendar/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Reconectar' })).toBeEnabled();
+      expect(screen.queryByRole('button', { name: 'Sincronizar ahora' })).toBeNull();
+    });
+
     it('shows the API message when Google does not answer', async () => {
       mockApi(CONNECTED, {
         'POST /staff/calendar/sync': () => Promise.reject(new ApiError(502, 'CALENDAR_PROVIDER_ERROR', 'Google Calendar request failed')),
@@ -240,6 +315,26 @@ describe('CalendarTab', () => {
       await userEvent.click(await screen.findByRole('button', { name: 'Sincronizar ahora' }));
       await waitFor(() => expect(toastError).toHaveBeenCalledWith('Google Calendar no respondió. Probá de nuevo en un rato.'));
       expect(screen.queryByText('Google Calendar request failed')).toBeNull();
+    });
+  });
+
+  describe('long values', () => {
+    const LONG_EMAIL = `${'a'.repeat(60)}@${'subdominio'.repeat(10)}.example.com`;
+    const LONG_NAME = 'Calendario'.repeat(15);
+
+    it('breaks a long account email while choosing the calendar, so it cannot push the page sideways', async () => {
+      mockApi({ ...CONNECTED_WITHOUT_CALENDAR, accountEmail: LONG_EMAIL });
+      renderTab();
+      expect(await screen.findByText(LONG_EMAIL)).toHaveClass('break-all');
+    });
+
+    it('breaks a long account email and a long calendar name when connected', async () => {
+      mockApi({ ...CONNECTED, accountEmail: LONG_EMAIL, calendarName: LONG_NAME });
+      renderTab();
+      expect(await screen.findByText(LONG_EMAIL)).toHaveClass('break-all');
+      expect(screen.getByText(LONG_NAME)).toHaveClass('break-words');
+      // Cada celda de la grilla puede encogerse por debajo del ancho de la palabra larga.
+      for (const value of [LONG_EMAIL, LONG_NAME]) expect(screen.getByText(value).parentElement).toHaveClass('min-w-0');
     });
   });
 

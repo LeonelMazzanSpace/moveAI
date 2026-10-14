@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { DisplayTitle } from '@/components/move/display-title';
 import { RECOVERY_EQUIPMENT, RECOVERY_ROOM_PHOTOS, RECOVERY_ROOM_TEXT } from './recovery-room-data';
 import { RecoveryRoomSection } from './recovery-room-section';
 
@@ -40,5 +41,16 @@ describe('RecoveryRoomSection', () => {
       '/img/recovery/recovery-sauna-infrarrojo.jpg',
       '/img/recovery/recovery-luz-roja-panel.jpg',
     ]);
+  });
+});
+
+describe('RecoveryRoomSection title', () => {
+  it('uses the shared title style, so a change to DisplayTitle reaches it too', () => {
+    render(<RecoveryRoomSection />);
+    const shared = render(<DisplayTitle size="lg">x</DisplayTitle>).getByRole('heading', { name: 'x' });
+    const heading = screen.getByRole('heading', { name: /Recovery Room\s*by MOVE/ });
+    expect(heading.tagName).toBe(shared.tagName);
+    expect(heading.className).toBe(shared.className);
+    expect(within(heading).getByText('by MOVE')).toHaveClass('text-muted-foreground');
   });
 });

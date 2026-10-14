@@ -70,6 +70,39 @@ describe('ContactTab', () => {
     expect(screen.getByText('Recibe los avisos de reservas de Rehab y de Google Calendar.')).toBeInTheDocument();
   });
 
+  it('links the staff notices hint to its field, and keeps it next to the error message', async () => {
+    renderTab();
+    const field = await screen.findByLabelText('Email para avisos del staff');
+    expect(field).toHaveAccessibleDescription('Recibe los avisos de reservas de Rehab y de Google Calendar.');
+    expect(screen.getByLabelText('Dirección')).not.toHaveAttribute('aria-describedby');
+
+    await replaceValue('Email para avisos del staff', 'tampoco');
+    await save();
+    await screen.findByText('Ingresá un email válido.');
+    expect(field).toHaveAccessibleDescription('Ingresá un email válido. Recibe los avisos de reservas de Rehab y de Google Calendar.');
+  });
+
+  it.each([
+    ['a quoted email', '"ana"@move.uy'],
+    ['an email with a query', 'ana?cc=x@move.uy'],
+    ['an email with an ampersand', 'ana&body=x@move.uy'],
+    ['an email with angle brackets', 'Ana <ana@move.uy>'],
+  ])('blocks %s before sending it, like the API does', async (_label, value) => {
+    renderTab();
+    await replaceValue('Email de contacto', value);
+    await save();
+    expect(await screen.findByText('Ingresá un email válido.')).toBeInTheDocument();
+    expect(patchCalls()).toHaveLength(0);
+  });
+
+  it.each(['https:foo.com', 'https:/foo.com'])('blocks the Maps URL %s, which the API rejects', async (value) => {
+    renderTab();
+    await replaceValue('Enlace de Google Maps', value);
+    await save();
+    expect(await screen.findByText(/Ingresá un enlace que empiece con https:\/\//)).toBeInTheDocument();
+    expect(patchCalls()).toHaveLength(0);
+  });
+
   it('shows a loading skeleton and then an error state with retry when the load fails', async () => {
     apiFetch.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR', 'Algo salió mal.'));
     renderTab();

@@ -16,5 +16,5 @@ export function mailtoUrl(email: string): string | null {
 }
 
 export function hasContactData(contact: ContactInfoDto): boolean {
-  return Object.values(contact).some((value) => value.trim() !== '');
+  return Object.values(contact).some((value) => typeof value === 'string' && value.trim() !== '');
 }
