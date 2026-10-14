@@ -40,6 +40,7 @@ function mockApi(plan: PlanDto | ApiError, subscriptions: MySubscriptionsDto = n
       return plan;
     }
     if (path === '/me/subscriptions') return subscriptions;
+    if (path === '/me/auto-debits') return [];
     if (path === '/checkout/plan' && init?.method === 'POST') return checkout();
     throw new Error(`unexpected request ${path}`);
   });
@@ -214,12 +215,64 @@ describe('PlanCheckout automatic debit', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('offers the payment mode only when the plan allows automatic debit', async () => {
-    mockApi(makePlan({ autoDebitEnabled: false }));
+    mockDebitApi(makePlan({ autoDebitEnabled: false }));
     renderCheckout();
 
-    expect(await screen.findByRole('button', { name: 'Pagar con Mercado Pago' })).toBeEnabled();
+    await screen.findByRole('button', { name: 'Pagar con Mercado Pago' });
+    await payButtonEnabled();
     expect(screen.queryByRole('radio')).toBeNull();
+  });
+
+  it('checks the debits of every Performance plan, even one that does not allow debit', async () => {
+    mockDebitApi(makePlan({ autoDebitEnabled: false }));
+    renderCheckout();
+
+    await payButtonEnabled();
+    expect(apiFetch).toHaveBeenCalledWith('/me/auto-debits');
+  });
+
+  it('does not check the debits for a Recovery plan that does not allow debit, and does not delay its button', async () => {
+    mockDebitApi(makePlan({ ...pack, autoDebitEnabled: false }));
+    renderCheckout('recovery-paquete-4');
+
+    expect(await screen.findByRole('button', { name: 'Pagar con Mercado Pago' })).toBeEnabled();
     expect(apiFetch).not.toHaveBeenCalledWith('/me/auto-debits');
+  });
+
+  it('blocks a Performance plan that does not allow debit while a Performance debit is authorized', async () => {
+    mockDebitApi(makePlan({ autoDebitEnabled: false }), { debits: [autoDebit()] });
+    renderCheckout();
+
+    expect(await screen.findByText(ACTIVE_NOTICE)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Pagar con Mercado Pago' })).toBeNull();
+    expect(screen.queryByRole('radio')).toBeNull();
+  });
+
+  it('keeps the button of a Performance plan without debit disabled until the debits are known', async () => {
+    let release: (value: AutoDebitDto[]) => void = () => undefined;
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path.startsWith('/catalog/plans/')) return makePlan({ autoDebitEnabled: false });
+      if (path === '/me/subscriptions') return noSubscriptions;
+      if (path === '/me/auto-debits') return new Promise<AutoDebitDto[]>((resolve) => (release = resolve));
+      throw new Error(`unexpected request ${path}`);
+    });
+    renderCheckout();
+
+    expect(await screen.findByRole('button', { name: 'Pagar con Mercado Pago' })).toBeDisabled();
+    release([autoDebit()]);
+    expect(await screen.findByText(ACTIVE_NOTICE)).toBeInTheDocument();
+  });
+
+  it('does not delay the button of a Recovery plan that allows debit while the debits load', async () => {
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path.startsWith('/catalog/plans/')) return debitPack;
+      if (path === '/me/subscriptions') return noSubscriptions;
+      if (path === '/me/auto-debits') return new Promise(() => undefined);
+      throw new Error(`unexpected request ${path}`);
+    });
+    renderCheckout('recovery-paquete-4');
+
+    expect(await screen.findByRole('button', { name: 'Pagar con Mercado Pago' })).toBeEnabled();
   });
 
   it('shows "Pago único" selected by default next to "Débito automático"', async () => {

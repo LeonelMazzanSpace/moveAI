@@ -180,7 +180,9 @@ export function PlanCheckout({ slug }: { slug: string }) {
     queryFn: () => apiFetch<MySubscriptionsDto>('/me/subscriptions'),
   });
   const autoDebitAllowed = plan.data?.autoDebitEnabled === true;
-  const debits = useMyAutoDebits({ enabled: autoDebitAllowed });
+  // Todo plan Performance consulta los débitos: un débito autorizado de Performance bloquea la compra aunque este plan no permita débito.
+  const checksDebits = autoDebitAllowed || plan.data?.service === 'performance';
+  const debits = useMyAutoDebits({ enabled: checksDebits });
   const checkout = usePlanCheckout();
   const autoDebitCheckout = useAutoDebitCheckout();
   const [mode, setMode] = useState<PaymentMode>('one_time');
@@ -211,7 +213,7 @@ export function PlanCheckout({ slug }: { slug: string }) {
             </p>
           ) : null}
           <Button
-            disabled={mutation.isPending || mutation.isSuccess || debits.isLoading}
+            disabled={mutation.isPending || mutation.isSuccess || (plan.data.service === 'performance' && debits.isLoading)}
             onClick={() => (debitMode ? autoDebitCheckout.mutate(plan.data.slug) : checkout.mutate(plan.data.id))}
             className={moveButtonSize({ size: 'block' })}
           >

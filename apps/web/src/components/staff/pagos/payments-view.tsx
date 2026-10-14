@@ -30,7 +30,6 @@ const ORIGIN_OPTIONS: { value: PaymentOrigin; label: string }[] = [
   { value: 'auto_debit', label: 'Débito automático' },
 ];
 
-
 const STATUS_OPTIONS: { value: PaymentStatusFilter; label: string }[] = [
   { value: 'approved', label: 'Aprobados' },
   { value: 'pending', label: 'Pendientes' },
