@@ -1,6 +1,6 @@
 ---
 type: failure
-status: todo
+status: shipped
 updated: 2026-10-13
 source:
   - move/docs/manual/manual-de-usuario.md
@@ -10,5 +10,5 @@ source:
 
 Si el shell exporta `NODE_ENV=development` (por ejemplo al tomar las variables de
 `.env.example`), `next build` falla en `/_global-error` con "Cannot read properties of
-null (reading 'useContext')" (T-037). Fix operativo: build y start de la web con
-`NODE_ENV=production`, documentado en el manual. Ningún script lo fuerza todavía.
+null (reading 'useContext')" (T-037). Fix (T-043): los scripts `build` y `start` de la
+web fijan `NODE_ENV=production`, así el build funciona con cualquier valor del shell.

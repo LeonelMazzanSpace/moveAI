@@ -25,6 +25,9 @@ de más ni de menos.
 - [[ADR simulador registrado con ConditionalModule]]
 - Abierta: [[ADR notificaciones de Mercado Pago por ambiente]]
 
+- [[ADR conciliacion de reservas vencidas por 72 horas]] (reemplaza a la anterior: reservas 72 horas, planes 7 días, sin re-consultar rechazadas)
+- Síntoma "la página de pago consulta para siempre": [[Polling de pago sin tope ante errores]] (resuelto)
+
 ## Reglas
 - [[Pago confirmado solo por webhook validado]]
 - [[Operaciones de pago idempotentes]] y [[Queries crudas con RETURNING via CTE]]

@@ -22,6 +22,8 @@ Espina 4. Quién es cada persona, cómo entra y qué puede hacer.
 - [[ADR volver a la pagina exacta tras ingresar]]
 - [[ADR create-staff exige promote-existing]]
 
+- [[ADR invitacion de 72 horas]]
+
 ## Reglas
 - [[Roles persistidos cliente y staff]] y [[Autorizacion validada en la API]]
 - [[Cuenta se crea durante la reserva]] y [[Una cuenta por email]]

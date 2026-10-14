@@ -9,6 +9,9 @@ copy lives in the origin note, this is only the reverse lookup.
 ## ADR conciliacion de compras de plan vencidas
 - ADR conciliacion re-consulta compras vencidas — supersedes → ADR conciliacion de compras de plan vencidas
 
+## ADR conciliacion re-consulta compras vencidas
+- ADR conciliacion de reservas vencidas por 72 horas — supersedes → ADR conciliacion re-consulta compras vencidas
+
 ## ADR desarrollo sin accesos a proveedores
 - ADR simulador registrado con ConditionalModule — requires → ADR desarrollo sin accesos a proveedores
 
@@ -22,8 +25,12 @@ copy lives in the origin note, this is only the reverse lookup.
 - ADR reintento visible para plan rechazado — requires → ADR pago de plan rechazado deja la compra pendiente
 
 ## ADR pago tardio sin lugar queda para el staff
+- ADR conciliacion de reservas vencidas por 72 horas — requires → ADR pago tardio sin lugar queda para el staff
 - ADR conciliacion re-consulta compras vencidas — requires → ADR pago tardio sin lugar queda para el staff
 - ADR retencion vencida sin lugar no se reconfirma — requires → ADR pago tardio sin lugar queda para el staff
+
+## ADR sin E2E web de demos
+- ADR suite E2E desktop y mobile — supersedes → ADR sin E2E web de demos
 
 ## ADR ubicacion de Better Auth
 - ADR Better Auth con Google OAuth — opens a question about → ADR ubicacion de Better Auth
@@ -61,6 +68,7 @@ copy lives in the origin note, this is only the reverse lookup.
 - Sin datos personales en logs — constrains → API NestJS
 - Sin secretos en codigo — constrains → API NestJS
 - Soft delete en datos de negocio — constrains → API NestJS
+- Suite E2E Playwright — depends on → API NestJS
 - Validacion de entrada con DTOs — constrains → API NestJS
 - Variable de entorno parseada una sola vez — constrains → API NestJS
 - Variables de entorno validadas al arrancar — constrains → API NestJS
@@ -105,6 +113,7 @@ copy lives in the origin note, this is only the reverse lookup.
 ## App web Next
 - ADR Next App Router en lugar de Vite — constrains → App web Next
 - ADR capa de datos del frontend — constrains → App web Next
+- ADR errores de campo con copy propio — constrains → App web Next
 - ADR shadcn base-nova sobre Base UI — constrains → App web Next
 - ADR volver a la pagina exacta tras ingresar — constrains → App web Next
 - Area cliente web — is part of → App web Next
@@ -114,15 +123,20 @@ copy lives in the origin note, this is only the reverse lookup.
 - Formularios validados con Zod — constrains → App web Next
 - Helpers compartidos fuera de modulos use client — constrains → App web Next
 - Manual de usuario — depends on → App web Next because captura las pantallas reales
+- Mensajes de validacion de la API no llegan al usuario — constrains → App web Next
 - Panel staff web — is part of → App web Next
+- Pantallas sin scroll horizontal en mobile — constrains → App web Next
 - Sin secretos en codigo — constrains → App web Next
 - Sistema visual MOVE — constrains → App web Next
+- Suite E2E Playwright — depends on → App web Next
 
 ## Area cliente web
+- ADR menu movil en las tres areas — constrains → Area cliente web
 - Pantalla check-in — is part of → Area cliente web because el formulario lo responde el alumno
 - Pantalla perfil cliente — is part of → Area cliente web
 
 ## Area publica web
+- ADR menu movil en las tres areas — constrains → Area publica web
 - Paginas publicas renderizadas en servidor — constrains → Area publica web
 - Pantalla Performance — is part of → Area publica web
 - Pantalla Recovery — is part of → Area publica web
@@ -152,6 +166,7 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Better Auth
 - ADR Better Auth con Google OAuth — constrains → Better Auth
+- ADR invitacion de 72 horas — constrains → Better Auth
 - Modulo auth — depends on → Better Auth
 
 ## Brevo
@@ -367,6 +382,15 @@ copy lives in the origin note, this is only the reverse lookup.
 - ADR manual de usuario con capturas — constrains → Manual de usuario
 - ADR sin archivos env nuevos — constrains → Manual de usuario
 
+## Mensajes de validacion de la API no llegan al usuario
+- ADR errores de campo con copy propio — establishes → Mensajes de validacion de la API no llegan al usuario
+
+## Mensajes de validacion en ingles visibles
+- Mensajes de validacion de la API no llegan al usuario — prevents → Mensajes de validacion en ingles visibles
+
+## Menu movil se reabre al volver a la pagina
+- ADR menu movil en las tres areas — enables → Menu movil se reabre al volver a la pagina
+
 ## Mercado Pago
 - ADR desarrollo sin accesos a proveedores — constrains → Mercado Pago
 - Modulo pagos — depends on → Mercado Pago
@@ -394,6 +418,7 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Modulo auth
 - ADR Better Auth endurecido — constrains → Modulo auth
+- ADR invitacion de 72 horas — constrains → Modulo auth
 - ADR ubicacion de Better Auth — constrains → Modulo auth
 - Area cliente web — depends on → Modulo auth
 - Autorizacion validada en la API — constrains → Modulo auth
@@ -414,6 +439,7 @@ copy lives in the origin note, this is only the reverse lookup.
 - Scheduler corre en una sola instancia — constrains → Modulo automatizaciones
 
 ## Modulo catalogo
+- ADR slug de plan reutilizable tras borrado — constrains → Modulo catalogo
 - Accesos y definiciones operativas al inicio — constrains → Modulo catalogo because precios y planes reales
 - Configuracion operativa administrada por staff — constrains → Modulo catalogo
 - Modulo agenda — depends on → Modulo catalogo
@@ -452,6 +478,7 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Modulo pagos
 - ADR Mercado Pago como procesador de pagos — constrains → Modulo pagos
 - ADR conciliacion de compras de plan vencidas — constrains → Modulo pagos
+- ADR conciliacion de reservas vencidas por 72 horas — constrains → Modulo pagos
 - ADR conciliacion re-consulta compras vencidas — constrains → Modulo pagos
 - ADR notificaciones de Mercado Pago por ambiente — constrains → Modulo pagos
 - ADR pago de plan rechazado deja la compra pendiente — constrains → Modulo pagos
@@ -527,6 +554,7 @@ copy lives in the origin note, this is only the reverse lookup.
 - Manual de usuario — is part of → Monorepo MOVE
 - Pipeline CI Bitbucket — is part of → Monorepo MOVE
 - Postgres local Docker — is part of → Monorepo MOVE
+- Suite E2E Playwright — is part of → Monorepo MOVE
 
 ## Motivo de inactividad
 - Estado del cliente — depends on → Motivo de inactividad
@@ -577,6 +605,7 @@ copy lives in the origin note, this is only the reverse lookup.
 - Conciliacion periodica de pagos pendientes — prevents → Pago tardio perdido tras expirar la compra
 
 ## Panel staff web
+- ADR menu movil en las tres areas — constrains → Panel staff web
 - Asistencia pendiente visible para staff — constrains → Panel staff web
 - Pantalla check-in — is part of → Panel staff web
 - Pantalla clientes staff — is part of → Panel staff web
@@ -591,6 +620,10 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## Pantalla pagos staff
 - ADR pago tardio sin lugar queda para el staff — constrains → Pantalla pagos staff
+
+## Pantallas sin scroll horizontal en mobile
+- ADR menu movil en las tres areas — establishes → Pantallas sin scroll horizontal en mobile
+- ADR suite E2E desktop y mobile — establishes → Pantallas sin scroll horizontal en mobile
 
 ## Paquete Recovery sobreconsumido
 - Sesiones Recovery no exceden el paquete — prevents → Paquete Recovery sobreconsumido
@@ -623,6 +656,7 @@ copy lives in the origin note, this is only the reverse lookup.
 - ADR Postgres en Docker para desarrollo — constrains → Postgres local Docker
 - API NestJS — depends on → Postgres local Docker because base de desarrollo
 - Paridad de version Postgres dev y prod — constrains → Postgres local Docker
+- Suite E2E Playwright — depends on → Postgres local Docker
 
 ## Prioridad de horarios Recovery
 - Paquete de sesiones Recovery — opens a question about → Prioridad de horarios Recovery
@@ -687,6 +721,9 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Secretos filtrados
 - Sin secretos en codigo — prevents → Secretos filtrados
 
+## Seed rompe con indice unico parcial
+- ADR slug de plan reutilizable tras borrado — enables → Seed rompe con indice unico parcial
+
 ## Servicio Recovery
 - Paquete de sesiones Recovery — depends on → Servicio Recovery
 
@@ -725,6 +762,16 @@ copy lives in the origin note, this is only the reverse lookup.
 ## Soft delete en datos de negocio
 - ADR TypeORM con migraciones por CLI — establishes → Soft delete en datos de negocio
 
+## Suite E2E Playwright
+- ADR suite E2E desktop y mobile — constrains → Suite E2E Playwright
+- Suite E2E solo sobre su base propia — constrains → Suite E2E Playwright
+
+## Suite E2E escribe en una base real
+- Suite E2E solo sobre su base propia — prevents → Suite E2E escribe en una base real
+
+## Suite E2E solo sobre su base propia
+- ADR suite E2E desktop y mobile — establishes → Suite E2E solo sobre su base propia
+
 ## Suscripcion
 - Estado del cliente — depends on → Suscripcion
 - Fechas en zona horaria de Uruguay — constrains → Suscripcion
@@ -743,6 +790,7 @@ copy lives in the origin note, this is only the reverse lookup.
 
 ## UI inconsistente con el diseno
 - Estilos via tokens del tema — prevents → UI inconsistente con el diseno
+- Pantallas sin scroll horizontal en mobile — mitigates → UI inconsistente con el diseno
 
 ## Una cuenta por email
 - ADR Better Auth con Google OAuth — establishes → Una cuenta por email

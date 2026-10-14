@@ -1,6 +1,6 @@
 ---
 type: decision
-status: shipped
+status: superseded
 updated: 2026-10-13
 source:
   - move/docs/superpowers/plans/2026-10-13-move-mvp.md

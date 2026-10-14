@@ -5,6 +5,6 @@ Punto de sincronización del vault con cada repo que sigue. El próximo sync dif
 las demás no se tocan.
 
 ## move
-branch: feature/move-mvp
-commit: be89bc5
+branch: main
+commit: 0d09ee6
 date: 2026-10-13

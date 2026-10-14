@@ -29,3 +29,6 @@ capturas actuales en el [[Manual de usuario]]. Sistema visual: [[Sistema visual 
 - 09 [[Pantalla seguimiento]]
 - 10 [[Pantalla check-in]]
 - sin mockup: [[Pantalla dashboard staff]], [[Pantalla pagos staff]], [[Pantalla configuracion staff]]
+
+## Mobile
+[[ADR menu movil en las tres areas]] establece [[Pantallas sin scroll horizontal en mobile]]: menú móvil en las tres áreas y tarjetas en turnos y pagos de staff. La [[Suite E2E Playwright]] lo mide en cada pantalla visitada. Falla resuelta: [[Menu movil se reabre al volver a la pagina]].

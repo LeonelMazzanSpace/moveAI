@@ -12,8 +12,9 @@ source:
 
 Cada 10 minutos un job consulta a Mercado Pago las compras pendientes con más de
 `reconcile_after_minutes` y aplica su estado real. También re-consulta las compras
-vencidas de los últimos 7 días, de plan y de reserva, para no perder pagos tardíos
-(D60). Cubre los webhooks que nunca llegaron o se rechazaron.
+vencidas, de reserva durante 72 horas y de plan durante 7 días, para no perder pagos
+tardíos; las rechazadas no se re-consultan (D60, T-040). Cubre los webhooks que nunca
+llegaron o se rechazaron.
 
 ## Structural
 - constrains → [[Modulo pagos]]

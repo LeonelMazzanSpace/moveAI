@@ -13,12 +13,12 @@ source:
 ---
 # Manual de usuario
 
-Manual en Markdown y PDF para clientes, staff y equipo técnico: estado actual frente
-a MOVE.pdf, una captura de cada pantalla, cómo levantar todo, diagrama de
-arquitectura y la guía de cada proveedor (Neon, Elastic Beanstalk, Vercel, dominio,
-Mercado Pago, Google, Brevo, Bitbucket). Se regenera con scripts que cargan datos de
-demo (por la API y por `psql` en el contenedor de desarrollo), capturan con
-Playwright, renderizan el diagrama y arman el PDF.
+Manual en Markdown y PDF para clientes, staff y equipo técnico: una guía destacada
+"Probar MOVE en local" con los usuarios de demo, estado actual frente a MOVE.pdf, una
+captura de cada pantalla, deuda conocida, cómo levantar todo, diagrama de arquitectura
+y la guía de cada proveedor. Se regenera con scripts que cargan datos de demo (por la
+API y por `psql` en el contenedor de desarrollo), capturan con Playwright y publican
+las imágenes solo si salieron todas; los scripts rechazan bases y URLs no locales.
 
 ## Structural
 - is part of → [[Monorepo MOVE]]

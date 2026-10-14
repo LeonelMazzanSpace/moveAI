@@ -1,6 +1,6 @@
 ---
 type: constraint
-status: todo
+status: shipped
 semana: 4
 updated: 2026-10-13
 source:
@@ -11,9 +11,9 @@ source:
 # Variable de entorno parseada una sola vez
 
 Una variable de entorno se valida y se convierte con una sola función, y lo que usa la
-app es ese valor convertido. `TRUST_PROXY_HOPS` ya lo cumple (D64); `PORT`, `DB_PORT`
-y `DB_SSL` todavía se validan en un lugar y se vuelven a leer de `process.env` con otra
-regla en su config.
+app es ese valor convertido. Lo cumplen `TRUST_PROXY_HOPS` (D64) y, desde T-039,
+`PORT` y `DB_PORT` (`parsePort`: solo dígitos 1–65535) y `DB_SSL` (solo `true` o
+`false`); un valor raro como `8e3` o `DB_SSL=1` impide arrancar.
 
 ## Structural
 - constrains → [[API NestJS]]

@@ -14,15 +14,17 @@ Monorepo, infraestructura, deploy y reglas transversales a todos los módulos.
 ## En el repo (shipped)
 [[Monorepo MOVE]] · [[App web Next]] · [[API NestJS]] · [[Postgres local Docker]] ·
 [[Modulo configuracion]] · [[Simulador de pagos de desarrollo]] · [[Manual de usuario]] ·
-[[Pipeline CI Bitbucket]]
+[[Pipeline CI Bitbucket]] · [[Suite E2E Playwright]]
 Decisiones: [[ADR monorepo pnpm sin Turborepo]] · [[ADR Next App Router en lugar de Vite]] ·
 [[ADR NestJS 12 en ESM]] · [[ADR TypeORM con migraciones por CLI]] ·
 [[ADR Postgres en Docker para desarrollo]] · [[ADR shadcn base-nova sobre Base UI]] ·
 [[ADR modulos simples por dominio]] (reemplaza a [[ADR arquitectura hexagonal por modulo]]) ·
 [[ADR capa de datos del frontend]] · [[ADR desarrollo sin accesos a proveedores]] ·
 [[ADR errores 4xx fuera de contrato como validacion]] · [[ADR un parser por variable de entorno]] ·
-[[ADR sin E2E web de demos]] · [[ADR sin archivos env nuevos]] · [[ADR manual de usuario con capturas]] ·
-[[ADR manual con guia de proveedores]]
+[[ADR suite E2E desktop y mobile]] (reemplaza a [[ADR sin E2E web de demos]]) · [[ADR sin archivos env nuevos]] ·
+[[ADR manual de usuario con capturas]] · [[ADR manual con guia de proveedores]] ·
+[[ADR menu movil en las tres areas]] · [[ADR errores de campo con copy propio]] ·
+[[ADR slug de plan reutilizable tras borrado]]
 
 ## Producción (todo)
 [[Vercel]] · [[AWS Elastic Beanstalk]] · [[Neon Postgres]], con [[ADR Vercel para la web]],
@@ -43,5 +45,10 @@ La guía por consola está en la parte 4 del [[Manual de usuario]]; los comandos
 [[Config leida al importar antes de cargar el entorno]] · [[Variable de entorno parseada dos veces con reglas distintas]] ·
 [[Throttling por IP ve la IP del proxy]] · [[Helper de modulo use client rompe un Server Component]] ·
 [[Build de Next falla con NODE_ENV development]] · [[Guard muerto por UPDATE RETURNING sin CTE]]
+Tanda de deuda técnica (T-039…T-054): [[Seed rompe con indice unico parcial]] · [[Mensajes de validacion en ingles visibles]] ·
+[[Polling de pago sin tope ante errores]] · [[Menu movil se reabre al volver a la pagina]] ·
+[[Variables del ejemplo filtran PORT a la web]] · [[Suite E2E escribe en una base real]]
+Reglas nuevas: [[Pantallas sin scroll horizontal en mobile]] · [[Mensajes de validacion de la API no llegan al usuario]] ·
+[[Suite E2E solo sobre su base propia]]
 Riesgos de deploy: [[API inalcanzable detras del proxy de Elastic Beanstalk]] ·
 [[Emails bloqueados por IP nueva en Brevo]] · [[Base de dev borrada por expiracion de rama Neon]]
