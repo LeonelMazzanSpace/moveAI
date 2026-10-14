@@ -4,6 +4,7 @@ import { businessToday } from '../../../common/time/business-time.js';
 import { appConfig } from '../../../config/app.config.js';
 import { InactivityService } from '../../followup/services/inactivity.service.js';
 import { NotificationsService } from '../../notifications/services/notifications.service.js';
+import { AutoDebitsService } from '../../payments/services/auto-debits.service.js';
 import { SettingsService } from '../../settings/services/settings.service.js';
 import { performanceSummary } from '../../subscriptions/domain/vigencia.js';
 import type { SubscriptionModel } from '../../subscriptions/models/subscription.model.js';
@@ -27,16 +28,18 @@ export class ExpiryRemindersService {
     private readonly subscriptions: SubscriptionsService,
     private readonly inactivity: InactivityService,
     private readonly notifications: NotificationsService,
+    private readonly autoDebits: AutoDebitsService,
     @Inject(appConfig.KEY) private readonly app: ConfigType<typeof appConfig>,
   ) {}
 
   async run(today: string = businessToday()): Promise<{ expiring: number; expired: number }> {
     const clients = await this.users.listClients();
     const ids = clients.map((client) => client.id);
-    const [{ expiringSoonDays }, pauses, subs] = await Promise.all([
+    const [{ expiringSoonDays }, pauses, subs, autoDebits] = await Promise.all([
       this.settings.getAll(),
       this.inactivity.getActivePauses(ids),
       this.subscriptions.listPerformanceByUsers(ids),
+      this.autoDebits.listUsersWithAuthorized('performance'),
     ]);
     const subsByUser = groupByUser(subs);
 
@@ -45,7 +48,7 @@ export class ExpiryRemindersService {
       const { current, latest } = performanceSummary(userSubs, today);
       const covered = current ?? latest;
       const renewed = covered !== null && userSubs.some((sub) => sub.startsOn > covered.endsOn);
-      return { userId, paused: pauses.has(userId), current, latest, renewed };
+      return { userId, paused: pauses.has(userId), current, latest, renewed, autoDebit: autoDebits.has(userId) };
     });
     const reminders = selectExpiryReminders({ today, expiringSoonDays, clients: reminderClients });
 

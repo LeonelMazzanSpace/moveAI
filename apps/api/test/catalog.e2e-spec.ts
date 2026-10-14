@@ -34,6 +34,7 @@ describe('catalog (e2e)', () => {
       id: expect.any(String), service: 'recovery', kind: 'session_pack', slug: 'recovery-paquete-4', name: 'Paquete 4 sesiones',
       description: 'Recovery Room by MOVE, abierta a todo público.', features: expect.any(Array), price: 3200, currency: 'UYU',
       periodMonths: null, periodDays: 30, sessionsIncluded: 4, durationMinutes: 45, featured: true, active: true, sortOrder: 2,
+      autoDebitEnabled: true,
     });
   });
 
@@ -66,7 +67,7 @@ describe('catalog (e2e)', () => {
 
   it('lets staff manage plans and hides inactive ones from the public list', async () => {
     const created = await staff.post('/api/staff/plans').send(validPlan).expect(201);
-    expect(created.body).toMatchObject({ slug: 'performance-anual', currency: 'UYU', featured: false, active: true, sortOrder: 0, description: '', features: [] });
+    expect(created.body).toMatchObject({ slug: 'performance-anual', currency: 'UYU', featured: false, active: true, sortOrder: 0, description: '', features: [], autoDebitEnabled: false });
     await staff.post('/api/staff/plans')
       .send({ service: 'performance', kind: 'period_plan', slug: 'performance-anual', name: 'Dup', price: 1, periodMonths: 1 })
       .expect(409).expect(expectCode('SLUG_TAKEN'));
@@ -286,6 +287,53 @@ describe('catalog (e2e)', () => {
     });
   });
 
+  describe('automatic debit flag (D96)', () => {
+    const findPlan = async (slug: string) =>
+      (await staff.get('/api/staff/plans').expect(200)).body.find((plan: { slug: string }) => plan.slug === slug);
+
+    it('seeds the monthly plan and both Recovery packs with automatic debit', async () => {
+      const res = await publicGet('/api/catalog/plans').expect(200);
+      const enabled = res.body.filter((p: { autoDebitEnabled: boolean }) => p.autoDebitEnabled).map((p: { slug: string }) => p.slug);
+      expect(enabled.sort()).toEqual(['performance-mensual', 'recovery-paquete-4', 'recovery-paquete-8']);
+      await publicGet('/api/catalog/plans/performance-trimestral').expect(200).expect((r) => expect(r.body.autoDebitEnabled).toBe(false));
+    });
+
+    it('creates period plans and packs with it, and defaults to false', async () => {
+      const plan = await staff.post('/api/staff/plans').send({ ...validPlan, autoDebitEnabled: true }).expect(201);
+      expect(plan.body.autoDebitEnabled).toBe(true);
+      const pack = await staff.post('/api/staff/plans')
+        .send({ service: 'recovery', kind: 'session_pack', slug: 'recovery-paquete-12', name: 'Paquete 12', price: 8000, periodDays: 30, sessionsIncluded: 12, autoDebitEnabled: true })
+        .expect(201);
+      expect(pack.body.autoDebitEnabled).toBe(true);
+      const plain = await staff.post('/api/staff/plans').send({ ...validPlan, slug: 'performance-bianual' }).expect(201);
+      expect(plain.body.autoDebitEnabled).toBe(false);
+    });
+
+    it('rejects it on the kinds paid with a booking', async () => {
+      await staff.post('/api/staff/plans')
+        .send({ service: 'rehab', kind: 'evaluation', slug: 'rehab-x', name: 'Eval', price: 1, durationMinutes: 60, autoDebitEnabled: true })
+        .expect(400).expect(expectCode('PLAN_KIND_INVALID'));
+      await staff.post('/api/staff/plans')
+        .send({ service: 'recovery', kind: 'single_session', slug: 'recovery-x', name: 'Single', price: 1, durationMinutes: 45, autoDebitEnabled: true })
+        .expect(400).expect(expectCode('PLAN_KIND_INVALID'));
+      const evaluation = await findPlan('rehab-evaluacion');
+      await staff.patch(`/api/staff/plans/${evaluation.id}`).send({ autoDebitEnabled: true }).expect(400).expect(expectCode('PLAN_KIND_INVALID'));
+      expect(await findPlan('rehab-evaluacion')).toEqual(evaluation);
+      const single = await findPlan('recovery-sesion');
+      await staff.patch(`/api/staff/plans/${single.id}`).send({ autoDebitEnabled: false }).expect(200);
+    });
+
+    it('toggles it with a PATCH and leaves the other fields intact', async () => {
+      const plan = await findPlan('performance-trimestral');
+      const on = await staff.patch(`/api/staff/plans/${plan.id}`).send({ autoDebitEnabled: true }).expect(200);
+      expect(on.body).toEqual({ ...plan, autoDebitEnabled: true });
+      const off = await staff.patch(`/api/staff/plans/${plan.id}`).send({ autoDebitEnabled: false }).expect(200);
+      expect(off.body).toEqual(plan);
+      const priced = await staff.patch(`/api/staff/plans/${plan.id}`).send({ price: 11000 }).expect(200);
+      expect(priced.body).toEqual({ ...plan, price: 11000 });
+    });
+  });
+
   it('answers 404 for unknown or malformed plan ids', async () => {
     await staff.patch('/api/staff/plans/00000000-0000-4000-8000-000000000000').send({ price: 1 }).expect(404).expect(expectCode('PLAN_NOT_FOUND'));
     await staff.delete('/api/staff/plans/00000000-0000-4000-8000-000000000000').expect(404).expect(expectCode('PLAN_NOT_FOUND'));
@@ -366,6 +414,8 @@ describe('catalog (e2e)', () => {
       ['durationMinutes under 15', { durationMinutes: 14 }],
       ['durationMinutes over 240', { durationMinutes: 241 }],
       ['non boolean featured', { featured: 'yes' }],
+      ['non boolean autoDebitEnabled', { autoDebitEnabled: 'true' }],
+      ['null autoDebitEnabled', { autoDebitEnabled: null }],
       ['null active', { active: null }],
       ['negative sortOrder', { sortOrder: -1 }],
       ['sortOrder over 999', { sortOrder: 1000 }],
@@ -385,6 +435,8 @@ describe('catalog (e2e)', () => {
       ['null featured', { featured: null }],
       ['null active', { active: null }],
       ['null sortOrder', { sortOrder: null }],
+      ['null autoDebitEnabled', { autoDebitEnabled: null }],
+      ['non boolean autoDebitEnabled', { autoDebitEnabled: 1 }],
       ['extreme price', { price: 1e20 }],
       ['extreme sortOrder', { sortOrder: 1e20 }],
       ['price over 10.000.000', { price: 10_000_001 }],

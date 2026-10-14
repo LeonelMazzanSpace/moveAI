@@ -2,9 +2,11 @@ import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsOptional } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/http/pagination.js';
 import type { PurchaseMethod, PurchaseStatus } from '../entities/purchase.entity.js';
+import type { PaymentOrigin } from './payment-responses.js';
 
 const PURCHASE_STATUSES: PurchaseStatus[] = ['pending', 'approved', 'rejected', 'cancelled', 'expired'];
 const PURCHASE_METHODS: PurchaseMethod[] = ['mercadopago', 'cash', 'transfer'];
+const PAYMENT_ORIGINS: PaymentOrigin[] = ['one_time', 'auto_debit'];
 
 const toBoolean = ({ value }: { value: unknown }): unknown => {
   if (value === 'true') return true;
@@ -25,4 +27,8 @@ export class ListStaffPaymentsQuery extends PaginationQueryDto {
   @Transform(toBoolean)
   @IsBoolean()
   needsAttention?: boolean;
+
+  @IsOptional()
+  @IsIn(PAYMENT_ORIGINS)
+  origin?: PaymentOrigin;
 }

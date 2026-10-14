@@ -5,6 +5,7 @@ import {
 import { Booking } from '../../bookings/entities/booking.entity.js';
 import { Plan } from '../../catalog/entities/plan.entity.js';
 import { User } from '../../users/entities/user.entity.js';
+import { AutoDebit } from './auto-debit.entity.js';
 
 export type PurchaseKind = 'plan' | 'booking';
 export type PurchaseMethod = 'mercadopago' | 'cash' | 'transfer';
@@ -37,6 +38,8 @@ export class Purchase {
   @ManyToOne(() => User, { nullable: true }) @JoinColumn({ name: 'recorded_by' }) recordedByUser: User | null;
   @Column({ type: 'text', nullable: true }) note: string | null;
   @Column({ type: 'timestamptz', nullable: true }) approvedAt: Date | null;
+  @Index() @Column({ type: 'uuid', nullable: true }) autoDebitId: string | null;
+  @ManyToOne(() => AutoDebit, { nullable: true }) @JoinColumn({ name: 'auto_debit_id' }) autoDebit: AutoDebit | null;
   @CreateDateColumn({ type: 'timestamptz' }) createdAt: Date;
   @UpdateDateColumn({ type: 'timestamptz' }) updatedAt: Date;
   @DeleteDateColumn({ type: 'timestamptz' }) deletedAt: Date | null;

@@ -1,4 +1,4 @@
-import { assertDurationClearable, validatePlanShape } from './plan-rules.js';
+import { assertAutoDebitAllowed, assertDurationClearable, validatePlanShape } from './plan-rules.js';
 
 const base = { periodMonths: null, periodDays: null, sessionsIncluded: null, durationMinutes: null };
 
@@ -37,6 +37,20 @@ describe('assertDurationClearable', () => {
     expect(() => assertDurationClearable('session_pack')).not.toThrow();
     for (const kind of ['period_plan', 'single_session', 'evaluation'] as const) {
       expect(() => assertDurationClearable(kind)).toThrowError(expect.objectContaining({ code: 'PLAN_KIND_INVALID' }));
+    }
+  });
+});
+
+describe('assertAutoDebitAllowed', () => {
+  it('lets period plans and session packs enable the automatic debit', () => {
+    expect(() => assertAutoDebitAllowed('period_plan', true)).not.toThrow();
+    expect(() => assertAutoDebitAllowed('session_pack', true)).not.toThrow();
+  });
+
+  it('rejects it for the kinds paid with a booking', () => {
+    for (const kind of ['single_session', 'evaluation'] as const) {
+      expect(() => assertAutoDebitAllowed(kind, true)).toThrowError(expect.objectContaining({ code: 'PLAN_KIND_INVALID' }));
+      expect(() => assertAutoDebitAllowed(kind, false)).not.toThrow();
     }
   });
 });

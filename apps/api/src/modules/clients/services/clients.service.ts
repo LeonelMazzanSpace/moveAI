@@ -13,6 +13,7 @@ import { AlertsService } from '../../followup/services/alerts.service.js';
 import { ContactsService } from '../../followup/services/contacts.service.js';
 import { InactivityService } from '../../followup/services/inactivity.service.js';
 import type { InactivityReasonDto } from '../../followup/models/inactivity.model.js';
+import { AutoDebitsService } from '../../payments/services/auto-debits.service.js';
 import { SettingsService } from '../../settings/services/settings.service.js';
 import type { SubscriptionModel } from '../../subscriptions/models/subscription.model.js';
 import { SubscriptionsService } from '../../subscriptions/services/subscriptions.service.js';
@@ -99,6 +100,7 @@ export class ClientsService {
     private readonly slotStats: SlotStatsService,
     private readonly alerts: AlertsService,
     private readonly overview: OverviewService,
+    private readonly autoDebits: AutoDebitsService,
   ) {}
 
   // D26: every client is loaded and filtered in memory.
@@ -131,13 +133,14 @@ export class ClientsService {
   async detail(id: string): Promise<ClientDetailDto> {
     const user = await this.requireClient(id);
     const today = businessToday();
-    const [context, mine, contacts, reasons, history, upcomingBookings] = await Promise.all([
+    const [context, mine, contacts, reasons, history, upcomingBookings, autoDebits] = await Promise.all([
       this.loadContext(user, today),
       this.subscriptions.getMySubscriptions(id, today),
       this.contacts.listForUser(id),
       this.inactivity.listForUser(id),
       this.overview.listActivity(id, 'all'),
       this.bookings.listForUser(id, 'upcoming'),
+      this.autoDebits.listForUser(id),
     ]);
     return {
       client: toSummary(context),
@@ -150,6 +153,7 @@ export class ClientsService {
       reasons,
       history: history.slice(0, HISTORY_LIMIT),
       upcomingBookings,
+      autoDebits,
     };
   }
 

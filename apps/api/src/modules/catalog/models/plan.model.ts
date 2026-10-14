@@ -18,6 +18,7 @@ export type PlanModel = {
   featured: boolean;
   active: boolean;
   sortOrder: number;
+  autoDebitEnabled: boolean;
 };
 
 export const toPlanDto = (plan: Plan): PlanModel => ({
@@ -37,4 +38,5 @@ export const toPlanDto = (plan: Plan): PlanModel => ({
   featured: plan.featured,
   active: plan.active,
   sortOrder: plan.sortOrder,
+  autoDebitEnabled: plan.autoDebitEnabled,
 });
