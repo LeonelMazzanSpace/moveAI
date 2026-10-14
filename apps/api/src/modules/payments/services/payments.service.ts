@@ -9,6 +9,7 @@ import { businessToday } from '../../../common/time/business-time.js';
 import { mercadoPagoConfig } from '../../../config/mercado-pago.config.js';
 import { displayDate } from '../../bookings/domain/booking-rules.js';
 import type { ActivityItemDto } from '../../bookings/models/booking.model.js';
+import { BookingEmailsService } from '../../bookings/services/booking-emails.service.js';
 import { BookingsService } from '../../bookings/services/bookings.service.js';
 import type { PlanKind, Service } from '../../catalog/entities/plan.entity.js';
 import { CatalogService } from '../../catalog/services/catalog.service.js';
@@ -67,6 +68,11 @@ interface Approval {
   amount: number;
   subscription: SubscriptionModel | null;
   confirmedBookingId: string | null;
+}
+
+interface Applied {
+  approval: Approval | null;
+  rejectedBookingId: string | null;
 }
 
 interface StaffPaymentRow {
@@ -144,6 +150,7 @@ export class PaymentsService {
     private readonly catalog: CatalogService,
     private readonly subscriptions: SubscriptionsService,
     private readonly bookings: BookingsService,
+    private readonly bookingEmails: BookingEmailsService,
     private readonly mercadoPago: MercadoPagoService,
     private readonly autoDebits: AutoDebitsService,
     @Inject(mercadoPagoConfig.KEY) private readonly config: ConfigType<typeof mercadoPagoConfig>,
@@ -358,22 +365,25 @@ export class PaymentsService {
       this.logger.warn(`payment ${payment.id} ignored: no purchase reference`);
       return false;
     }
-    const approval = await this.dataSource.transaction(async (manager): Promise<Approval | null> => {
+    const { approval, rejectedBookingId } = await this.dataSource.transaction(async (manager): Promise<Applied> => {
       const purchase = await this.lockPurchase(manager, payment.externalReference);
       if (!purchase) {
         this.logger.warn(`payment ${payment.id} ignored: unknown purchase`);
-        return null;
+        return { approval: null, rejectedBookingId: null };
       }
       const stored = await this.upsertPayment(manager, purchase.id, payment);
-      if (payment.status === 'approved') return this.applyApproved(manager, purchase, payment, stored);
+      if (payment.status === 'approved') {
+        return { approval: await this.applyApproved(manager, purchase, payment, stored), rejectedBookingId: null };
+      }
       // D44: a declined plan payment leaves the purchase pending, so an approved retry on the same preference
       // activates it; the 24 h expiry closes abandoned ones.
       const declined = payment.status === 'rejected' || payment.status === 'cancelled';
       if (declined && purchase.kind === 'booking' && purchase.status === 'pending') {
-        await this.reject(manager, purchase);
+        return { approval: null, rejectedBookingId: await this.reject(manager, purchase) };
       }
-      return null;
+      return { approval: null, rejectedBookingId: null };
     });
+    if (rejectedBookingId) await this.bookingEmails.notConfirmed([rejectedBookingId], 'payment_rejected');
     if (!approval) return false;
     await this.sendPurchaseApproved(approval);
     if (approval.confirmedBookingId) await this.bookings.sendBookingConfirmation(approval.confirmedBookingId);
@@ -439,12 +449,14 @@ export class PaymentsService {
     }
   }
 
-  // R16 step 5, for booking purchases (D44).
-  private async reject(manager: EntityManager, purchase: LockedPurchase): Promise<void> {
+  // R16 step 5, for booking purchases (D44). Returns the released booking, so its client is told after the commit (D93).
+  private async reject(manager: EntityManager, purchase: LockedPurchase): Promise<string | null> {
     await manager.query(`UPDATE purchases SET status = 'rejected', updated_at = now() WHERE id = $1 AND status = 'pending'`, [
       purchase.id,
     ]);
-    if (purchase.bookingId) await this.bookings.releaseHold(manager, purchase.bookingId, 'cancelled');
+    if (!purchase.bookingId) return null;
+    await this.bookings.releaseHold(manager, purchase.bookingId, 'cancelled');
+    return purchase.bookingId;
   }
 
   private async flag(manager: EntityManager, purchaseId: string): Promise<void> {
