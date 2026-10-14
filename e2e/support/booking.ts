@@ -48,4 +48,26 @@ export async function payPlan(ui: Ui, outcome: 'Aprobar' | 'Rechazar' = 'Aprobar
   await settlePayment(ui, outcome);
 }
 
-export const approvedTitle = (page: Page) => page.getByText('¡Listo! Tu pago fue aprobado.');
+// Contrata un plan con débito automático (D96) y lo autoriza en el simulador: queda en "Débito automático activo".
+export async function authorizeAutoDebit(ui: Ui, slug: string): Promise<void> {
+  const { page } = ui;
+  await ui.visit(`/checkout/plan/${slug}`);
+  await expect(page.getByRole('heading', { level: 1, name: 'Confirmá tu plan.' })).toBeVisible();
+  // Un clic antes de que React hidrate no deja elegida la opción.
+  const activate = page.getByRole('button', { name: 'Activar débito automático' });
+  await expect(async () => {
+    await page.getByRole('radio', { name: 'Débito automático' }).check();
+    await expect(activate).toBeVisible({ timeout: 2_000 });
+  }).toPass();
+  await ui.expectFits();
+  await activate.click();
+  await page.waitForURL(/\/checkout\/simulado\?debito=/);
+  await expect(page.getByText('Simulador de débito automático (desarrollo)')).toBeVisible();
+  await ui.expectFits();
+  await page.getByRole('button', { name: 'Autorizar', exact: true }).click();
+  await page.waitForURL(/\/checkout\/resultado\?debito=/);
+  await expect(page.getByText('Débito automático activo', { exact: true })).toBeVisible();
+  await ui.expectFits();
+}
+
+export const approvedTitle =(page: Page) => page.getByText('¡Listo! Tu pago fue aprobado.');
