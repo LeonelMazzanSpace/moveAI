@@ -27,7 +27,8 @@
     "migration:revert": "nest build && typeorm migration:revert -d dist/database/data-source.js",
     "migration:show": "nest build && typeorm migration:show -d dist/database/data-source.js",
     "seed": "nest build && node dist/database/seed.js",
-    "user:create-staff": "nest build && node dist/cli/create-staff.js"
+    "user:create-staff": "nest build && node dist/cli/create-staff.js",
+    "emails:preview": "nest build && node dist/cli/emails-preview.js"
   },
   "dependencies": {
     "@date-fns/tz": "1.5.0",
