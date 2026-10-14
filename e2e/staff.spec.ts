@@ -351,4 +351,24 @@ test.describe('Staff', () => {
     await page.getByRole('button', { name: 'Guardar' }).click();
     await expect(page.getByText('Reglas guardadas.')).toBeVisible();
   });
+
+  test('configuración: cada pestaña entra en pantalla', async ({ page, ui }) => {
+    const tabs = page.getByRole('navigation', { name: 'Secciones de configuración' });
+    const sections = [
+      { tab: 'planes', label: 'Planes', content: page.getByRole('button', { name: 'Nuevo plan' }) },
+      { tab: 'horarios', label: 'Horarios', content: page.getByRole('button', { name: 'Nuevo horario' }) },
+      { tab: 'profesionales', label: 'Profesionales', content: page.getByLabel('Nombre del profesional') },
+      { tab: 'reglas', label: 'Reglas', content: page.getByText('Valores provisorios — confirmar con MOVE') },
+      { tab: 'contacto', label: 'Contacto', content: page.getByLabel('Email para avisos del staff') },
+      { tab: 'calendario', label: 'Calendario', content: page.getByText('Falta configurar Google en el servidor', { exact: false }) },
+    ];
+    for (const section of sections) {
+      await ui.visit(`/staff/configuracion?tab=${section.tab}`);
+      await expect(page.getByRole('heading', { level: 1, name: 'Configuración' })).toBeVisible();
+      await expect(tabs.getByRole('link')).toHaveCount(sections.length);
+      await expect(tabs.getByRole('link', { name: section.label, exact: true })).toHaveAttribute('aria-current', 'page');
+      await expect(section.content).toBeVisible();
+      await ui.expectFits();
+    }
+  });
 });

@@ -62,4 +62,21 @@ test.describe('Área de clientes', () => {
     const alert = alerts.find((item) => item.client.id === client.id);
     expect(alert?.checkin?.painDetail).toBe('Rodilla derecha al hacer sentadillas');
   });
+
+  test('historial y check-in pendiente se abren directo sin scroll horizontal', async ({ page, ui, createClient, staff, login }) => {
+    const client = await createClient({ plan: 'performance-mensual' });
+    await staff.call('POST', '/staff/checkins/send');
+    await login(page, client);
+
+    await ui.visit('/historial');
+    await expect(page.getByRole('heading', { level: 1, name: 'Historial.' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Pagos' })).toBeVisible();
+    await expect(page.getByText('Pago — Plan Mensual · $ 3.900').first()).toBeVisible();
+    await ui.expectFits();
+
+    await ui.visit('/check-in');
+    await expect(page.getByRole('heading', { name: `¿Cómo venís, ${client.firstName}?` })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Enviar respuesta' })).toBeVisible();
+    await ui.expectFits();
+  });
 });

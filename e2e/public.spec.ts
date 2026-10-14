@@ -51,3 +51,27 @@ test.describe('Visitante', () => {
     await expect(page.getByRole('main').getByRole('link', { name: /^Rehab/ })).toHaveAttribute('href', '/rehab#reservar');
   });
 });
+
+test.describe('Pantallas de acceso y checkout sin sesión', () => {
+  test('recuperar, continuar, resultado y simulador sin parámetros entran en pantalla', async ({ page, ui }) => {
+    await ui.visit('/recuperar');
+    await expect(page.getByRole('heading', { level: 1, name: 'Recuperá tu acceso.' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Volver a ingresar' })).toHaveAttribute('href', '/ingresar');
+
+    // Sin sesión, /continuar no redirige: ofrece ingresar.
+    await ui.visit('/continuar');
+    await expect(page.getByText('Tu sesión no está activa.')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Ingresar' })).toHaveAttribute('href', '/ingresar');
+    await ui.expectFits();
+
+    await ui.visit('/checkout/resultado');
+    await expect(page.getByRole('heading', { level: 1, name: 'Tu pago.' })).toBeVisible();
+    await expect(page.getByText('No encontramos la operación')).toBeVisible();
+    await ui.expectFits();
+
+    await ui.visit('/checkout/simulado');
+    await expect(page.getByText('No encontramos la operación')).toBeVisible();
+    await expect(page.getByText('Falta la referencia del pago.')).toBeVisible();
+    await ui.expectFits();
+  });
+});
