@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { addDays, addMonths, businessToday } from '../src/common/time/business-time.js';
 import { seedCatalogAndSchedule } from '../src/database/seed-data.js';
+import { NotificationsService } from '../src/modules/notifications/services/notifications.service.js';
 import { createTestApp, type TestApp } from './utils/app.js';
 import { signUpClient, signUpStaff, type TestAgent } from './utils/auth.js';
 import { resetDb, waitForLockWaiters } from './utils/db.js';
@@ -246,7 +247,9 @@ describe('automatic debit (e2e, simulator)', () => {
       const debit = await startDebit(agent);
       const res = await simulate(debit.externalReference, 'charge_approved');
       expect(res.body.status).toBe('pending');
+      await simulate(debit.externalReference, 'charge_rejected');
       expect(await count('purchases')).toBe(0);
+      expect(await count(`email_logs WHERE template = 'auto-debit-charge-failed'`)).toBe(0);
     });
   });
 
@@ -282,6 +285,7 @@ describe('automatic debit (e2e, simulator)', () => {
       // Cancelling again changes nothing; charges stop and Performance can be bought once again.
       const again = await agent.post(`/api/me/auto-debits/${id}/cancel`).expect(200);
       expect(again.body).toEqual(res.body);
+      expect(await count(`email_logs WHERE idempotency_key = $1`, [`auto-debit-cancelled:${id}`])).toBe(1);
       await simulate(debit.externalReference, 'charge_approved');
       expect(await count('purchases')).toBe(1);
       const planId = await planIdBySlug(ctx.dataSource, 'performance-mensual');
@@ -301,6 +305,7 @@ describe('automatic debit (e2e, simulator)', () => {
       expect(res.body).toMatchObject({ id, status: 'cancelled', cancelReason: 'staff' });
       const after = await staff.get(`/api/staff/clients/${userId}`).expect(200);
       expect(after.body.autoDebits).toEqual([res.body]);
+      expect(await count(`email_logs WHERE idempotency_key = $1`, [`auto-debit-cancelled:${id}`])).toBe(1);
       const subs = await agent.get('/api/me/subscriptions').expect(200);
       expect(subs.body.recoveryPacks).toHaveLength(1);
     });
@@ -329,6 +334,73 @@ describe('automatic debit (e2e, simulator)', () => {
       const res = await simulate(debit.externalReference, 'cancel');
       expect(res.body).toMatchObject({ status: 'cancelled', nextChargeDate: null });
       expect(await debitRow(debit.externalReference)).toMatchObject({ status: 'cancelled', cancelReason: 'provider' });
+      const { id } = await debitRow(debit.externalReference);
+      expect(await count(`email_logs WHERE idempotency_key = $1`, [`auto-debit-cancelled:${id}`])).toBe(1);
+    });
+  });
+
+  describe('emails', () => {
+    const sendSpy = () => vi.spyOn(ctx.app.get(NotificationsService), 'send');
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('emails each rejected charge and leaves the plan as it was', async () => {
+      const { agent, userId } = await signUpClient(ctx.app);
+      const debit = await startDebit(agent);
+      await simulate(debit.externalReference, 'authorize');
+      const send = sendSpy();
+      const res = await simulate(debit.externalReference, 'charge_rejected');
+      expect(res.body).toMatchObject({ status: 'authorized', nextChargeDate: addMonths(today(), 1) });
+      expect(send).toHaveBeenCalledWith(expect.objectContaining({
+        template: 'auto-debit-charge-failed',
+        userId,
+        idempotencyKey: expect.stringMatching(/^auto-debit-charge-failed:sim-/),
+        params: { name: 'Usuario Test', planName: 'Plan Mensual', manageUrl: `${process.env.WEB_URL}/perfil` },
+      }));
+      expect(await count(`email_logs WHERE template = 'auto-debit-charge-failed' AND user_id = $1`, [userId])).toBe(1);
+      expect(await count('purchases')).toBe(1);
+
+      await simulate(debit.externalReference, 'charge_rejected');
+      expect(await count(`email_logs WHERE template = 'auto-debit-charge-failed'`)).toBe(2);
+    });
+
+    it('tells the client until when the cancelled debit paid', async () => {
+      const { agent, userId } = await signUpClient(ctx.app);
+      const debit = await startDebit(agent);
+      await simulate(debit.externalReference, 'authorize');
+      await simulate(debit.externalReference, 'charge_approved');
+      const { id } = await debitRow(debit.externalReference);
+      const send = sendSpy();
+      await agent.post(`/api/me/auto-debits/${id}/cancel`).expect(200);
+      const [y, m, d] = addMonths(addMonths(today(), 1), 1).split('-');
+      expect(send).toHaveBeenCalledWith(expect.objectContaining({
+        template: 'auto-debit-cancelled',
+        userId,
+        idempotencyKey: `auto-debit-cancelled:${id}`,
+        params: { name: 'Usuario Test', planName: 'Plan Mensual', paidUntil: `${d}/${m}/${y}`, manageUrl: `${process.env.WEB_URL}/perfil` },
+      }));
+    });
+
+    it('sends no paid date when the debit was cancelled before any charge', async () => {
+      const { agent } = await signUpClient(ctx.app);
+      const debit = await startDebit(agent);
+      const { id } = await debitRow(debit.externalReference);
+      const send = sendSpy();
+      await agent.post(`/api/me/auto-debits/${id}/cancel`).expect(200);
+      expect(send).toHaveBeenCalledWith(expect.objectContaining({
+        template: 'auto-debit-cancelled', params: expect.objectContaining({ paidUntil: null }),
+      }));
+    });
+
+    it('sends a single cancellation email whoever cancels', async () => {
+      const { agent, userId } = await signUpClient(ctx.app);
+      const debit = await startDebit(agent, 'recovery-paquete-4');
+      await simulate(debit.externalReference, 'authorize');
+      const { id } = await debitRow(debit.externalReference);
+      const { agent: staff } = await signUpStaff(ctx.app, ctx.dataSource);
+      await staff.post(`/api/staff/clients/${userId}/auto-debits/${id}/cancel`).expect(200);
+      await agent.post(`/api/me/auto-debits/${id}/cancel`).expect(200);
+      await simulate(debit.externalReference, 'cancel');
+      expect(await count(`email_logs WHERE template = 'auto-debit-cancelled'`)).toBe(1);
     });
   });
 

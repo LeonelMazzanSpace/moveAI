@@ -176,6 +176,8 @@ describe('automatic debit with Mercado Pago (e2e, fake provider)', () => {
       preapprovals.set(preapprovalId, { ...preapprovals.get(preapprovalId)!, status: 'cancelled' });
       await notify('subscription_preapproval', preapprovalId).expect(200);
       expect(await debitRow(ref)).toMatchObject({ status: 'cancelled', cancelReason: 'provider', nextChargeDate: null });
+      await notify('subscription_preapproval', preapprovalId).expect(200);
+      expect(await count(`email_logs WHERE template = 'auto-debit-cancelled'`)).toBe(1);
       const subs = await agent.get('/api/me/subscriptions').expect(200);
       expect(subs.body.performance).toMatchObject({ endsOn: addMonths(today(), 1) });
     });
@@ -234,12 +236,30 @@ describe('automatic debit with Mercado Pago (e2e, fake provider)', () => {
       expect(await count('purchases')).toBe(1);
     });
 
-    it('records nothing for a rejected charge', async () => {
+    it('emails a rejected charge once, however many times it is notified or reconciled, and records nothing', async () => {
       const { preapprovalId } = await startDebit();
+      authorizeInProvider(preapprovalId);
       chargeInProvider({ chargeId: '9600', preapprovalId, paymentId: '560', status: 'rejected' });
       await notify('subscription_authorized_payment', '9600').expect(200);
+      await notify('subscription_authorized_payment', '9600').expect(200);
+      await app.get(PaymentsService).reconcilePending(new Date());
       expect(await count('purchases')).toBe(0);
       expect(await count('subscriptions')).toBe(0);
+      expect(await count(`email_logs WHERE template = 'auto-debit-charge-failed'`)).toBe(1);
+      expect(await count(`email_logs WHERE idempotency_key = 'auto-debit-charge-failed:9600'`)).toBe(1);
+
+      // Mercado Pago retries the same charge with a new payment: still one email for that charge.
+      chargeInProvider({ chargeId: '9600', preapprovalId, paymentId: '561', status: 'rejected' });
+      await notify('subscription_authorized_payment', '9600').expect(200);
+      expect(await count(`email_logs WHERE template = 'auto-debit-charge-failed'`)).toBe(1);
+    });
+
+    it('does not email a charge that is still being processed', async () => {
+      const { preapprovalId } = await startDebit();
+      chargeInProvider({ chargeId: '9650', preapprovalId, paymentId: '565', status: 'in_process' });
+      await notify('subscription_authorized_payment', '9650').expect(200);
+      expect(await count('email_logs')).toBe(0);
+      expect(await count('purchases')).toBe(0);
     });
 
     // Barrier: a separate transaction holds the debit row, so both notifications and the reconciliation are waiting
@@ -314,6 +334,7 @@ describe('automatic debit with Mercado Pago (e2e, fake provider)', () => {
       const res = await agent.post(`/api/me/auto-debits/${id}/cancel`).expect(502);
       expect(res.body.code).toBe('PAYMENT_PROVIDER_ERROR');
       expect(await debitRow(ref)).toMatchObject({ status: 'authorized' });
+      expect(await count(`email_logs WHERE template = 'auto-debit-cancelled'`)).toBe(0);
     });
 
     it('closes the debit when Mercado Pago refuses because it is already cancelled there', async () => {

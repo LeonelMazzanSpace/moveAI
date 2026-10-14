@@ -244,6 +244,9 @@ export class PaymentsService {
       if (debit.nextChargeDate === null) await this.simulateCharge(debit);
     }
     if (action === 'charge_approved' && debit.status === 'authorized') await this.simulateCharge(debit);
+    if (action === 'charge_rejected' && debit.status === 'authorized') {
+      await this.autoDebits.sendChargeFailed(debit, `sim-${randomUUID()}`);
+    }
     if (action === 'cancel') await this.autoDebits.refresh({ ...preapproval, status: 'cancelled' });
     return this.autoDebits.getStatusByReference(externalReference);
   }
@@ -492,7 +495,8 @@ export class PaymentsService {
     }
   }
 
-  // Returns whether the charge activated a plan. A charge Mercado Pago has not tried to collect yet has no payment.
+  // Returns whether the charge activated a plan. A charge Mercado Pago has not tried to collect yet has no payment;
+  // a declined one only emails the client (one email per charge, whatever Mercado Pago retries).
   private async applyCharge(charge: ProviderAuthorizedPayment): Promise<boolean> {
     const debit = await this.autoDebits.findByPreapprovalId(charge.preapprovalId);
     if (!debit) {
@@ -501,6 +505,7 @@ export class PaymentsService {
     }
     if (!charge.paymentId) return false;
     const payment = await this.mercadoPago.getPayment(charge.paymentId);
+    if (payment.status === 'rejected' || payment.status === 'cancelled') await this.autoDebits.sendChargeFailed(debit, charge.id);
     if (payment.status !== 'approved') return false;
     return this.applyAutoDebitCharge(debit, payment);
   }

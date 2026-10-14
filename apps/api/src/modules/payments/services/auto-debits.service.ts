@@ -6,8 +6,10 @@ import { AppError } from '../../../common/errors/app-error.js';
 import { businessToday } from '../../../common/time/business-time.js';
 import { appConfig } from '../../../config/app.config.js';
 import { mercadoPagoConfig } from '../../../config/mercado-pago.config.js';
+import { displayDate } from '../../bookings/domain/booking-rules.js';
 import type { PlanModel } from '../../catalog/models/plan.model.js';
 import { CatalogService } from '../../catalog/services/catalog.service.js';
+import { NotificationsService } from '../../notifications/services/notifications.service.js';
 import type { PlanSnapshot } from '../../subscriptions/models/subscription.model.js';
 import { SubscriptionsService } from '../../subscriptions/services/subscriptions.service.js';
 import { UsersService } from '../../users/services/users.service.js';
@@ -92,6 +94,7 @@ export class AutoDebitsService {
     private readonly catalog: CatalogService,
     private readonly subscriptions: SubscriptionsService,
     private readonly users: UsersService,
+    private readonly notifications: NotificationsService,
     private readonly mercadoPago: MercadoPagoService,
     @Inject(mercadoPagoConfig.KEY) private readonly config: ConfigType<typeof mercadoPagoConfig>,
     @Inject(appConfig.KEY) private readonly app: ConfigType<typeof appConfig>,
@@ -157,18 +160,19 @@ export class AutoDebitsService {
   }
 
   // D97: cancelling stops the charges; what was already paid stays valid. Mercado Pago is cancelled first, so a debit
-  // is never closed in MOVE while Mercado Pago keeps charging. Cancelling twice changes nothing.
+  // is never closed in MOVE while Mercado Pago keeps charging. Cancelling twice changes nothing (one email).
   async cancel(input: { userId: string; id: string; by: Extract<AutoDebitCancelReason, 'client' | 'staff'> }): Promise<AutoDebitDto> {
     const debit = isUUID(input.id) ? await this.findById(input.id) : null;
     if (!debit || debit.userId !== input.userId) throw new AppError('AUTO_DEBIT_NOT_FOUND');
     if (debit.status !== 'cancelled') {
       if (debit.mpPreapprovalId && !this.config.simulatorEnabled) await this.cancelAtProvider(debit.mpPreapprovalId);
-      await this.markCancelled(this.dataSource.manager, debit.id, input.by);
+      if (await this.markCancelled(this.dataSource.manager, debit.id, input.by)) await this.sendCancelled(debit);
     }
     return toDto(await this.requireById(debit.id));
   }
 
-  // Applies the state Mercado Pago reports. `paused` has no meaning in MOVE: the debit stays authorized (D97).
+  // Applies the state Mercado Pago reports. `paused` has no meaning in MOVE: the debit stays authorized (D97). A
+  // cancellation made in Mercado Pago (by the client there or by Mercado Pago) is emailed like one made in MOVE.
   async refresh(preapproval: ProviderPreapproval): Promise<AutoDebitModel | null> {
     const debit =
       (await this.findByPreapprovalId(preapproval.id)) ??
@@ -185,7 +189,9 @@ export class AutoDebitsService {
         [debit.id, preapproval.nextPaymentDate],
       );
     }
-    if (preapproval.status === 'cancelled') await this.markCancelled(this.dataSource.manager, debit.id, 'provider');
+    if (preapproval.status === 'cancelled' && (await this.markCancelled(this.dataSource.manager, debit.id, 'provider'))) {
+      await this.sendCancelled(debit);
+    }
     return this.requireById(debit.id);
   }
 
@@ -271,6 +277,50 @@ export class AutoDebitsService {
       [externalReference],
     );
     return rows[0] ?? null;
+  }
+
+  // A declined charge: Mercado Pago retries it by itself, so the client gets one email per charge. Never throws.
+  async sendChargeFailed(debit: AutoDebitModel, authorizedPaymentId: string): Promise<void> {
+    try {
+      const user = await this.users.findById(debit.userId);
+      if (!user) return;
+      await this.notifications.send({
+        template: 'auto-debit-charge-failed',
+        to: { email: user.email, name: user.name },
+        userId: user.id,
+        idempotencyKey: `auto-debit-charge-failed:${authorizedPaymentId}`,
+        params: { name: user.name, planName: debit.planName, manageUrl: `${this.app.webUrl}/perfil` },
+      });
+    } catch {
+      this.logger.error(`auto-debit-charge-failed email failed auto debit=${debit.id}`);
+    }
+  }
+
+  // D97: sent once per debit, after it closed; what it already paid stays valid. Never throws.
+  private async sendCancelled(debit: AutoDebitModel): Promise<void> {
+    try {
+      const user = await this.users.findById(debit.userId);
+      if (!user) return;
+      const [{ paidUntil }]: { paidUntil: string | null }[] = await this.dataSource.query(
+        `SELECT max(s.ends_on) AS "paidUntil" FROM subscriptions s JOIN purchases pu ON pu.id = s.purchase_id
+         WHERE pu.auto_debit_id = $1 AND s.deleted_at IS NULL`,
+        [debit.id],
+      );
+      await this.notifications.send({
+        template: 'auto-debit-cancelled',
+        to: { email: user.email, name: user.name },
+        userId: user.id,
+        idempotencyKey: `auto-debit-cancelled:${debit.id}`,
+        params: {
+          name: user.name,
+          planName: debit.planName,
+          paidUntil: paidUntil ? displayDate(paidUntil) : null,
+          manageUrl: `${this.app.webUrl}/perfil`,
+        },
+      });
+    } catch {
+      this.logger.error(`auto-debit-cancelled email failed auto debit=${debit.id}`);
+    }
   }
 
   private async findById(id: string): Promise<AutoDebitModel | null> {
