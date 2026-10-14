@@ -331,6 +331,7 @@ describe('schedule (e2e)', () => {
         professional: null,
         cancelledAt: null,
         booked: 0, present: 0, absent: 0, noShow: 0, cancelled: 0, pendingAttendance: 0,
+        calendarBlocked: false, calendarConflict: false,
       });
       const [row] = await ctx.dataSource.query(`SELECT template_id FROM time_slots WHERE id = $1`, [res.body.id]);
       expect(row.template_id).toBeNull();
