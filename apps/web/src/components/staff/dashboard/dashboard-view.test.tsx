@@ -15,7 +15,7 @@ const COUNTS: AlertCountsDto = {
 
 const slot = (over: Partial<StaffTimeSlotDto>): StaffTimeSlotDto => ({
   id: 's1', service: 'performance', startsAt: '2026-10-13T21:00:00.000Z', endsAt: '2026-10-13T22:00:00.000Z', capacity: 14,
-  professional: null, cancelledAt: null, booked: 12, present: 8, absent: 1, noShow: 1, cancelled: 1, pendingAttendance: 2, ...over,
+  professional: null, cancelledAt: null, calendarBlocked: false, calendarConflict: false, booked: 12, present: 8, absent: 1, noShow: 1, cancelled: 1, pendingAttendance: 2, ...over,
 });
 
 const DASHBOARD: DashboardDto = {

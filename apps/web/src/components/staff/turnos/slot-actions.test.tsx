@@ -15,7 +15,7 @@ const { CancelBookingDialog, SlotActions } = await import('./slot-actions');
 
 const SLOT: StaffTimeSlotDto = {
   id: 's1', service: 'performance', startsAt: '2026-10-12T22:00:00.000Z', endsAt: '2026-10-12T23:00:00.000Z', capacity: 14,
-  professional: null, cancelledAt: null, booked: 12, present: 0, absent: 0, noShow: 0, cancelled: 0, pendingAttendance: 12,
+  professional: null, cancelledAt: null, calendarBlocked: false, calendarConflict: false, booked: 12, present: 0, absent: 0, noShow: 0, cancelled: 0, pendingAttendance: 12,
 };
 
 const BOOKING: RosterItemDto = {

@@ -27,9 +27,10 @@ export type AutoDebitStatus = 'pending' | 'authorized' | 'cancelled';
 export type AutoDebitCancelReason = 'client' | 'staff' | 'provider' | 'expired';
 export type AutoDebitFrequencyType = 'months' | 'days';
 export type PaymentOrigin = 'one_time' | 'auto_debit';
+export type CalendarConnectionStatus = 'disconnected' | 'connected' | 'needs_reconnect';
 export type JobName =
   | 'followup-detect' | 'checkins-monthly' | 'expiry-reminders'
-  | 'generate-slots' | 'expire-holds' | 'reconcile-payments';
+  | 'generate-slots' | 'expire-holds' | 'reconcile-payments' | 'booking-reminders';
 
 export type ErrorCode =
   | 'VALIDATION_FAILED' | 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'INTERNAL_ERROR'
@@ -42,7 +43,8 @@ export type ErrorCode =
   | 'PURCHASE_NOT_FOUND' | 'INVALID_SIGNATURE' | 'PAYMENT_PROVIDER_ERROR'
   | 'CLIENT_NOT_FOUND' | 'ALERT_NOT_FOUND' | 'ALERT_ALREADY_HANDLED' | 'PAUSE_ALREADY_ACTIVE' | 'NO_ACTIVE_PAUSE'
   | 'CHECKIN_NOT_FOUND' | 'CHECKIN_ALREADY_ANSWERED' | 'JOB_UNKNOWN'
-  | 'AUTO_DEBIT_NOT_ALLOWED' | 'AUTO_DEBIT_ACTIVE' | 'AUTO_DEBIT_NOT_FOUND';
+  | 'AUTO_DEBIT_NOT_ALLOWED' | 'AUTO_DEBIT_ACTIVE' | 'AUTO_DEBIT_NOT_FOUND'
+  | 'CALENDAR_NOT_CONFIGURED' | 'CALENDAR_NOT_CONNECTED' | 'CALENDAR_INVALID_CALENDAR' | 'CALENDAR_PROVIDER_ERROR';
 
 export interface ApiErrorBody {
   statusCode: number;
@@ -102,9 +104,15 @@ export interface AvailabilityDayDto { date: string; available: number; }
 
 export interface StaffTimeSlotDto {
   id: string; service: Service; startsAt: string; endsAt: string; capacity: number; professional: SlotProfessional | null;
-  cancelledAt: string | null;
+  cancelledAt: string | null; calendarBlocked: boolean; calendarConflict: boolean;
   booked: number; present: number; absent: number; noShow: number; cancelled: number; pendingAttendance: number;
 }
+
+export interface CalendarStatusDto {
+  configured: boolean; status: CalendarConnectionStatus; accountEmail: string | null;
+  calendarId: string | null; calendarName: string | null; lastPushAt: string | null; lastPullAt: string | null;
+}
+export interface GoogleCalendarOptionDto { id: string; name: string; primary: boolean; }
 
 export interface SubscriptionDto {
   id: string; planId: string; planName: string; service: 'performance'; startsOn: string; endsOn: string;
