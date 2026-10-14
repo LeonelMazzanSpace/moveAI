@@ -29,6 +29,7 @@ const EXISTING_PLAN: PlanDto = {
   featured: false,
   active: true,
   sortOrder: 1,
+  autoDebitEnabled: false,
 };
 
 function renderTab() {
@@ -94,6 +95,7 @@ describe('PlansTab', () => {
       featured: false,
       active: true,
       sortOrder: 0,
+      autoDebitEnabled: false,
     });
     expect(hasNullValue(init.body)).toBe(false);
     expect(Object.keys(init.body)).not.toContain('periodDays');
@@ -121,6 +123,7 @@ describe('PlansTab', () => {
       featured: false,
       active: true,
       sortOrder: 0,
+      autoDebitEnabled: false,
     });
     expect(hasNullValue(body)).toBe(false);
   });
@@ -150,6 +153,7 @@ describe('PlansTab', () => {
       featured: false,
       active: true,
       sortOrder: 0,
+      autoDebitEnabled: false,
     });
     expect(hasNullValue(body)).toBe(false);
   });
@@ -177,8 +181,35 @@ describe('PlansTab', () => {
       featured: false,
       active: true,
       sortOrder: 0,
+      autoDebitEnabled: false,
     });
     expect(hasNullValue(body)).toBe(false);
+  });
+
+  it('sends autoDebitEnabled: true when the checkbox is ticked while editing a plan', async () => {
+    renderTab();
+    await userEvent.click(await screen.findByRole('button', { name: 'Editar' }));
+    const dialog = within(await screen.findByRole('dialog'));
+    await userEvent.click(dialog.getByLabelText('Permite débito automático'));
+    await userEvent.click(dialog.getByRole('button', { name: 'Guardar' }));
+
+    await vi.waitFor(() => expect(writeCalls('PATCH')).toHaveLength(1));
+    expect(writeCalls('PATCH')[0][1].body).toEqual(expect.objectContaining({ autoDebitEnabled: true }));
+  });
+
+  it('sends autoDebitEnabled: false when the checkbox of a plan with debit is cleared', async () => {
+    apiFetch.mockImplementation(async (_path: string, init?: { method?: string; body?: Record<string, unknown> }) =>
+      init?.method === 'PATCH' ? { ...EXISTING_PLAN, ...init.body } : [{ ...EXISTING_PLAN, autoDebitEnabled: true }],
+    );
+    renderTab();
+    await userEvent.click(await screen.findByRole('button', { name: 'Editar' }));
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByLabelText('Permite débito automático')).toBeChecked();
+    await userEvent.click(dialog.getByLabelText('Permite débito automático'));
+    await userEvent.click(dialog.getByRole('button', { name: 'Guardar' }));
+
+    await vi.waitFor(() => expect(writeCalls('PATCH')).toHaveLength(1));
+    expect(writeCalls('PATCH')[0][1].body).toEqual(expect.objectContaining({ autoDebitEnabled: false }));
   });
 
   it('edits the price of an existing plan without sending null keys', async () => {
@@ -203,6 +234,7 @@ describe('PlansTab', () => {
       featured: false,
       active: true,
       sortOrder: 1,
+      autoDebitEnabled: false,
     });
     expect(hasNullValue(init.body)).toBe(false);
   });
@@ -253,6 +285,7 @@ describe('PlansTab', () => {
         featured: false,
         active: true,
         sortOrder: 1,
+        autoDebitEnabled: false,
       });
       expect(Object.keys(init.body)).not.toContain('durationMinutes');
       expect(Object.keys(init.body)).not.toContain('service');
@@ -290,6 +323,7 @@ describe('PlansTab', () => {
         featured: false,
         active: true,
         sortOrder: 1,
+        autoDebitEnabled: false,
       });
       expect(Object.keys(init.body)).not.toContain('service');
       expect(Object.keys(init.body)).not.toContain('kind');

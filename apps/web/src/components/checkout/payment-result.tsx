@@ -1,6 +1,5 @@
 'use client';
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { EmptyState } from '@/components/move/empty-state';
@@ -12,9 +11,9 @@ import { ApiError } from '@/lib/api/errors';
 import type { PurchaseStatusDto } from '@/lib/api/types';
 import { formatDateLong, formatTime, formatUYU } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { AutoDebitResult } from './auto-debit-result';
+import { MAX_POLL_ATTEMPTS, usePolledStatus } from './use-checkout';
 
-const POLL_INTERVAL_MS = 3000;
-const MAX_ATTEMPTS = 20;
 const CTA_CLASS = moveButton({ size: 'cta' });
 const SECONDARY_CTA_CLASS = moveButton({ variant: 'outline', size: 'cta' });
 
@@ -117,27 +116,12 @@ export function PaymentResultView({ status, timedOut }: PaymentResultViewProps) 
   );
 }
 
-/** Cada consulta cuenta, salga bien o mal: así los errores persistentes también terminan el polling. */
-function attemptsOf(state: { dataUpdateCount: number; errorUpdateCount: number } | undefined): number {
-  return state ? state.dataUpdateCount + state.errorUpdateCount : 0;
-}
-
 function usePurchaseStatus(reference: string) {
-  const queryClient = useQueryClient();
-  const queryKey = ['purchase', reference];
-  const query = useQuery({
-    queryKey,
+  return usePolledStatus({
+    queryKey: ['purchase', reference],
     queryFn: () => apiFetch<PurchaseStatusDto>(`/checkout/purchases/${encodeURIComponent(reference)}`),
-    retry: false,
-    staleTime: 0,
-    refetchInterval: (current) =>
-      current.state.data?.status === 'pending' && attemptsOf(current.state) < MAX_ATTEMPTS ? POLL_INTERVAL_MS : false,
+    isPending: (purchase) => purchase.status === 'pending',
   });
-  // Leer estas marcas suscribe el render a cada respuesta o error, aunque `data` sea idéntico (structural sharing);
-  // sin eso el último intento no vuelve a renderizar y `attempts` queda viejo.
-  void query.dataUpdatedAt;
-  void query.errorUpdatedAt;
-  return { query, attempts: attemptsOf(queryClient.getQueryState(queryKey)) };
 }
 
 function PurchaseStatus({ reference }: { reference: string }) {
@@ -145,7 +129,7 @@ function PurchaseStatus({ reference }: { reference: string }) {
 
   if (purchase.isPending) return <Skeleton className="h-48 rounded" />;
   // Un error del polling no tapa el último estado conocido: la próxima consulta lo corrige.
-  if (purchase.data) return <PaymentResultView status={purchase.data} timedOut={attempts >= MAX_ATTEMPTS} />;
+  if (purchase.data) return <PaymentResultView status={purchase.data} timedOut={attempts >= MAX_POLL_ATTEMPTS} />;
   if (purchase.error instanceof ApiError && purchase.error.code === 'PURCHASE_NOT_FOUND') {
     return <EmptyState title="No encontramos la operación" description="Revisá el link o contactá a MOVE." />;
   }
@@ -153,7 +137,10 @@ function PurchaseStatus({ reference }: { reference: string }) {
 }
 
 export function PaymentResult() {
-  const reference = useSearchParams().get('ref');
+  const params = useSearchParams();
+  const debit = params.get('debito');
+  if (debit) return <AutoDebitResult reference={debit} />;
+  const reference = params.get('ref');
   if (!reference) return <EmptyState title="No encontramos la operación" description="Revisá el link o contactá a MOVE." />;
   return <PurchaseStatus reference={reference} />;
 }

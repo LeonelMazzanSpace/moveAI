@@ -7,7 +7,7 @@ const plan: PlanDto = {
   id: 'p1', service: 'performance', kind: 'period_plan', slug: 'performance-trimestral', name: 'Plan Trimestral',
   description: '', features: ['Asistencias ilimitadas con reserva', 'Ahorrás un 10% vs. mensual'], price: 10500,
   currency: 'UYU', periodMonths: 3, periodDays: null, sessionsIncluded: null, durationMinutes: null,
-  featured: true, active: true, sortOrder: 2,
+  featured: true, active: true, sortOrder: 2, autoDebitEnabled: false,
 };
 
 describe('PlanCard', () => {

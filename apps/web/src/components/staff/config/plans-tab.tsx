@@ -48,6 +48,7 @@ function updateBody(payload: PlanFormPayload, plan: PlanDto): PlanUpdateBody {
     featured: payload.featured,
     active: payload.active,
     sortOrder: payload.sortOrder,
+    autoDebitEnabled: payload.autoDebitEnabled,
   };
 }
 

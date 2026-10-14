@@ -11,6 +11,7 @@ import { applyFieldErrors } from '@/lib/api/field-errors';
 import type { PlanDto, Service } from '@/lib/api/types';
 import { SERVICE_LABEL } from '@/lib/format';
 import {
+  AUTO_DEBIT_KINDS,
   emptyPlanFormValues,
   KIND_FIELDS,
   KIND_LABEL,
@@ -37,6 +38,7 @@ const PLAN_FIELDS: readonly (keyof PlanFormInput)[] = [
   'sortOrder',
   'featured',
   'active',
+  'autoDebitEnabled',
 ];
 
 interface PlanFormProps {
@@ -172,7 +174,7 @@ export function PlanForm({ mode, plan, submitting = false, onSubmit, onCancel }:
           />
         </FormField>
       </div>
-      <div className="flex gap-6">
+      <div className="flex flex-wrap gap-x-6 gap-y-3">
         <Label htmlFor={id('featured')} className="text-sm">
           <input id={id('featured')} type="checkbox" className={CHECKBOX_CLASS} {...register('featured')} />
           Destacado
@@ -181,6 +183,12 @@ export function PlanForm({ mode, plan, submitting = false, onSubmit, onCancel }:
           <input id={id('active')} type="checkbox" className={CHECKBOX_CLASS} {...register('active')} />
           Activo
         </Label>
+        {AUTO_DEBIT_KINDS.includes(kind) ? (
+          <Label htmlFor={id('autoDebitEnabled')} className="text-sm">
+            <input id={id('autoDebitEnabled')} type="checkbox" className={CHECKBOX_CLASS} {...register('autoDebitEnabled')} />
+            Permite débito automático
+          </Label>
+        ) : null}
       </div>
       <div className="flex justify-end gap-3 pt-2">
         {onCancel ? (

@@ -61,6 +61,9 @@ const ERROR_MESSAGES: Record<ErrorCode, string> = {
   CHECKIN_NOT_FOUND: 'El check-in no existe.',
   CHECKIN_ALREADY_ANSWERED: 'Este check-in ya fue respondido.',
   JOB_UNKNOWN: 'La automatización no existe.',
+  AUTO_DEBIT_NOT_ALLOWED: 'Este plan no tiene débito automático.',
+  AUTO_DEBIT_ACTIVE: 'Ya tenés un débito automático activo para este servicio.',
+  AUTO_DEBIT_NOT_FOUND: 'No encontramos ese débito automático.',
 };
 
 export function errorMessage(error: unknown): string {

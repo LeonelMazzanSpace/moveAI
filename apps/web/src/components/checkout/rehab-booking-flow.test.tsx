@@ -19,7 +19,7 @@ const { RehabBookingFlow } = await import('./rehab-booking-flow');
 const plan: PlanDto = {
   id: 'plan-eval', service: 'rehab', kind: 'evaluation', slug: 'rehab-evaluacion', name: 'Evaluación y Diagnóstico',
   description: '', features: [], price: 1800, currency: 'UYU', periodMonths: null, periodDays: null,
-  sessionsIncluded: null, durationMinutes: 60, featured: false, active: true, sortOrder: 1,
+  sessionsIncluded: null, durationMinutes: 60, featured: false, active: true, sortOrder: 1, autoDebitEnabled: false,
 };
 const settings: PublicSettingsDto = { cancelLimitHours: 2, bookingWindowDays: 14 };
 const today = businessTodayWeb();

@@ -9,9 +9,9 @@ import { ErrorState } from '@/components/move/error-state';
 import { BUTTON_OUTLINE, BUTTON_PRIMARY, FormField, SELECT_CLASS } from '@/components/staff/form-primitives';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api/client';
-import type { Paginated, PaymentMethod, PurchaseStatus, StaffPaymentDto } from '@/lib/api/types';
+import type { Paginated, PaymentMethod, PaymentOrigin, PurchaseStatus, StaffPaymentDto } from '@/lib/api/types';
 import { ManualPaymentDialog } from './manual-payment-dialog';
-import { METHOD_LABEL, PaymentsTable } from './payments-table';
+import { METHOD_LABEL, ORIGIN_PARAM, originFromParam, PaymentsTable } from './payments-table';
 
 export const PAGE_SIZE = 20;
 
@@ -20,9 +20,16 @@ export type PaymentStatusFilter = Extract<PurchaseStatus, 'approved' | 'pending'
 export interface PaymentFilters {
   status: PaymentStatusFilter | null;
   method: PaymentMethod | null;
+  origin: PaymentOrigin | null;
   needsAttention: boolean;
   page: number;
 }
+
+const ORIGIN_OPTIONS: { value: PaymentOrigin; label: string }[] = [
+  { value: 'one_time', label: 'Pago único' },
+  { value: 'auto_debit', label: 'Débito automático' },
+];
+
 
 const STATUS_OPTIONS: { value: PaymentStatusFilter; label: string }[] = [
   { value: 'approved', label: 'Aprobados' },
@@ -43,6 +50,7 @@ function pageHref(filters: PaymentFilters): string {
   const params = new URLSearchParams();
   if (filters.status) params.set('estado', filters.status);
   if (filters.method) params.set('metodo', filters.method);
+  if (filters.origin) params.set('origen', ORIGIN_PARAM[filters.origin]);
   if (filters.needsAttention) params.set('atencion', '1');
   if (filters.page > 1) params.set('pagina', String(filters.page));
   const search = params.toString();
@@ -60,6 +68,7 @@ export function PaymentsView({ filters }: { filters: PaymentFilters }) {
         query: {
           status: filters.status ?? undefined,
           method: filters.method ?? undefined,
+          origin: filters.origin ?? undefined,
           needsAttention: filters.needsAttention ? true : undefined,
           page: filters.page,
           pageSize: PAGE_SIZE,
@@ -104,6 +113,23 @@ export function PaymentsView({ filters }: { filters: PaymentFilters }) {
                 {METHODS.map((method) => (
                   <option key={method} value={method}>
                     {METHOD_LABEL[method]}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          </div>
+          <div className="w-44">
+            <FormField id={`${uid}-origin`} label="Origen">
+              <select
+                id={`${uid}-origin`}
+                className={SELECT_CLASS}
+                value={filters.origin ? ORIGIN_PARAM[filters.origin] : ''}
+                onChange={(event) => navigate({ origin: originFromParam(event.target.value) })}
+              >
+                <option value="">Todos</option>
+                {ORIGIN_OPTIONS.map((option) => (
+                  <option key={option.value} value={ORIGIN_PARAM[option.value]}>
+                    {option.label}
                   </option>
                 ))}
               </select>
