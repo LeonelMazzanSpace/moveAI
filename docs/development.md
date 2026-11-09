@@ -110,7 +110,7 @@ Entorno propio, sin archivos `.env` (D61): base `move_e2e`, API en `:3150` (modo
 
 ```bash
 set -a; source apps/api/.env.example; set +a                 # o exportarlas a mano (NODE_ENV no hace falta)
-unset NODE_ENV
+unset NODE_ENV                                               # NODE_ENV no hace falta: la API de E2E y los scripts de la web lo fijan solos
 read -rs E2E_STAFF_PASSWORD && export E2E_STAFF_PASSWORD     # contraseña del staff de E2E (mínimo 8 caracteres)
 read -rs E2E_CLIENT_PASSWORD && export E2E_CLIENT_PASSWORD   # contraseña de los clientes que crean las pruebas
 pnpm exec playwright install chromium                        # una sola vez
