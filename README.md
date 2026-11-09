@@ -43,6 +43,47 @@ El `.env.example` de la API trae valores de desarrollo. Sin credenciales de prov
 | API | `TRUST_PROXY_HOPS` | Proxies delante de la API cuya entrada de `X-Forwarded-For` se acepta para tomar la IP del cliente: un dígito de 0 a 5, default `0`; `2` detrás del ALB + Nginx de Elastic Beanstalk; nunca `true` (ver [docs/deploy.md](docs/deploy.md)) |
 | Web | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_GOOGLE_ENABLED` | URL de la API (con `/api`) y botón de Google |
 
+## Cómo correr los tests
+
+### Tests unitarios
+
+`pnpm test` corre los tests unitarios de todo el monorepo (API y web, con Vitest; equivale a `pnpm -r run test`). No necesita base de datos. Para una sola app: `pnpm --filter @move/api test` o `pnpm --filter @move/web test`.
+
+### E2E de la API
+
+`pnpm test:e2e` corre los e2e de la API contra Postgres real. Necesita la base de datos levantada con `pnpm db:up` y una base de test dedicada, distinta de la de desarrollo, en `E2E_DATABASE_NAME`:
+
+```bash
+pnpm db:up                                                  # Postgres local en Docker
+docker exec move-postgres createdb -U move move_test        # una sola vez
+E2E_DATABASE_NAME=move_test pnpm test:e2e
+```
+
+Más detalle en [docs/development.md](docs/development.md#tests).
+
+### E2E de la web (Playwright)
+
+`pnpm test:e2e:web` corre las pruebas end to end de la web con Playwright en desktop y mobile; levanta solas la API y la web en los puertos `:3150` y `:3250`, que tienen que estar libres. Necesita:
+
+- La base de datos levantada (`pnpm db:up`).
+- Chromium de Playwright instalado, una sola vez (`pnpm exec playwright install chromium`).
+- La base `move_e2e` preparada con `pnpm e2e:reset`.
+- Las variables de la API de `apps/api/.env.example` en el entorno.
+- `E2E_STAFF_PASSWORD` y `E2E_CLIENT_PASSWORD`.
+
+```bash
+pnpm db:up                                                   # si todavía no está levantada
+set -a; source apps/api/.env.example; set +a                 # variables de la API en el entorno
+unset NODE_ENV
+read -rs E2E_STAFF_PASSWORD && export E2E_STAFF_PASSWORD     # contraseña del staff de E2E (mínimo 8 caracteres)
+read -rs E2E_CLIENT_PASSWORD && export E2E_CLIENT_PASSWORD   # contraseña de los clientes que crean las pruebas
+pnpm exec playwright install chromium                        # una sola vez
+pnpm e2e:reset                                               # recrea move_e2e: migraciones, seed, staff y datos mínimos
+pnpm test:e2e:web                                            # --project=desktop o --project=mobile para una sola
+```
+
+Más detalle en [docs/development.md](docs/development.md#pruebas-end-to-end).
+
 ## Scripts raíz
 
 | Script | Qué hace |
