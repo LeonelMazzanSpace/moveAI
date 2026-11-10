@@ -44,7 +44,7 @@ export function ServiceCards() {
     <div className="mt-12 grid gap-6 md:grid-cols-3">
       {SERVICES.map((service) => (
         <div key={service.label} className="flex flex-col rounded border border-border bg-card p-7">
-          <span className="text-[11px] font-medium uppercase tracking-[0.3em] text-muted-foreground">{service.label}</span>
+          <span className="text-[11px] font-medium uppercase tracking-[0.3em] text-brand">{service.label}</span>
           <h3 className="mt-4 font-display text-2xl font-extrabold uppercase leading-tight">{service.title}</h3>
           <p className="mt-4 flex-1 text-sm leading-relaxed text-muted-foreground">{service.description}</p>
           <Link
