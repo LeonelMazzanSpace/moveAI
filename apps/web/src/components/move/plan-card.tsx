@@ -37,7 +37,7 @@ export function PlanCard({ plan, ctaHref, ctaLabel, unitLabel }: PlanCardProps) 
   const features = plan.features.filter((feature) => !HIDDEN_TEXT.test(feature));
 
   return (
-    <div className={cn('relative rounded border bg-card p-7', plan.featured ? 'border-foreground' : 'border-border')}>
+    <div className={cn('relative rounded border bg-card p-7', plan.featured ? 'border-primary' : 'border-border')}>
       {plan.featured ? (
         <span className="absolute -top-3 left-6 rounded bg-primary px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-primary-foreground">
           {featuredTag(plan)}

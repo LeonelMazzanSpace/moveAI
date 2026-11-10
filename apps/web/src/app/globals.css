@@ -11,6 +11,7 @@
   --font-sans: var(--font-inter);
   --font-heading: var(--font-sans);
   --color-soft: var(--soft);
+  --color-brand: var(--brand);
   --color-success: var(--success);
   --color-success-muted: var(--success-muted);
   --color-warning: var(--warning);
@@ -96,6 +97,23 @@
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #262626;
   --sidebar-ring: #9a9a9a;
+  --brand: var(--muted-foreground);
+}
+
+/* Red and black public site: re-points the same tokens, so components keep using them. */
+.theme-red {
+  --card: #140a0b;
+  --popover: #140a0b;
+  --soft: #0d0607;
+  --border: #2e1618;
+  --input: #2e1618;
+  --muted: #0d0607;
+  --primary: #e5262d;
+  --primary-foreground: #ffffff;
+  --secondary: #140a0b;
+  --accent: #1d0d0f;
+  --ring: #e5262d;
+  --brand: #ff4047;
 }
 
 @layer base {

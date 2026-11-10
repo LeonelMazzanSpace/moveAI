@@ -10,12 +10,12 @@ async function SessionAwareHeader() {
 
 export default function PublicLayout({ children }: { children: ReactNode }) {
   return (
-    <>
+    <div className="theme-red contents">
       <Suspense fallback={<PublicHeader user={null} />}>
         <SessionAwareHeader />
       </Suspense>
       <main className="flex-1">{children}</main>
       <PublicFooter />
-    </>
+    </div>
   );
 }
