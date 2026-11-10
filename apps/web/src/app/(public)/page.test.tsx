@@ -35,3 +35,19 @@ describe('home page composition', () => {
     expect(blocks.indexOf('account-cta')).toBe(blocks.length - 2);
   });
 });
+
+describe('landing red and black theme', () => {
+  const root = (HomePage as () => ReactElement<{ className?: string }>)();
+
+  it('marks the page with the landing-red class that the theme keys on', () => {
+    expect(root.props.className).toBe('landing-red');
+  });
+
+  it('defines the red tokens for that marker in the theme', async () => {
+    const { readFileSync } = await import('node:fs');
+    const css = readFileSync('src/app/globals.css', 'utf8');
+    const block = /:root:has\(\.landing-red\)\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(block).toMatch(/--primary:\s*#e10600/);
+    expect(block).toMatch(/--brand:\s*#ff3b30/);
+  });
+});

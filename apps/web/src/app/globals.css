@@ -11,6 +11,7 @@
   --font-sans: var(--font-inter);
   --font-heading: var(--font-sans);
   --color-soft: var(--soft);
+  --color-brand: var(--brand);
   --color-success: var(--success);
   --color-success-muted: var(--success-muted);
   --color-warning: var(--warning);
@@ -64,6 +65,7 @@
   --popover: #121212;
   --popover-foreground: #ffffff;
   --soft: #0c0c0c;
+  --brand: #9a9a9a;
   --border: #262626;
   --input: #262626;
   --muted: #0c0c0c;
@@ -96,6 +98,24 @@
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #262626;
   --sidebar-ring: #9a9a9a;
+}
+
+/* Landing (home): red and black. The page renders a `.landing-red` marker; `:has` lets the shared header and footer follow it. */
+:root:has(.landing-red) {
+  --card: #130808;
+  --popover: #130808;
+  --soft: #0d0606;
+  --border: #331414;
+  --input: #331414;
+  --muted: #0d0606;
+  --primary: #e10600;
+  --primary-foreground: #ffffff;
+  --secondary: #130808;
+  --accent: #200a0a;
+  --ring: #ff3b30;
+  --brand: #ff3b30;
+  --sidebar-primary: #e10600;
+  --sidebar-primary-foreground: #ffffff;
 }
 
 @layer base {

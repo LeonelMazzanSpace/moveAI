@@ -29,7 +29,7 @@ async function HomeContact() {
 
 export default function HomePage() {
   return (
-    <>
+    <div className="landing-red">
       <Hero
         size="hero"
         eyebrow="Performance & Rehab · Uruguay"
@@ -39,7 +39,7 @@ export default function HomePage() {
             <br />
             Recuperá
             <br />
-            más rápido.
+            <span className="text-primary">más rápido.</span>
           </>
         }
         description="Entrenamiento y recuperación basados en evidencia. Conocé nuestros servicios, contratá tu plan y reservá online — todo desde una misma plataforma."
@@ -90,6 +90,6 @@ export default function HomePage() {
       <Suspense fallback={null}>
         <HomeContact />
       </Suspense>
-    </>
+    </div>
   );
 }
