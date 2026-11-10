@@ -143,6 +143,12 @@ describe('MobileNav in the staff area', () => {
     expect(within(dialog).getByRole('button', { name: 'Salir' })).toBeInTheDocument();
     expect(within(dialog).getByText('Ana Pérez')).toBeInTheDocument();
   });
+
+  it('keeps the grayscale theme', async () => {
+    renderWithQuery(<StaffTopbar name="Ana Pérez" />);
+    const { dialog } = await openMenu();
+    expect(dialog).not.toHaveClass('theme-red');
+  });
 });
 
 describe('MobileNav in the client area', () => {
@@ -203,6 +209,12 @@ describe('MobileNav in the public area', () => {
     expect(within(dialog).getByRole('link', { name: 'Equipo' })).toHaveAttribute('href', '/#equipo');
     expect(within(dialog).getByRole('link', { name: 'Ingresar' })).toHaveAttribute('href', '/ingresar');
     expect(within(dialog).getByRole('link', { name: 'Reservar' })).toHaveAttribute('href', '/reservar');
+  });
+
+  it('themes the menu panel red, since it renders in a portal outside the public layout', async () => {
+    render(<PublicHeader user={null} />);
+    const { dialog } = await openMenu();
+    expect(dialog).toHaveClass('theme-red');
   });
 
   it('marks only the current public link', async () => {

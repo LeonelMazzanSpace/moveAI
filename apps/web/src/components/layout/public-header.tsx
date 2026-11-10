@@ -66,6 +66,7 @@ export function PublicHeader({ user }: { user: Pick<MeDto, 'role'> | null }) {
             items={PUBLIC_NAV_ITEMS}
             actions={[account, { label: 'Reservar', href: '/reservar', primary: true }]}
             breakpoint="lg"
+            contentClassName="theme-red"
           />
         </div>
       </PageContainer>

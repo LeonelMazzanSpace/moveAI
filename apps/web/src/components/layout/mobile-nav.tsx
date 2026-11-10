@@ -22,10 +22,20 @@ interface MobileNavProps {
   actions?: (NavItem & { primary?: boolean })[];
   footer?: ReactNode;
   className?: string;
+  /** For the menu panel, which renders in a portal outside the layout that scopes a theme class. */
+  contentClassName?: string;
   breakpoint?: NavBreakpoint;
 }
 
-export function MobileNav({ items, alertsTotal = 0, actions = [], footer, className, breakpoint = 'md' }: MobileNavProps) {
+export function MobileNav({
+  items,
+  alertsTotal = 0,
+  actions = [],
+  footer,
+  className,
+  contentClassName,
+  breakpoint = 'md',
+}: MobileNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [openedOn, setOpenedOn] = useState(pathname);
@@ -46,7 +56,7 @@ export function MobileNav({ items, alertsTotal = 0, actions = [], footer, classN
       </DialogTrigger>
       <DialogContent
         showCloseButton={false}
-        className="top-4 max-h-[calc(100dvh-2rem)] -translate-y-0 overflow-y-auto"
+        className={cn('top-4 max-h-[calc(100dvh-2rem)] -translate-y-0 overflow-y-auto', contentClassName)}
       >
         <div className="flex items-center justify-between">
           <DialogTitle className="text-xs font-semibold uppercase tracking-[0.2em]">Menú</DialogTitle>
