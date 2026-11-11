@@ -98,6 +98,19 @@
   --sidebar-ring: #9a9a9a;
 }
 
+/* Landing (home page): red and black. Overrides the theme tokens only inside the wrapper, so other pages keep the white-on-black look. */
+.theme-landing {
+  --primary: #dc2626;
+  --primary-foreground: #ffffff;
+  --ring: #ef4444;
+  --border: #3a1414;
+  --input: #3a1414;
+  --card: #140808;
+  --soft: #0d0505;
+  --muted: #0d0505;
+  --accent: #1f0b0b;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
