@@ -5,7 +5,7 @@ import { expect, test } from './fixtures';
 test.describe('Visitante', () => {
   test('recorre el sitio público con la navegación principal', async ({ page, ui, isMobile }) => {
     await ui.visit('/');
-    await expect(page.getByRole('heading', { level: 1, name: /Movete mejor/ })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: /Movete, Mejor/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Tres áreas. Una experiencia.' })).toBeVisible();
     if (isMobile) {
       await expect(page.getByRole('banner').getByRole('navigation')).toBeHidden();
@@ -19,7 +19,7 @@ test.describe('Visitante', () => {
       { label: 'Rehab', path: '/rehab', heading: /Evaluación y/ },
       { label: 'Recovery', path: '/recovery', heading: /Recuperá/ },
       { label: 'Planes', path: '/planes', heading: 'Elegí tu plan.' },
-      { label: 'Inicio', path: '/', heading: /Movete mejor/ },
+      { label: 'Inicio', path: '/', heading: /Movete, Mejor/ },
     ];
     for (const target of pages) {
       await ui.navigate(target.label);

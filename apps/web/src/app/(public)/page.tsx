@@ -34,13 +34,7 @@ export default function HomePage() {
         size="hero"
         eyebrow="Performance & Rehab · Uruguay"
         title={
-          <>
-            Movete mejor.
-            <br />
-            Recuperá
-            <br />
-            más rápido.
-          </>
+          <>Movete, Mejor</>
         }
         description="Entrenamiento y recuperación basados en evidencia. Conocé nuestros servicios, contratá tu plan y reservá online — todo desde una misma plataforma."
       >
