@@ -98,6 +98,17 @@
   --sidebar-ring: #9a9a9a;
 }
 
+/* Red and black: the home page wraps itself in this class; every other screen keeps the white-on-black theme. */
+.theme-landing {
+  --primary: #dc2626;
+  --primary-foreground: #ffffff;
+  --ring: #dc2626;
+  --card: #140a0a;
+  --soft: #0d0606;
+  --border: #3b1414;
+  --input: #3b1414;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
