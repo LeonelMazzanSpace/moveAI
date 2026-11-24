@@ -33,13 +33,13 @@ export const TEAM_MEMBERS: readonly TeamMember[] = [
   },
   {
     slug: 'gianluca-pasini',
-    name: 'Gianluca Pasini',
+    name: 'Leonel',
     role: 'Entrenador de fuerza y potencia | Co-fundador',
     bio: 'Entrenador especializado en fuerza y potencia, con más de 10 años de experiencia en entrenamiento deportivo y 4 como preparador físico de un equipo de rugby de primera división. Ex jugador de la selección uruguaya de rugby, representó al país en un mundial: conoce desde adentro lo que exige el deporte de elite y lo que significa volver a competir después de una lesión. Hoy también planifica preparación física a online para futbolistas profesionales en Europa. En MOVE dirige el área de entrenamiento, donde trabaja con planificación individualizada, control de cargas y progresión medida —el mismo criterio del alto rendimiento— tanto con atletas como con personas que entrenan para sentirse mejor. Es quien toma el trabajo donde termina la rehabilitación y lo lleva hasta el rendimiento.',
     specialties: ['Fuerza y potencia', 'Readaptación deportiva', 'Alto rendimiento', 'Planificación individualizada'],
     photo: {
       src: '/img/equipo/gianluca-pasini.jpg',
-      alt: 'Gianluca Pasini, entrenador de fuerza y potencia y co-fundador de MOVE®',
+      alt: 'Leonel, entrenador de fuerza y potencia y co-fundador de MOVE®',
     },
   },
   {

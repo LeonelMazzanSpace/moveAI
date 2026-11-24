@@ -370,7 +370,7 @@ Presenta los tres servicios de MOVE y lleva a **Ver planes** o a **Reservar Reco
 
 ![Inicio](img/01-inicio.png)
 
-Más abajo está la sección **Equipo** ("El equipo detrás de MOVE", a la que también lleva **Equipo** en la barra): presenta a Pierina Paladini, Gianluca Pasini y Leandro Olenchuk con su foto, su rol, una biografía breve y sus especialidades. Las fotos y los textos son **fijos** (salen del sitio actual de MOVE, moveperformance.uy) y no se editan desde el panel.
+Más abajo está la sección **Equipo** ("El equipo detrás de MOVE", a la que también lleva **Equipo** en la barra): presenta a Pierina Paladini, Leonel y Leandro Olenchuk con su foto, su rol, una biografía breve y sus especialidades. Las fotos y los textos son **fijos** (salen del sitio actual de MOVE, moveperformance.uy) y no se editan desde el panel.
 
 ![Inicio: Equipo](img/39-inicio-equipo.png)
 

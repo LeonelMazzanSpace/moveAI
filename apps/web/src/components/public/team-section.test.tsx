@@ -15,7 +15,7 @@ describe('TeamSection', () => {
   it('lists the three members in order with their names and roles', () => {
     render(<TeamSection />);
     const headings = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
-    expect(headings).toEqual(['Pierina Paladini', 'Gianluca Pasini', 'Leandro Olenchuk']);
+    expect(headings).toEqual(['Pierina Paladini', 'Leonel', 'Leandro Olenchuk']);
     expect(screen.getByText('Fisioterapeuta deportiva | Co-fundadora')).toBeInTheDocument();
     expect(screen.getByText('Entrenador de fuerza y potencia | Co-fundador')).toBeInTheDocument();
     expect(screen.getByText('Entrenador')).toBeInTheDocument();
@@ -38,7 +38,7 @@ describe('TeamSection', () => {
     render(<TeamSection />);
     const alts = [
       'Pierina Paladini, fisioterapeuta deportiva y co-fundadora de MOVE®',
-      'Gianluca Pasini, entrenador de fuerza y potencia y co-fundador de MOVE®',
+      'Leonel, entrenador de fuerza y potencia y co-fundador de MOVE®',
       'Leandro Olenchuk, entrenador en MOVE®',
     ];
     for (const alt of alts) expect(screen.getByAltText(alt)).toBeInTheDocument();

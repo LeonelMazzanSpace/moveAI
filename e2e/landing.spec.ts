@@ -5,7 +5,7 @@ import { expect, test } from './fixtures';
 
 const TEAM = [
   { name: 'Pierina Paladini', specialty: 'Ecografía músculo-esquelética' },
-  { name: 'Gianluca Pasini', specialty: 'Fuerza y potencia' },
+  { name: 'Leonel', specialty: 'Fuerza y potencia' },
   { name: 'Leandro Olenchuk', specialty: 'Entrenamiento en sala' },
 ];
 
